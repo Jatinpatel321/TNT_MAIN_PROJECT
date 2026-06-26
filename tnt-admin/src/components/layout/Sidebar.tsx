@@ -29,6 +29,7 @@ const navItems = [
   { path: '/security', label: 'Security SOC', icon: ShieldAlert },
   { path: '/backup', label: 'Backup & Recovery', icon: ShieldCheck },
   { path: '/policies', label: 'Policies', icon: Shield },
+  { path: '/health', label: 'Health Monitor', icon: Activity },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 

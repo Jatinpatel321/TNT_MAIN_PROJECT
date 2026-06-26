@@ -276,4 +276,11 @@ export const adminApi = {
 
   changeUserRole: (userId: number, role: string) =>
     api.patch(`/v1/admin/users/${userId}/role`, { role }),
+
+  // System Health Endpoints
+  getSystemHealthMetrics: () =>
+    api.get('/v1/admin/health/metrics'),
+
+  getSystemHealthStatus: () =>
+    api.get('/v1/admin/health/status'),
 };

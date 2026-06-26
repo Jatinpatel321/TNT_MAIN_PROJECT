@@ -32,6 +32,7 @@ const FraudDashboard = lazy(() => import('../pages/fraud/FraudDashboard'));
 const FraudDetail = lazy(() => import('../pages/fraud/FraudDetail'));
 const FraudInvestigation = lazy(() => import('../pages/fraud/FraudInvestigation'));
 const SecurityDashboard = lazy(() => import('../pages/security/SecurityDashboard'));
+const SystemHealth = lazy(() => import('../pages/health/SystemHealth'));
 
 // Page loading fallback
 function PageLoader() {
@@ -161,6 +162,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: 'security', element: <SecurityDashboard /> },
+      { path: 'health', element: <SystemHealth /> },
       { path: 'settings', element: <Settings /> },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
