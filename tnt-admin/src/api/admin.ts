@@ -117,14 +117,43 @@ export const adminApi = {
   getConflicts: () =>
     api.get('/v1/admin/conflicts'),
 
-  // Backup & Restore
-  getBackups: () =>
-    api.get('/v1/admin/backups'),
+  // Backup & Restore — Enhanced
+  getBackupList: (params?: {
+    page?: number;
+    page_size?: number;
+    backup_type?: string;
+    status?: string;
+  }) =>
+    api.get('/v1/admin/backups', { params }),
+
+  getBackupDetail: (id: number) =>
+    api.get(`/v1/admin/backups/${id}`),
 
   triggerBackup: () =>
-    api.post('/v1/admin/backup'),
+    api.post('/v1/admin/backup/run'),
 
-  // Export endpoints
+  deleteBackup: (id: number) =>
+    api.delete(`/v1/admin/backups/${id}`),
+
+  restoreBackup: (backupId: number, confirmPhrase: string) =>
+    api.post('/v1/admin/backup/restore', {
+      backup_id: backupId,
+      confirm_phrase: confirmPhrase,
+    }),
+
+  getStorageStats: () =>
+    api.get('/v1/admin/backup/storage'),
+
+  getSchedulerStatus: () =>
+    api.get('/v1/admin/backup/scheduler'),
+
+  verifyBackup: (id: number) =>
+    api.get(`/v1/admin/backup/verify/${id}`),
+
+  // Legacy aliases
+  getBackups: (params?: { page?: number; page_size?: number }) =>
+    api.get('/v1/admin/backups', { params }),
+
   exportOrders: (params?: { date_from?: string; date_to?: string; status?: string }) =>
     api.get('/v1/admin/export/orders', { params, responseType: 'blob' }),
 
@@ -139,6 +168,23 @@ export const adminApi = {
 
   exportRevenue: (params?: { date_from?: string; date_to?: string }) =>
     api.get('/v1/admin/export/revenue', { params, responseType: 'blob' }),
+
+  getKPIs: (params?: {
+    date_from?: string;
+    date_to?: string;
+    department?: string;
+    vendor_id?: number;
+  }) =>
+    api.get('/v1/admin/analytics/kpis', { params }),
+
+  exportKPIs: (params: {
+    format: 'excel' | 'pdf';
+    date_from?: string;
+    date_to?: string;
+    department?: string;
+    vendor_id?: number;
+  }) =>
+    api.get('/v1/admin/export/kpis', { params, responseType: 'blob' }),
 
   // Holiday & Exam Calendar
   getCalendarEvents: (params?: { year?: number; month?: number; event_type?: string }) =>
@@ -158,4 +204,36 @@ export const adminApi = {
 
   checkCalendarDate: (event_date: string) =>
     api.get('/v1/admin/calendar-events/check-date', { params: { event_date } }),
+
+  // Fraud Detection Endpoints
+  getFraudAlerts: (params?: {
+    page?: number;
+    page_size?: number;
+    alert_type?: string;
+    severity?: string;
+    status?: string;
+    search?: string;
+  }) =>
+    api.get('/v1/admin/fraud/alerts', { params }),
+
+  getFraudAlertDetail: (id: number) =>
+    api.get(`/v1/admin/fraud/alerts/${id}`),
+
+  resolveFraudAlert: (id: number, notes: string) =>
+    api.post(`/v1/admin/fraud/alerts/${id}/resolve`, { notes }),
+
+  markFalsePositive: (id: number, notes: string) =>
+    api.post(`/v1/admin/fraud/alerts/${id}/false-positive`, { notes }),
+
+  blacklistUser: (userId: number) =>
+    api.post(`/v1/admin/fraud/users/${userId}/blacklist`),
+
+  blacklistVendor: (vendorId: number) =>
+    api.post(`/v1/admin/fraud/vendors/${vendorId}/blacklist`),
+
+  triggerFraudScan: () =>
+    api.post('/v1/admin/fraud/scan'),
+
+  getFraudMetrics: () =>
+    api.get('/v1/admin/fraud/metrics'),
 };

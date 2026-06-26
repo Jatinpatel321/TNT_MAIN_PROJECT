@@ -395,6 +395,34 @@ def get_analytics(
     }
 
 
+@router.get("/analytics/kpis", summary="Get aggregated institutional KPIs with filters")
+async def get_kpis(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    vendor_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    from app.modules.admin.kpi_service import KPIService
+    from app.core.redis_cache import cache_service
+
+    # Build cache key based on query filters
+    cache_identifier = f"kpis:from={date_from or 'all'}:to={date_to or 'all'}:dept={department or 'all'}:vendor={vendor_id or 'all'}"
+
+    def fetch_kpis():
+        service = KPIService(db)
+        return service.get_aggregated_kpis(date_from, date_to, department, vendor_id)
+
+    data = await cache_service.get_or_set(
+        category="analytics",
+        identifier=cache_identifier,
+        fetch_func=fetch_kpis,
+        ttl=300
+    )
+    return data
+
+
 # 👥 USER MANAGEMENT
 @router.get("/users", response_model=AdminUserListResponse)
 def list_all_users(
@@ -528,6 +556,42 @@ def export_revenue(
     user=Depends(require_role("admin")),
 ):
     return export_service.export_revenue_csv(db, date_from, date_to)
+
+@router.get("/export/kpis", summary="Export KPIs as PDF or Excel")
+def export_kpis(
+    format: str = Query("excel", regex="^(excel|pdf)$"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    vendor_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    from datetime import datetime
+    from app.modules.admin.kpi_service import KPIService
+    from app.modules.admin.kpi_export_service import generate_kpi_excel, generate_kpi_pdf
+
+    service = KPIService(db)
+    data = service.get_aggregated_kpis(date_from, date_to, department, vendor_id)
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format == "pdf":
+        pdf_buf = generate_kpi_pdf(data)
+        filename = f"tnt_kpi_report_{now_str}.pdf"
+        return StreamingResponse(
+            pdf_buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    else:
+        excel_buf = generate_kpi_excel(data)
+        filename = f"tnt_kpi_report_{now_str}.xlsx"
+        return StreamingResponse(
+            excel_buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
 
 
 # 🏛 POLICIES

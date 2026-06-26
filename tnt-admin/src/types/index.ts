@@ -327,3 +327,132 @@ export interface PaginatedResponse<T> {
   size: number;
   pages: number;
 }
+
+// ─── Institutional KPIs ──────────────────────────────────────────────────────────
+export interface KPIData {
+  filters: {
+    date_from: string;
+    date_to: string;
+    department: string | null;
+    vendor_id: number | null;
+  };
+  university_kpis: {
+    total_orders: number;
+    food_orders: number;
+    stationery_orders: number;
+    daily_trend: Array<{ date: string; count: number }>;
+    weekly_trend: Array<{ date: string; count: number }>;
+    monthly_trend: Array<{ date: string; count: number }>;
+  };
+  operational_kpis: {
+    avg_waiting_time_minutes: number;
+    queue_reduction_pct: number;
+    avg_pickup_time_minutes: number;
+    slot_utilization_pct: number;
+    vendor_performance: Array<{
+      vendor_id: number;
+      vendor_name: string;
+      orders_count: number;
+      completion_rate: number;
+      avg_wait_minutes: number;
+      rating: number;
+    }>;
+  };
+  business_kpis: {
+    revenue_inr: number;
+    refunds_inr: number;
+    cancellation_rate_pct: number;
+    user_growth_count: number;
+    vendor_growth_count: number;
+  };
+  engagement_kpis: {
+    active_users: number;
+    returning_users: number;
+    peak_hours: number[];
+    heatmap_grid: Record<number, Record<number, number>>;
+    vouchers_redeemed_count: number;
+    points_redeemed: number;
+  };
+}
+
+// ─── Fraud Detection ──────────────────────────────────────────────────────────
+export interface FraudAlert {
+  id: number;
+  user_id?: number;
+  vendor_id?: number;
+  order_id?: number;
+  alert_type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  score: number;
+  description?: string;
+  status: 'pending' | 'resolved' | 'false_positive';
+  resolution_notes?: string;
+  created_at: string;
+  updated_at: string;
+  user_phone?: string;
+  user_name?: string;
+  vendor_name?: string;
+}
+
+export interface FraudAlertListResponse {
+  alerts: FraudAlert[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface FraudMetrics {
+  summary: {
+    total_alerts: number;
+    pending_alerts: number;
+    resolved_alerts: number;
+    false_positives: number;
+    critical_alerts: number;
+    blacklisted_users: number;
+    blacklisted_vendors: number;
+  };
+  severity_distribution: {
+    low: number;
+    medium: number;
+    high: number;
+    critical: number;
+  };
+  type_distribution: Record<string, number>;
+  recent_activity: Array<{
+    id: number;
+    alert_type: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    user_name: string;
+    created_at: string;
+    status: 'pending' | 'resolved' | 'false_positive';
+  }>;
+}
+
+export interface FraudAlertDetailResponse {
+  alert: FraudAlert;
+  user?: {
+    id: number;
+    name: string;
+    phone: string;
+    role: string;
+    is_active: boolean;
+    created_at: string;
+    cumulative_fraud_score: number;
+  };
+  vendor?: {
+    id: number;
+    name: string;
+    phone: string;
+    status: string;
+    is_active: boolean;
+  };
+  order?: {
+    id: number;
+    status: string;
+    total_amount: number;
+    created_at: string;
+    booking_type: string;
+  };
+}
+

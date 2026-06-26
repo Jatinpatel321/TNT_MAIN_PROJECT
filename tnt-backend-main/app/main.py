@@ -19,6 +19,7 @@ from app.database.init_db import init_db
 from app.database.session import engine
 from app.api.v1 import api_v1_router
 from app.modules.orders.lifecycle_simulator import order_lifecycle_simulator
+from app.modules.backup.backup_scheduler import start_scheduler, stop_scheduler
 
 from fastapi import Response
 from starlette.requests import Request
@@ -37,10 +38,17 @@ async def lifespan(app: FastAPI):
     if settings.APP_ENV != "production" and "pytest" not in sys.modules:
         await order_lifecycle_simulator.start()
 
+    # Start backup scheduler (gracefully skips if APScheduler not installed)
+    import sys as _sys
+    if "pytest" not in _sys.modules:
+        start_scheduler()
+
     yield
 
     if settings.APP_ENV != "production" and "pytest" not in sys.modules:
         await order_lifecycle_simulator.stop()
+
+    stop_scheduler()
 
 
 app = FastAPI(title="TNT – Tap N Take", lifespan=lifespan)
@@ -247,6 +255,8 @@ from app.modules.admin.router import router as admin_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.auditlog.router import router as audit_log_router
 from app.modules.ai_intelligence.router import router as ai_router
+from app.modules.fraud.router import router as fraud_router
+from app.modules.backup.router import router as backup_router
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.refresh_router import router as refresh_router
 from app.modules.cart.router import checkout_router, router as cart_router
@@ -293,6 +303,8 @@ from app.modules.search.router import router as search_router
 from app.ml.router import router as ml_router
 
 app.include_router(auth_router, deprecated=True)
+app.include_router(fraud_router, deprecated=True)
+app.include_router(backup_router, deprecated=True)
 app.include_router(refresh_router, deprecated=True)
 app.include_router(users_router, deprecated=True)
 app.include_router(profile_router, deprecated=True)

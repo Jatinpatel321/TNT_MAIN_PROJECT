@@ -13,6 +13,7 @@ import { RevenueBarChart } from '../../components/charts/RevenueBarChart';
 import { ExportButton } from '../../components/ExportButton';
 import ConflictWidget from '../../components/ConflictWidget';
 import { useAdminAnalytics } from '../../hooks/useAdminAnalytics';
+import { KPIDashboard } from '../../components/dashboard/KPIDashboard';
 import { adminApi } from '../../api/admin';
 import { aiApi } from '../../api/ai';
 import { vendorsApi } from '../../api/vendors';
@@ -77,6 +78,7 @@ export default function Dashboard() {
   }
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'kpis'>('overview');
 
   const fetchLiveOrders = useCallback(async () => {
     try {
@@ -233,7 +235,37 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ─── Row 1: Stat Cards (Hero Section) ────────────────── */}
+      {/* Tabs */}
+      <div className="flex border-b border-[#E5E7EB] gap-6">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={cn(
+            "pb-3 text-sm font-bold border-b-2 px-1 transition-all",
+            activeTab === 'overview'
+              ? "border-[#4F46E5] text-[#4F46E5]"
+              : "border-transparent text-[#6B7280] hover:text-[#111827]"
+          )}
+        >
+          Live Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('kpis')}
+          className={cn(
+            "pb-3 text-sm font-bold border-b-2 px-1 transition-all",
+            activeTab === 'kpis'
+              ? "border-[#4F46E5] text-[#4F46E5]"
+              : "border-transparent text-[#6B7280] hover:text-[#111827]"
+          )}
+        >
+          Institutional KPIs
+        </button>
+      </div>
+
+      {activeTab === 'kpis' ? (
+        <KPIDashboard />
+      ) : (
+        <>
+          {/* ─── Row 1: Stat Cards (Hero Section) ────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           title="Total Users"
@@ -603,6 +635,8 @@ export default function Dashboard() {
           <ConflictWidget />
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

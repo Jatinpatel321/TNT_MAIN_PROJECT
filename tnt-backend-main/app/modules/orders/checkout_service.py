@@ -142,6 +142,7 @@ def checkout_order_for_user(
 
     # ── Automated fraud detection ──────────────────────────────────────
     from app.modules.fraud.fraud_rules import run_fraud_checks
+    from app.modules.fraud.fraud_detection_service import FraudDetectionService
     from app.core.time_utils import utcnow_naive as _utcnow
 
     fraud_reason = run_fraud_checks(order, db)
@@ -150,6 +151,13 @@ def checkout_order_for_user(
         order.fraud_reason = fraud_reason
         order.flagged_at = _utcnow()
         logger.info("auto_fraud_flag order_id=%s reason=%s", order.id, fraud_reason)
+
+    # Run complete fraud detection service to log structured database alerts
+    try:
+        db.flush()
+        FraudDetectionService.run_all_detectors_for_order(db, order)
+    except Exception as e:
+        logger.error("checkout_fraud_service_error order_id=%s err=%s", order.id, str(e))
     # ───────────────────────────────────────────────────────────────────
 
     congestion_factor = slot.congestion_level if hasattr(slot, "congestion_level") else 0

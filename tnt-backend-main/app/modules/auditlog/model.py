@@ -9,7 +9,7 @@ from app.database.base import Base
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
 
     # Actor
     actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

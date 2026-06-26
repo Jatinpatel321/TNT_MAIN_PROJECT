@@ -26,6 +26,8 @@ import app.modules.admin.model  # noqa
 import app.modules.recommendations.models  # noqa
 import app.modules.calendar.model  # noqa
 import app.modules.auditlog.model  # noqa
+import app.modules.fraud.model  # noqa
+import app.modules.backup.models  # noqa
 
 # ── FORCE IMPORT MODELS ─────────────────────────────────────────────────────
 import app.modules.users.model  # noqa

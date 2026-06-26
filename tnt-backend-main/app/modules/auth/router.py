@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -89,6 +89,7 @@ async def send_otp(
 @router.post("/verify-otp")
 def verify_otp_login(
     body: VerifyOTPRequest,
+    request: Request,
     db: Session = Depends(get_db),
     _rl: None = Depends(login_rate_limiter),
 ):
@@ -97,6 +98,19 @@ def verify_otp_login(
 
     if not verify_otp(phone_normalized, body.otp):
         observability.record_otp_attempt(success=False)
+        try:
+            from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+            write_audit_log(
+                db=db,
+                action=AuditAction.LOGIN_FAILED,
+                action_category=AuditCategory.AUTH,
+                entity_type="User",
+                metadata={"phone": phone_normalized},
+                request=request
+            )
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
 
     observability.record_otp_attempt(success=True)
@@ -127,6 +141,22 @@ def verify_otp_login(
             user.phone = phone_normalized
             db.commit()
             db.refresh(user)
+
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.LOGIN_SUCCESS,
+            action_category=AuditCategory.AUTH,
+            actor_id=user.id,
+            actor_role=user.role.value,
+            entity_type="User",
+            entity_id=str(user.id),
+            request=request
+        )
+        db.commit()
+    except Exception:
+        pass
 
     expires_minutes = settings.JWT_EXPIRY_MINUTES if hasattr(settings, "JWT_EXPIRY_MINUTES") else 1440
     token = create_access_token(

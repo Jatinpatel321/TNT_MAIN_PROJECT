@@ -26,3 +26,7 @@ tzdata
 # --- Admin TOTP 2FA ---
 pyotp==2.9.0
 qrcode[pil]==7.4.2
+# --- Backup Scheduler ---
+apscheduler==3.10.4
+pg8000
+

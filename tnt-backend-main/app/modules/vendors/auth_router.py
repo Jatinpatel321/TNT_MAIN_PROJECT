@@ -17,7 +17,7 @@ DELETE /vendor/staff/{id}    — Delete staff member (owner only)
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
@@ -81,6 +81,7 @@ def register(
 @router.post("/login", response_model=VendorLoginResponse)
 def login(
     body: VendorLoginRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Authenticate as vendor owner or staff.
@@ -93,11 +94,13 @@ def login(
             phone=body.staff_phone,
             password=body.password,
             db=db,
+            request=request,
         )
     return login_as_vendor_owner(
         vendor_id=body.vendor_id,
         password=body.password,
         db=db,
+        request=request,
     )
 
 

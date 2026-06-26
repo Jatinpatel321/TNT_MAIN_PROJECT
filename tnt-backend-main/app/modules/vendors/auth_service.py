@@ -25,7 +25,7 @@ import uuid
 from datetime import timedelta
 from typing import Any, Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 import bcrypt as _bcrypt_lib
@@ -248,13 +248,41 @@ def login_as_vendor_owner(
     vendor_id: int,
     password: str,
     db: Session,
+    request: Optional[Request] = None,
 ) -> dict:
     """Authenticate a vendor owner by vendor_id + password."""
     vendor = db.query(Vendor).filter(Vendor.vendor_id == vendor_id).first()
     if not vendor:
+        try:
+            from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+            write_audit_log(
+                db=db,
+                action=AuditAction.LOGIN_FAILED,
+                action_category=AuditCategory.AUTH,
+                entity_type="Vendor",
+                metadata={"vendor_id": vendor_id},
+                request=request
+            )
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail="Invalid vendor ID or password")
 
     if not _verify_password(password, vendor.password_hash):
+        try:
+            from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+            write_audit_log(
+                db=db,
+                action=AuditAction.LOGIN_FAILED,
+                action_category=AuditCategory.AUTH,
+                entity_type="Vendor",
+                actor_id=vendor.owner_id,
+                metadata={"vendor_id": vendor_id},
+                request=request
+            )
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail="Invalid vendor ID or password")
 
     if vendor.status == VendorStatus.SUSPENDED:
@@ -265,6 +293,22 @@ def login_as_vendor_owner(
     access_token = _create_access_token(vendor.vendor_id, "vendor_owner")
     refresh_token, jti = _create_refresh_token(vendor.vendor_id, "vendor_owner")
     _store_refresh_jti(jti, vendor.vendor_id)
+
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.LOGIN_SUCCESS,
+            action_category=AuditCategory.AUTH,
+            actor_id=vendor.owner_id,
+            actor_role="vendor_owner",
+            entity_type="Vendor",
+            entity_id=str(vendor.vendor_id),
+            request=request
+        )
+        db.commit()
+    except Exception:
+        pass
 
     return {
         "access_token": access_token,
@@ -278,13 +322,40 @@ def login_as_vendor_staff(
     phone: str,
     password: str,
     db: Session,
+    request: Optional[Request] = None,
 ) -> dict:
     """Authenticate a vendor staff member by phone + password."""
     staff = db.query(VendorStaff).filter(VendorStaff.phone == phone).first()
     if not staff:
+        try:
+            from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+            write_audit_log(
+                db=db,
+                action=AuditAction.LOGIN_FAILED,
+                action_category=AuditCategory.AUTH,
+                entity_type="VendorStaff",
+                metadata={"phone": phone},
+                request=request
+            )
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail="Invalid staff phone or password")
 
     if not staff.password_hash or not _verify_password(password, staff.password_hash):
+        try:
+            from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+            write_audit_log(
+                db=db,
+                action=AuditAction.LOGIN_FAILED,
+                action_category=AuditCategory.AUTH,
+                entity_type="VendorStaff",
+                metadata={"phone": phone, "vendor_id": staff.vendor_id},
+                request=request
+            )
+            db.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=401, detail="Invalid staff phone or password")
 
     if not staff.is_active:
@@ -297,6 +368,22 @@ def login_as_vendor_staff(
     access_token = _create_access_token(staff.vendor_id, "vendor_staff", staff.id)
     refresh_token, jti = _create_refresh_token(staff.vendor_id, "vendor_staff", staff.id)
     _store_refresh_jti(jti, staff.vendor_id)
+
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.LOGIN_SUCCESS,
+            action_category=AuditCategory.AUTH,
+            actor_role="vendor_staff",
+            entity_type="VendorStaff",
+            entity_id=str(staff.id),
+            metadata={"vendor_id": staff.vendor_id},
+            request=request
+        )
+        db.commit()
+    except Exception:
+        pass
 
     return {
         "access_token": access_token,

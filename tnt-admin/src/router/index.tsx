@@ -28,6 +28,9 @@ const BackupRecovery = lazy(() => import('../pages/backup/BackupRecovery'));
 const AuditLogs = lazy(() => import('../pages/audit/AuditLogs'));
 const ConflictResolution = lazy(() => import('../pages/conflicts/ConflictResolution'));
 const Settings = lazy(() => import('../pages/settings/Settings'));
+const FraudDashboard = lazy(() => import('../pages/fraud/FraudDashboard'));
+const FraudDetail = lazy(() => import('../pages/fraud/FraudDetail'));
+const FraudInvestigation = lazy(() => import('../pages/fraud/FraudInvestigation'));
 
 // Page loading fallback
 function PageLoader() {
@@ -148,6 +151,14 @@ const router = createBrowserRouter([
       { path: 'audit-logs', element: <AuditLogs /> },
       { path: 'conflicts', element: <ConflictResolution /> },
       { path: 'backup', element: <BackupRecovery /> },
+      {
+        path: 'fraud',
+        children: [
+          { index: true, element: <FraudDashboard /> },
+          { path: ':id', element: <FraudDetail /> },
+          { path: 'investigate', element: <FraudInvestigation /> },
+        ],
+      },
       { path: 'settings', element: <Settings /> },
       { path: '*', element: <Navigate to="/dashboard" replace /> },
     ],
