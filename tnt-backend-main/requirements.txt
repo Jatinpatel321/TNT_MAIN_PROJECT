@@ -1,0 +1,28 @@
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+alembic
+psycopg2-binary
+passlib[bcrypt]
+python-jose
+pydantic
+redis
+razorpay
+httpx
+fakeredis
+python-multipart
+# Content-based MIME type detection for file upload validation (ISS-016)
+python-magic==0.4.27
+pandas
+# --- ML Dependencies ---
+scikit-learn==1.5.0
+numpy
+scipy
+xgboost==2.1.0
+lightgbm==4.5.0
+joblib
+tzdata
+# --- Admin TOTP 2FA ---
+pyotp==2.9.0
+qrcode[pil]==7.4.2
