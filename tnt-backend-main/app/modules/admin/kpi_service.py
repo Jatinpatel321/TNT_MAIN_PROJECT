@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, extract, cast, Date as SADate, Integer
+from sqlalchemy import func, extract, cast, Date as SADate, Integer, case
 from sqlalchemy.orm import Session
 
 from app.core.redis_cache import cache_service
@@ -230,8 +230,15 @@ class KPIService:
                 "rating": round(float(avg_rating), 1),
             })
 
-        # Sort performance list by order count desc
-        vendor_perf.sort(key=lambda x: x["orders_count"], reverse=True)
+        # Calculate a weighted Vendor Ranking Score
+        max_orders_val = max((x["orders_count"] for x in vendor_perf), default=1) or 1
+        for vp in vendor_perf:
+            rating_score = vp["rating"] * 20.0
+            volume_score = (vp["orders_count"] / max_orders_val) * 100.0
+            vp["score"] = round(rating_score * 0.4 + vp["completion_rate"] * 0.3 + volume_score * 0.3, 1)
+
+        # Sort performance list by rank score desc (Vendor Ranking)
+        vendor_perf.sort(key=lambda x: x["score"], reverse=True)
 
         # ── BUSINESS KPIs ────────────────────────────────────────────────────
         # Revenue (successful payment sums in paise, returned in INR)
@@ -344,6 +351,274 @@ class KPIService:
         points_redeemed_q = self._apply_order_filters(points_redeemed_q, date_from_dt, date_to_dt, department, vendor_id)
         points_redeemed = points_redeemed_q.scalar() or 0.0
 
+        # ── DEPARTMENT ANALYTICS ──────────────────────────────────────────────
+        dept_orders_q = self.db.query(
+            User.department,
+            func.count(Order.id).label("order_count"),
+            func.count(func.distinct(Order.user_id)).label("active_users")
+        ).join(Order, User.id == Order.user_id)
+        dept_orders_q = self._apply_order_filters(dept_orders_q, date_from_dt, date_to_dt, None, vendor_id)
+        dept_orders_res = dept_orders_q.group_by(User.department).all()
+
+        dept_revenue_q = self.db.query(
+            User.department,
+            func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+        ).join(Order, User.id == Order.user_id)\
+         .join(Payment, Order.id == Payment.order_id)\
+         .filter(Payment.status == PaymentStatus.SUCCESS)
+        dept_revenue_q = self._apply_order_filters(dept_revenue_q, date_from_dt, date_to_dt, None, vendor_id)
+        dept_revenue_res = {r.department: r.revenue_paise for r in dept_revenue_q.group_by(User.department).all()}
+
+        department_analytics = [
+            {
+                "department": r.department or "Other/Unknown",
+                "order_count": r.order_count,
+                "active_users": r.active_users,
+                "revenue_inr": float(dept_revenue_res.get(r.department, 0)) / 100.0
+            }
+            for r in dept_orders_res
+        ]
+
+        # ── FOOD & STATIONERY TRENDS ──────────────────────────────────────────
+        if is_sqlite:
+            day_field = func.strftime("%Y-%m-%d", Order.created_at).label("day")
+            food_trend_q = self.db.query(
+                day_field,
+                func.count(Order.id).label("count"),
+                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
+             .filter(Order.booking_type == "food", Payment.status == PaymentStatus.SUCCESS)
+            food_trend_q = self._apply_order_filters(food_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            food_trend_rows = food_trend_q.group_by(day_field).order_by(day_field).all()
+            food_trends = [{"date": str(r[0]), "orders": r[1], "revenue_inr": float(r[2]) / 100.0} for r in food_trend_rows]
+
+            stat_trend_q = self.db.query(
+                day_field,
+                func.count(Order.id).label("count"),
+                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
+             .filter(Order.booking_type == "stationery", Payment.status == PaymentStatus.SUCCESS)
+            stat_trend_q = self._apply_order_filters(stat_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            stat_trend_rows = stat_trend_q.group_by(day_field).order_by(day_field).all()
+            stationery_trends = [{"date": str(r[0]), "orders": r[1], "revenue_inr": float(r[2]) / 100.0} for r in stat_trend_rows]
+
+            rev_trend_q = self.db.query(
+                day_field,
+                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            ).join(Order, Payment.order_id == Order.id)\
+             .filter(Payment.status == PaymentStatus.SUCCESS)
+            rev_trend_q = self._apply_order_filters(rev_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            rev_trend_rows = rev_trend_q.group_by(day_field).order_by(day_field).all()
+            revenue_trends = [{"date": str(r[0]), "revenue_inr": float(r[1]) / 100.0} for r in rev_trend_rows]
+        else:
+            day_field = cast(Order.created_at, SADate).label("day")
+            food_trend_q = self.db.query(
+                day_field,
+                func.count(Order.id).label("count"),
+                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
+             .filter(Order.booking_type == "food", Payment.status == PaymentStatus.SUCCESS)
+            food_trend_q = self._apply_order_filters(food_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            food_trend_rows = food_trend_q.group_by(day_field).order_by(day_field).all()
+            food_trends = [{"date": str(r.day), "orders": r.count, "revenue_inr": float(r.revenue_paise) / 100.0} for r in food_trend_rows]
+
+            stat_trend_q = self.db.query(
+                day_field,
+                func.count(Order.id).label("count"),
+                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
+             .filter(Order.booking_type == "stationery", Payment.status == PaymentStatus.SUCCESS)
+            stat_trend_q = self._apply_order_filters(stat_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            stat_trend_rows = stat_trend_q.group_by(day_field).order_by(day_field).all()
+            stationery_trends = [{"date": str(r.day), "orders": r.count, "revenue_inr": float(r.revenue_paise) / 100.0} for r in stat_trend_rows]
+
+            rev_trend_q = self.db.query(
+                cast(Payment.created_at, SADate).label("day"),
+                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            ).join(Order, Payment.order_id == Order.id)\
+             .filter(Payment.status == PaymentStatus.SUCCESS)
+            rev_trend_q = self._apply_order_filters(rev_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            rev_trend_rows = rev_trend_q.group_by(cast(Payment.created_at, SADate)).order_by(cast(Payment.created_at, SADate)).all()
+            revenue_trends = [{"date": str(r.day), "revenue_inr": float(r.revenue_paise) / 100.0} for r in rev_trend_rows]
+
+        # ── PEAK HOUR ANALYSIS ────────────────────────────────────────────────
+        if is_sqlite:
+            hour_field = cast(func.strftime("%H", Order.created_at), Integer).label("hour")
+            peak_analysis_q = self.db.query(
+                hour_field,
+                func.sum(case((Order.booking_type == "food", 1), else_=0)).label("food_count"),
+                func.sum(case((Order.booking_type == "stationery", 1), else_=0)).label("stat_count")
+            )
+            peak_analysis_q = self._apply_order_filters(peak_analysis_q, date_from_dt, date_to_dt, department, vendor_id)
+            peak_analysis_rows = peak_analysis_q.group_by(func.strftime("%H", Order.created_at)).order_by(hour_field).all()
+        else:
+            hour_field = extract("hour", Order.created_at).label("hour")
+            peak_analysis_q = self.db.query(
+                hour_field,
+                func.sum(case((Order.booking_type == "food", 1), else_=0)).label("food_count"),
+                func.sum(case((Order.booking_type == "stationery", 1), else_=0)).label("stat_count")
+            )
+            peak_analysis_q = self._apply_order_filters(peak_analysis_q, date_from_dt, date_to_dt, department, vendor_id)
+            peak_analysis_rows = peak_analysis_q.group_by(extract("hour", Order.created_at)).order_by(hour_field).all()
+
+        peak_hour_analysis = {int(r.hour or 0): {"food_orders": int(r.food_count or 0), "stationery_orders": int(r.stat_count or 0)} for r in peak_analysis_rows}
+        for h in range(24):
+            if h not in peak_hour_analysis:
+                peak_hour_analysis[h] = {"food_orders": 0, "stationery_orders": 0}
+        peak_hour_analysis_list = [{"hour": h, "food_orders": peak_hour_analysis[h]["food_orders"], "stationery_orders": peak_hour_analysis[h]["stationery_orders"]} for h in range(24)]
+
+        # ── SLOT USAGE ANALYSIS ───────────────────────────────────────────────
+        if is_sqlite:
+            slot_hour = cast(func.strftime("%H", Slot.start_time), Integer).label("hour")
+            slot_usage_q = self.db.query(
+                slot_hour,
+                func.sum(Slot.current_orders).label("booked"),
+                func.sum(Slot.max_orders).label("capacity")
+            )
+            if vendor_id:
+                slot_usage_q = slot_usage_q.filter(Slot.vendor_id == vendor_id)
+            if date_from_dt:
+                slot_usage_q = slot_usage_q.filter(Slot.start_time >= date_from_dt)
+            if date_to_dt:
+                slot_usage_q = slot_usage_q.filter(Slot.start_time <= date_to_dt)
+            slot_usage_rows = slot_usage_q.group_by(func.strftime("%H", Slot.start_time)).order_by(slot_hour).all()
+        else:
+            slot_hour = extract("hour", Slot.start_time).label("hour")
+            slot_usage_q = self.db.query(
+                slot_hour,
+                func.sum(Slot.current_orders).label("booked"),
+                func.sum(Slot.max_orders).label("capacity")
+            )
+            if vendor_id:
+                slot_usage_q = slot_usage_q.filter(Slot.vendor_id == vendor_id)
+            if date_from_dt:
+                slot_usage_q = slot_usage_q.filter(Slot.start_time >= date_from_dt)
+            if date_to_dt:
+                slot_usage_q = slot_usage_q.filter(Slot.start_time <= date_to_dt)
+            slot_usage_rows = slot_usage_q.group_by(extract("hour", Slot.start_time)).order_by(slot_hour).all()
+
+        slot_usage_analysis = []
+        for r in slot_usage_rows:
+            h = int(r.hour or 0)
+            booked = int(r.booked or 0)
+            capacity = int(r.capacity or 0)
+            utilization_pct = round((booked / capacity) * 100, 1) if capacity > 0 else 0.0
+            slot_usage_analysis.append({
+                "hour": h,
+                "booked_orders": booked,
+                "total_capacity": capacity,
+                "utilization_pct": utilization_pct
+            })
+
+        # ── CANCELLATION TRENDS ───────────────────────────────────────────────
+        if is_sqlite:
+            day_field = func.strftime("%Y-%m-%d", Order.created_at).label("day")
+            canc_trend_q = self.db.query(
+                day_field,
+                func.count(Order.id).label("total"),
+                func.sum(case((Order.status == OrderStatus.CANCELLED, 1), else_=0)).label("cancelled")
+            )
+            canc_trend_q = self._apply_order_filters(canc_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            canc_trend_rows = canc_trend_q.group_by(day_field).order_by(day_field).all()
+            cancellation_trends = [
+                {
+                    "date": str(r[0]),
+                    "cancelled_count": int(r[2] or 0),
+                    "total_count": int(r[1] or 0),
+                    "cancellation_rate": round((int(r[2] or 0) / int(r[1] or 1)) * 100, 1)
+                }
+                for r in canc_trend_rows
+            ]
+        else:
+            day_field = cast(Order.created_at, SADate).label("day")
+            canc_trend_q = self.db.query(
+                day_field,
+                func.count(Order.id).label("total"),
+                func.sum(case((Order.status == OrderStatus.CANCELLED, 1), else_=0)).label("cancelled")
+            )
+            canc_trend_q = self._apply_order_filters(canc_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+            canc_trend_rows = canc_trend_q.group_by(day_field).order_by(day_field).all()
+            cancellation_trends = [
+                {
+                    "date": str(r.day),
+                    "cancelled_count": int(r.cancelled or 0),
+                    "total_count": int(r.total or 0),
+                    "cancellation_rate": round((int(r.cancelled or 0) / int(r.total or 1)) * 100, 1)
+                }
+                for r in canc_trend_rows
+            ]
+
+        # ── AI INSIGHTS GENERATION ────────────────────────────────────────────
+        ai_insights = []
+
+        max_hour_orders = 0
+        peak_hour = 12
+        for h, count in peak_hours.items():
+            if count > max_hour_orders:
+                max_hour_orders = count
+                peak_hour = h
+
+        if max_hour_orders > 0:
+            peak_util = slot_utilization
+            if peak_util > 75:
+                ai_insights.append({
+                    "type": "warning",
+                    "title": "Peak Hour Slot Congestion",
+                    "detail": f"Rush intensity peaks at {peak_hour:02d}:00 with slot utilization at {peak_util}%.",
+                    "recommendation": "Advise vendors to enable dynamic capacities or pre-pack popular combos to speed up handovers."
+                })
+            else:
+                ai_insights.append({
+                    "type": "info",
+                    "title": "Peak Traffic Distribution",
+                    "detail": f"Daily traffic peaks at {peak_hour:02d}:00 with {max_hour_orders} concurrent orders.",
+                    "recommendation": "Maintain standard slot configuration; capacities are currently sufficient."
+                })
+
+        if cancellation_rate > 8.0:
+            ai_insights.append({
+                "type": "danger",
+                "title": "Elevated Cancellation Rate",
+                "detail": f"Overall cancellation rate has spiked to {cancellation_rate}%.",
+                "recommendation": "Trigger operational speed audit for canteens showing preparation delays."
+            })
+        elif cancellation_rate > 3.0:
+            ai_insights.append({
+                "type": "warning",
+                "title": "Moderate Order Cancellations",
+                "detail": f"Order cancellation rate is at {cancellation_rate}%.",
+                "recommendation": "Notify vendors to update active menu stock levels to prevent cancels due to out-of-stock items."
+            })
+        else:
+            ai_insights.append({
+                "type": "success",
+                "title": "Healthy Operational Throughput",
+                "detail": f"Cancellations are low ({cancellation_rate}%) and orders are completed smoothly.",
+                "recommendation": "Keep standard slots configuration and maintain current vendor parameters."
+            })
+
+        if department_analytics:
+            top_dept = max(department_analytics, key=lambda x: x["order_count"])
+            total_orders_all = sum(x["order_count"] for x in department_analytics) or 1
+            pct = round((top_dept["order_count"] / total_orders_all) * 100, 1)
+            if pct > 30:
+                ai_insights.append({
+                    "type": "info",
+                    "title": "Department Demand Surge",
+                    "detail": f"The {top_dept['department']} department accounts for {pct}% of overall orders.",
+                    "recommendation": "Distribute promo vouchers during off-peak hours to this department's users to balance peak canteens load."
+                })
+
+        if vendor_perf:
+            top_v = vendor_perf[0]
+            if top_v["orders_count"] > 0:
+                ai_insights.append({
+                    "type": "success",
+                    "title": "Top Performing Vendor",
+                    "detail": f"{top_v['vendor_name']} leads with {top_v['orders_count']} orders and a rating of {top_v['rating']}/5.",
+                    "recommendation": "Feature this vendor on new admission guidelines or the app homepage."
+                })
+
         # Construct final payload
         res_payload = {
             "filters": {
@@ -381,7 +656,15 @@ class KPIService:
                 "heatmap_grid": heatmap_data,
                 "vouchers_redeemed_count": vouchers_redeemed_count,
                 "points_redeemed": float(points_redeemed)
-            }
+            },
+            "department_analytics": department_analytics,
+            "food_trends": food_trends,
+            "stationery_trends": stationery_trends,
+            "revenue_trends": revenue_trends,
+            "peak_hour_analysis": peak_hour_analysis_list,
+            "slot_usage_analysis": slot_usage_analysis,
+            "cancellation_trends": cancellation_trends,
+            "ai_insights": ai_insights
         }
 
         return res_payload

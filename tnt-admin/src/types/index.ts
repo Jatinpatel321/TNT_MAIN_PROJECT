@@ -356,6 +356,7 @@ export interface KPIData {
       completion_rate: number;
       avg_wait_minutes: number;
       rating: number;
+      score?: number;
     }>;
   };
   business_kpis: {
@@ -373,6 +374,49 @@ export interface KPIData {
     vouchers_redeemed_count: number;
     points_redeemed: number;
   };
+  department_analytics?: Array<{
+    department: string;
+    order_count: number;
+    active_users: number;
+    revenue_inr: number;
+  }>;
+  food_trends?: Array<{
+    date: string;
+    orders: number;
+    revenue_inr: number;
+  }>;
+  stationery_trends?: Array<{
+    date: string;
+    orders: number;
+    revenue_inr: number;
+  }>;
+  revenue_trends?: Array<{
+    date: string;
+    revenue_inr: number;
+  }>;
+  peak_hour_analysis?: Array<{
+    hour: number;
+    food_orders: number;
+    stationery_orders: number;
+  }>;
+  slot_usage_analysis?: Array<{
+    hour: number;
+    booked_orders: number;
+    total_capacity: number;
+    utilization_pct: number;
+  }>;
+  cancellation_trends?: Array<{
+    date: string;
+    cancelled_count: number;
+    total_count: number;
+    cancellation_rate: number;
+  }>;
+  ai_insights?: Array<{
+    type: 'info' | 'warning' | 'success' | 'danger';
+    title: string;
+    detail: string;
+    recommendation: string;
+  }>;
 }
 
 // ─── Fraud Detection ──────────────────────────────────────────────────────────

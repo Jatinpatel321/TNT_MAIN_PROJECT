@@ -27,6 +27,7 @@ export default function FraudDashboard() {
   const [alertsData, setAlertsData] = useState<{ alerts: FraudAlert[]; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const totalPages = alertsData ? Math.ceil(alertsData.total / 10) : 0;
 
   // Filter states
   const [page, setPage] = useState(1);
@@ -380,10 +381,10 @@ export default function FraudDashboard() {
         )}
 
         {/* Pagination */}
-        {alertsData && alertsData.total_pages > 1 && (
+        {alertsData && totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-[#E5E7EB] pt-4 mt-6">
             <span className="text-xs text-[#6B7280]">
-              Showing page {page} of {alertsData.total_pages}
+              Showing page {page} of {totalPages}
             </span>
             <div className="flex gap-2">
               <button
@@ -394,8 +395,8 @@ export default function FraudDashboard() {
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
-                onClick={() => setPage(prev => Math.min(prev + 1, alertsData.total_pages))}
-                disabled={page === alertsData.total_pages}
+                onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={page === totalPages}
                 className="inline-flex items-center justify-center p-2 border border-[#E5E7EB] rounded-xl hover:bg-[#F3F5F9] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronRight className="w-4 h-4" />

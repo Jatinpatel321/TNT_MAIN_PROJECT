@@ -17,7 +17,7 @@ export function TNTTooltip({ active, payload, label }: TooltipProps<number, stri
 
         return (
           <div key={`${name}-${idx}`} className="tnt-chart-tooltip__row">
-            <span className="tnt-chart-tooltip__dot" style={{ backgroundColor: color || chartTokens.brand.orange }} />
+            <span className="tnt-chart-tooltip__dot" style={{ backgroundColor: color || chartTokens.brand.amber }} />
             <span className="tnt-chart-tooltip__name">{name}:</span>
             <span className="tnt-chart-tooltip__value">
               {typeof value === 'number' ? value.toLocaleString('en-IN') : String(value)}

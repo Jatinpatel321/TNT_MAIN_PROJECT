@@ -89,5 +89,3 @@ export const vendorAuthApi = {
   deleteStaff: (staff_id: number) =>
     api.delete(`/v1/vendor/staff/${staff_id}`),
 };
-</path>
-</write_to_file>

@@ -140,7 +140,7 @@ export default function Login() {
       const res = await authApi.verifyOtp(`+91${phone}`, code);
       const data = res.data as VerifyOtpResponse;
       const { access_token, token: legacyToken, user, requires_2fa } = data.data;
-      const authToken = access_token || legacyToken;
+      const authToken = (access_token || legacyToken) as string;
 
       if (!authToken) {
         throw new Error('Login response did not include an access token');

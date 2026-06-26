@@ -176,5 +176,3 @@ export default function VendorLogin() {
     </div>
   );
 }
-</path>
-</write_to_file>

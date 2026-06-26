@@ -111,7 +111,7 @@ export default function SlotManagementPage() {
   const handleBulkCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await slotsApi.bulkCreate(bulkForm);
+      await slotsApi.bulkCreate(bulkForm as any);
       toast.success('Slots created successfully');
       setShowBulkModal(false);
       resetBulkForm();
@@ -173,7 +173,7 @@ export default function SlotManagementPage() {
   const handleCreateCapacityRule = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await slotsApi.createCapacityRule(capacityForm);
+      await slotsApi.createCapacityRule({ ...capacityForm, is_active: true });
       toast.success('Capacity rule created');
       setCapacityForm({ rule_name: '', day_of_week: undefined, start_hour: 9, end_hour: 17, base_capacity: 10, peak_capacity: undefined });
       loadData();

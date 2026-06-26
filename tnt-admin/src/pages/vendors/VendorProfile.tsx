@@ -302,5 +302,3 @@ export default function VendorProfilePage() {
     </div>
   );
 }
-</path>
-</write_to_file>
