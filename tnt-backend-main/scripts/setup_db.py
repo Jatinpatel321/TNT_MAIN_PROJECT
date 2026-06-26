@@ -27,6 +27,14 @@ import app.modules.notifications.model
 import app.modules.stationery.job_model
 import app.modules.stationery.service_model
 import app.modules.group_cart.model
+import app.modules.admin.model
+import app.modules.vendors.model
+import app.modules.vendors.profile_models
+import app.modules.vendors.settlement_models
+import app.modules.vendors.retention_models
+import app.modules.recommendations.models
+import app.modules.calendar.model
+import app.modules.auditlog.model
 
 try:
     import app.modules.feedback.model

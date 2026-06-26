@@ -30,3 +30,10 @@ class StationeryService(Base):
 
     # Relationships
     vendor = relationship("User", back_populates="stationery_services")
+
+    def __init__(self, **kwargs):
+        if "service_type" not in kwargs:
+            kwargs["service_type"] = "xerox"
+        if "price_per_page" not in kwargs:
+            kwargs["price_per_page"] = kwargs.get("price_per_unit") or 100
+        super().__init__(**kwargs)

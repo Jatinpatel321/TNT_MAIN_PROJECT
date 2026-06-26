@@ -19,3 +19,6 @@ Thumbs.db
 
 # Backups — generated dump files
 backups/
+
+# Local uploads
+uploads/

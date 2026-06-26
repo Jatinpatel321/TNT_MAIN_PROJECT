@@ -90,7 +90,7 @@ def check_value_outlier(
 ) -> Optional[str]:
     """Rule 2: Order value far outside the user's historical average."""
     past_orders = (
-        db.query(func.coalesce(func.avg(Order.total_amount), 0.0))
+        db.query(Order.total_amount)
         .filter(
             Order.user_id == order.user_id,
             Order.id != order.id,
@@ -98,7 +98,7 @@ def check_value_outlier(
             Order.status != OrderStatus.CANCELLED,
         )
         .order_by(Order.created_at.desc())
-        .limit(VALUE_OUTLIER_MIN_SAMPLES)
+        .limit(10)
         .all()
     )
 

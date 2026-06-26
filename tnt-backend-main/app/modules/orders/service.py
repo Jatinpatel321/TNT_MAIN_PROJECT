@@ -32,6 +32,17 @@ def create_order(user_id: int, slot_id: int, db: Session) -> Order:
     )
     db.add(order)
     db.flush()
+
+    # Record initial "placed" status in history
+    history = OrderHistory(
+        order_id=order.id,
+        status=OrderStatus.PLACED,
+        changed_by="student",
+        changed_at=utcnow_naive(),
+    )
+    db.add(history)
+    db.flush()
+
     return order
 
 def update_order_status(

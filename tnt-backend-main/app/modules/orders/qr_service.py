@@ -46,7 +46,7 @@ def generate_qr_code(order_id: int, db: Session) -> str:
     if order.status not in (OrderStatus.READY, OrderStatus.READY_FOR_PICKUP):
         raise ValueError("Order is not ready for pickup")
 
-    if order.qr_code:
+    if order.qr_code and "." in order.qr_code:
         return order.qr_code  # Return existing QR if already generated
 
     raw_token = secrets.token_urlsafe(16)

@@ -137,7 +137,8 @@ def verify_otp(phone: str, otp: str) -> bool:
         raise HTTPException(status_code=429, detail="Too many wrong attempts")
 
     # Compare using HMAC hash instead of plaintext
-    if stored_otp.decode() != _hash_otp(otp, phone):
+    stored_otp_str = stored_otp.decode() if isinstance(stored_otp, bytes) else stored_otp
+    if stored_otp_str != _hash_otp(otp, phone):
         redis_client.incr(attempts_key)
         redis_client.expire(attempts_key, OTP_TTL)
         raise HTTPException(status_code=400, detail="Invalid OTP")

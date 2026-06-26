@@ -24,6 +24,7 @@ class VendorProfile(Base):
     location = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    rating = Column(Float, default=4.5)
 
     # Branding
     logo_url = Column(String(500), nullable=True)

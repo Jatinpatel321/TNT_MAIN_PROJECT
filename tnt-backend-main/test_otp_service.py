@@ -41,14 +41,15 @@ class TestGenerateOTP:
         fake = _fake_redis()
         with patch("app.modules.auth.otp_service.redis_client", fake), \
              patch("app.modules.auth.otp_service.send_sms"):
-            from app.modules.auth.otp_service import generate_otp
+            from app.modules.auth.otp_service import generate_otp, _hash_otp
             generate_otp("9991111")
-            assert fake.get("otp:9991111") == "123456"
+            assert fake.get("otp:9991111") == _hash_otp("123456", "9991111")
 
     def test_normal_phone_generates_random_otp(self):
         """Normal phone gets a 6-digit OTP via SMS."""
         fake = _fake_redis()
         with patch("app.modules.auth.otp_service.redis_client", fake), \
+             patch("app.modules.auth.otp_service.settings.SMS_ENABLED", True), \
              patch("app.modules.auth.otp_service.send_sms") as mock_sms:
             from app.modules.auth.otp_service import generate_otp
             otp = generate_otp("9998887777")
@@ -86,6 +87,7 @@ class TestGenerateOTP:
         from app.core.sms import SMSConfigError
         fake = _fake_redis()
         with patch("app.modules.auth.otp_service.redis_client", fake), \
+             patch("app.modules.auth.otp_service.settings.SMS_ENABLED", True), \
              patch("app.modules.auth.otp_service.send_sms", side_effect=SMSConfigError("no config")):
             from app.modules.auth.otp_service import generate_otp
             with pytest.raises(HTTPException) as exc_info:
@@ -98,6 +100,7 @@ class TestGenerateOTP:
         from app.core.sms import SMSDeliveryError
         fake = _fake_redis()
         with patch("app.modules.auth.otp_service.redis_client", fake), \
+             patch("app.modules.auth.otp_service.settings.SMS_ENABLED", True), \
              patch("app.modules.auth.otp_service.send_sms", side_effect=SMSDeliveryError("delivery failed")):
             from app.modules.auth.otp_service import generate_otp
             with pytest.raises(HTTPException) as exc_info:
@@ -125,7 +128,8 @@ class TestVerifyOTP:
         """Correct OTP → returns True, clears Redis keys."""
         fake = _fake_redis()
         phone = "9990009999"
-        fake.setex(f"otp:{phone}", 300, "654321")
+        from app.modules.auth.otp_service import _hash_otp
+        fake.setex(f"otp:{phone}", 300, _hash_otp("654321", phone))
         with patch("app.modules.auth.otp_service.redis_client", fake):
             from app.modules.auth.otp_service import verify_otp
             result = verify_otp(phone, "654321")
@@ -149,7 +153,8 @@ class TestVerifyOTP:
         """Wrong OTP raises 400 and increments attempts counter."""
         fake = _fake_redis()
         phone = "9990007777"
-        fake.setex(f"otp:{phone}", 300, "111111")
+        from app.modules.auth.otp_service import _hash_otp
+        fake.setex(f"otp:{phone}", 300, _hash_otp("111111", phone))
         with patch("app.modules.auth.otp_service.redis_client", fake):
             from app.modules.auth.otp_service import verify_otp
             with pytest.raises(HTTPException) as exc_info:
@@ -163,7 +168,8 @@ class TestVerifyOTP:
         """After MAX_ATTEMPTS=5 wrong tries → HTTP 429."""
         fake = _fake_redis()
         phone = "9990006666"
-        fake.setex(f"otp:{phone}", 300, "111111")
+        from app.modules.auth.otp_service import _hash_otp
+        fake.setex(f"otp:{phone}", 300, _hash_otp("111111", phone))
         fake.set(f"otp:attempts:{phone}", "5")  # Already at limit
         with patch("app.modules.auth.otp_service.redis_client", fake):
             from app.modules.auth.otp_service import verify_otp
@@ -176,7 +182,8 @@ class TestVerifyOTP:
         """After too many attempts, the OTP key is deleted."""
         fake = _fake_redis()
         phone = "9990005555"
-        fake.setex(f"otp:{phone}", 300, "111111")
+        from app.modules.auth.otp_service import _hash_otp
+        fake.setex(f"otp:{phone}", 300, _hash_otp("111111", phone))
         fake.set(f"otp:attempts:{phone}", "5")
         with patch("app.modules.auth.otp_service.redis_client", fake):
             from app.modules.auth.otp_service import verify_otp

@@ -1006,8 +1006,18 @@ def maybe_reset_database(fresh: bool) -> None:
 		create_schema()
 		LOGGER.info("Recreated SQLite database at %s", db_path)
 	else:
-		create_schema()
-		Base.metadata.drop_all(bind=engine)
+		if "postgresql" in DATABASE_URL:
+			from sqlalchemy import text
+			with engine.connect() as conn:
+				try:
+					conn.execute(text("DROP SCHEMA public CASCADE"))
+					conn.execute(text("CREATE SCHEMA public"))
+					conn.commit()
+					LOGGER.info("Dropped and recreated public schema on PostgreSQL")
+				except Exception as e:
+					LOGGER.error(f"Error dropping public schema: {e}")
+		else:
+			Base.metadata.drop_all(bind=engine)
 		create_schema()
 		LOGGER.info("Dropped and recreated schema on %s", DATABASE_URL)
 

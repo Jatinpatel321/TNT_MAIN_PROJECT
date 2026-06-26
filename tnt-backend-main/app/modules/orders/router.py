@@ -40,12 +40,13 @@ def my_orders(
         raise HTTPException(status_code=404, detail="User not found")
     q = db.query(Order).filter(Order.user_id == db_user.id)
     total = q.count()
-    orders = q.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    all_items = order_service.get_my_orders(user, db)
+    items = all_items[offset:offset+limit]
     return {
         "total": total,
         "limit": limit,
         "offset": offset,
-        "items": [order_service._order_to_response(o, db) for o in orders],
+        "items": items,
     }
 
 

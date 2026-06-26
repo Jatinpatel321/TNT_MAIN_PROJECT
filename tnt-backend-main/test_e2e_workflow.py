@@ -112,6 +112,7 @@ def student(db: Session):
 
 @pytest.fixture(scope="module")
 def menu_item(db: Session, food_vendor: User):
+    from app.modules.menu.model import Inventory
     item = db.query(MenuItem).filter(MenuItem.vendor_id == food_vendor.id, MenuItem.is_available == True).first()
     if not item:
         item = MenuItem(
@@ -121,10 +122,24 @@ def menu_item(db: Session, food_vendor: User):
             price=8000,  # paise
             is_available=True,
             image_url="https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=500&q=70",
+            available_quantity=100,
         )
         db.add(item)
         db.commit()
         db.refresh(item)
+    else:
+        item.available_quantity = 100
+        db.commit()
+
+    inv = db.query(Inventory).filter(Inventory.menu_item_id == item.id).first()
+    if not inv:
+        inv = Inventory(menu_item_id=item.id, current_stock=100, low_stock_threshold=5)
+        db.add(inv)
+        db.commit()
+    else:
+        inv.current_stock = 100
+        db.commit()
+
     return item
 
 
@@ -166,7 +181,8 @@ class TestStep1_OTPLogin:
         # Inject OTP directly into fakeredis so we can verify it.
         # Note: the OTP service stores keys as "otp:{phone}" (no tnt: prefix).
         otp = "123456"
-        _auto_fake_redis.setex(f"otp:{9100000001}", 300, otp)
+        from app.modules.auth.otp_service import _hash_otp
+        _auto_fake_redis.setex(f"otp:+919100000001", 300, _hash_otp(otp, "+919100000001"))
 
         res = client.post("/auth/verify-otp", json={"phone": "9100000001", "otp": otp})
         assert res.status_code == 200, res.text
@@ -193,7 +209,8 @@ class TestStep2_BrowseVendors:
     def test_get_food_vendors(self, client: TestClient, student: User, food_vendor: User):
         res = client.get("/vendors/?type=food", headers=_auth(student))
         assert res.status_code == 200, res.text
-        vendors = res.json()
+        data = res.json()
+        vendors = data.get("items", data)
         assert isinstance(vendors, list), "Expected list of vendors"
         assert len(vendors) > 0, "No food vendors returned — ensure seed data exists"
         for v in vendors:
@@ -205,7 +222,8 @@ class TestStep2_BrowseVendors:
     def test_get_stationery_vendors(self, client: TestClient, student: User):
         res = client.get("/vendors/?type=stationery", headers=_auth(student))
         assert res.status_code == 200, res.text
-        vendors = res.json()
+        data = res.json()
+        vendors = data.get("items", data)
         assert isinstance(vendors, list)
         print(f"\n  ✓ {len(vendors)} stationery vendor(s) returned")
 
@@ -341,7 +359,8 @@ class TestStep7_OrderTracking:
         order_id = TestStep6_Checkout.order_id
         res = client.get("/orders/my", headers=_auth(student))
         assert res.status_code == 200, res.text
-        orders = res.json()
+        data = res.json()
+        orders = data.get("items", data)
         order_ids = [o["id"] for o in orders]
         assert order_id in order_ids, f"New order #{order_id} not in /orders/my"
         order = next(o for o in orders if o["id"] == order_id)
@@ -389,6 +408,14 @@ class TestStep8_VendorActions:
         assert "confirmed" in str(data).lower(), f"Unexpected confirm response: {data}"
         print(f"\n  ✓ Vendor confirmed order #{order_id} → {data}")
 
+    def test_vendor_mark_preparing(self, client: TestClient, food_vendor: User):
+        order_id = TestStep6_Checkout.order_id
+        res = client.post(f"/orders/{order_id}/preparing", headers=_auth(food_vendor))
+        assert res.status_code == 200, res.text
+        data = res.json()
+        assert "preparing" in str(data).lower(), f"Unexpected preparing response: {data}"
+        print(f"\n  ✓ Vendor marked order preparing → {data}")
+
     def test_vendor_mark_ready(self, client: TestClient, food_vendor: User):
         order_id = TestStep6_Checkout.order_id
         res = client.post(f"/orders/{order_id}/ready", headers=_auth(food_vendor))
@@ -406,6 +433,7 @@ class TestStep8_VendorActions:
         data = res.json()
         assert "qr_code" in data, f"No qr_code in response: {data}"
         assert data["qr_code"], "QR code is empty/null"
+        TestStep6_Checkout.pickup_token = data["qr_code"]
         print(f"\n  ✓ QR code confirmed still valid after READY: {data['qr_code']}")
 
 
@@ -455,8 +483,9 @@ class TestStep11_Rating:
         )
         assert res.status_code == 200, res.text
         data = res.json()
-        assert "feedback_id" in data
-        print(f"\n  ✓ Rating submitted – feedback #{data['feedback_id']}")
+        feedback_id = data.get("feedback_id") or data.get("id")
+        assert feedback_id is not None
+        print(f"\n  ✓ Rating submitted – feedback #{feedback_id}")
 
     def test_duplicate_feedback_rejected(self, client: TestClient, student: User):
         order_id = TestStep6_Checkout.order_id

@@ -22,6 +22,10 @@ import app.modules.vendors.model  # noqa
 import app.modules.vendors.profile_models  # noqa
 import app.modules.vendors.retention_models  # noqa
 import app.modules.vendors.settlement_models  # noqa
+import app.modules.admin.model  # noqa
+import app.modules.recommendations.models  # noqa
+import app.modules.calendar.model  # noqa
+import app.modules.auditlog.model  # noqa
 
 # ── FORCE IMPORT MODELS ─────────────────────────────────────────────────────
 import app.modules.users.model  # noqa

@@ -32,6 +32,7 @@ def engine():
                 "CREATE TABLE IF NOT EXISTS vendor_profiles ("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                 "vendor_id INTEGER UNIQUE NOT NULL, "
+                "business_name TEXT NOT NULL DEFAULT 'Test Business', "
                 "category TEXT, "
                 "description TEXT, "
                 "rating REAL DEFAULT 4.5, "
@@ -82,9 +83,9 @@ def _add_vendor(db, name, vendor_type="food", **kwargs):
 
 def _add_vendor_profile(db, vendor_id, category="cafe", rating=4.5, description=None, location="Campus"):
     db.execute(text(
-        "INSERT INTO vendor_profiles (vendor_id, category, description, rating, location) "
-        "VALUES (:vid, :cat, :desc, :rating, :loc)"
-    ), {"vid": vendor_id, "cat": category, "desc": description, "rating": rating, "loc": location})
+        "INSERT INTO vendor_profiles (vendor_id, category, description, rating, location, business_name) "
+        "VALUES (:vid, :cat, :desc, :rating, :loc, :bus_name)"
+    ), {"vid": vendor_id, "cat": category, "desc": description, "rating": rating, "loc": location, "bus_name": "Test Business"})
     db.commit()
 
 
@@ -110,6 +111,8 @@ def _add_stationery_service(db, vendor_id, name, price_per_unit=200, unit="page"
         price_per_unit=price_per_unit,
         unit=unit,
         is_available=is_available,
+        service_type="color_print",
+        price_per_page=price_per_unit,
     )
     db.add(svc)
     db.commit()
