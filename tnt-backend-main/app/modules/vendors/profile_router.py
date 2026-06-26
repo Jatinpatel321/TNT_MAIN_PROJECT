@@ -87,8 +87,40 @@ def update_staff(
     """Update staff member details and permissions."""
     vendor = _get_vendor(db, user)
     service = VendorProfileService(db)
+
+    # Check if we are updating permissions
+    before_permissions = []
+    if "permissions" in data:
+        try:
+            from app.modules.vendors.profile_models import VendorStaffPermission
+            perms = db.query(VendorStaffPermission).filter(VendorStaffPermission.staff_id == staff_id).all()
+            before_permissions = [p.permission for p in perms if p.is_granted]
+        except Exception:
+            pass
+
     try:
-        return service.update_staff(vendor.vendor_id, staff_id, data)
+        res = service.update_staff(vendor.vendor_id, staff_id, data)
+        # If permissions updated, write audit log
+        if "permissions" in data:
+            after_permissions = res.get("permissions", [])
+            if set(before_permissions) != set(after_permissions):
+                try:
+                    from app.modules.auditlog.service import write as write_audit_log, AuditCategory
+                    write_audit_log(
+                        db=db,
+                        action="vendor.staff_permissions_updated",
+                        action_category=AuditCategory.VENDOR,
+                        actor_id=user.get("id"),
+                        actor_role=user.get("role"),
+                        entity_type="VendorStaff",
+                        entity_id=str(staff_id),
+                        before_state={"permissions": before_permissions},
+                        after_state={"permissions": after_permissions},
+                    )
+                    db.commit()
+                except Exception:
+                    pass
+        return res
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

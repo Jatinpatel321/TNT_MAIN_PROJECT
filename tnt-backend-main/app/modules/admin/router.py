@@ -26,6 +26,7 @@ from app.modules.admin.schemas import (
     AdminUserListResponse,
     AdminUserDetailResponse,
     AdminUserStatusUpdate,
+    AdminUserRoleUpdate,
 )
 from app.modules.admin.conflict_service import get_conflict_summary
 from app.modules.admin.conflict_schemas import ConflictSummaryResponse
@@ -883,3 +884,59 @@ def list_backups(
 
     files = list_backups()
     return {"backups": files, "total": len(files)}
+
+
+@router.patch("/users/{user_id}/role", response_model=AdminUserDetailResponse, summary="Change user role")
+def update_user_role(
+    user_id: int,
+    payload: AdminUserRoleUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_role_str = payload.role.strip().lower()
+    valid_roles = {"student", "faculty", "vendor", "staff", "admin", "super_admin"}
+    if new_role_str not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of {valid_roles}")
+
+    from app.modules.users.model import UserRole
+    mapped_role = None
+    for r in UserRole:
+        if r.value.lower() == new_role_str:
+            mapped_role = r
+            break
+
+    if mapped_role is None:
+        raise HTTPException(status_code=400, detail="Invalid role enum value mapping")
+
+    before_role = db_user.role.value if hasattr(db_user.role, "value") else str(db_user.role)
+    if before_role == new_role_str:
+        return db_user
+
+    before = {"role": before_role}
+    db_user.role = mapped_role
+    db.commit()
+    db.refresh(db_user)
+
+    # Log to audit history
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.USER_ROLE_CHANGED,
+            action_category=AuditCategory.USER,
+            actor_id=user.get("id"),
+            actor_role=user.get("role"),
+            entity_type="User",
+            entity_id=str(db_user.id),
+            before_state=before,
+            after_state={"role": new_role_str},
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    return db_user

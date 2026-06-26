@@ -251,4 +251,29 @@ export const adminApi = {
 
   getFraudMetrics: () =>
     api.get('/v1/admin/fraud/metrics'),
+
+  // Security Dashboard Endpoints
+  getSecurityMetrics: () =>
+    api.get('/v1/admin/security/metrics'),
+
+  getSecurityEvents: (params?: { limit?: number }) =>
+    api.get('/v1/admin/security/events', { params }),
+
+  getActiveSessions: () =>
+    api.get('/v1/admin/security/sessions'),
+
+  revokeSession: (tokenKey: string) =>
+    api.delete(`/v1/admin/security/sessions/${tokenKey}`),
+
+  getBlockedTargets: () =>
+    api.get('/v1/admin/security/ip-blocks'),
+
+  blockTarget: (payload: { target: string; reason: string; duration_seconds?: number }) =>
+    api.post('/v1/admin/security/ip-blocks', payload),
+
+  unblockTarget: (target: string) =>
+    api.delete(`/v1/admin/security/ip-blocks/${target}`),
+
+  changeUserRole: (userId: number, role: string) =>
+    api.patch(`/v1/admin/users/${userId}/role`, { role }),
 };

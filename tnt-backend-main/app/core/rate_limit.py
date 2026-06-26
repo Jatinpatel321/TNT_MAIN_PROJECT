@@ -91,6 +91,14 @@ def check_rate_limit(
         remaining = max(limit - count, 0)
 
         if count > limit:
+            try:
+                from app.core import security_monitor
+                parts = key.split(":")
+                target_ip = parts[-1] if len(parts) >= 3 else "unknown"
+                prefix = parts[1] if len(parts) >= 2 else "unknown"
+                security_monitor.record_rate_limit_violation(ip=target_ip, path=prefix, limit_key=key)
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=429,
                 detail={

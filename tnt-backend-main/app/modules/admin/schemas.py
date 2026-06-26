@@ -35,3 +35,7 @@ class AdminUserListResponse(BaseModel):
 
 class AdminUserStatusUpdate(BaseModel):
     is_active: bool = True
+
+
+class AdminUserRoleUpdate(BaseModel):
+    role: str

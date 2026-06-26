@@ -74,6 +74,7 @@ from app.modules.search.router import router as search_router
 from app.ml.router import router as ml_router
 from app.modules.fraud.router import router as fraud_router
 from app.modules.backup.router import router as backup_router
+from app.modules.security.router import router as security_router
 
 api_v1_router = APIRouter(prefix="/v1")
 
@@ -89,6 +90,7 @@ api_v1_router.include_router(razorpay_webhook_router)
 api_v1_router.include_router(admin_router)
 api_v1_router.include_router(fraud_router)
 api_v1_router.include_router(backup_router)
+api_v1_router.include_router(security_router)
 api_v1_router.include_router(calendar_router)
 api_v1_router.include_router(audit_log_router)
 api_v1_router.include_router(stationery_router)
