@@ -48,6 +48,10 @@ class AuditStatsResponse(BaseModel):
     flagged_events: int
     category_counts: Dict[str, int]
     top_actors: List[TopActor]
+    total_logs_30d: int = 0
+    active_users_30d: int = 0
+    critical_actions_30d: int = 0
+    actions_by_category: Dict[str, int] = {}
 
 
 class AuditTimelineResponse(BaseModel):

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Store, CheckCircle, XCircle, Eye, RefreshCw } from 'lucide-react';
+import { Search, Store, CheckCircle, XCircle, Eye, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { vendorsApi } from '../../api/vendors';
+
 import { adminApi } from '../../api/admin';
-import { formatDate, formatNumber } from '../../utils/format';
+import { formatDate } from '../../utils/format';
 import type { Vendor } from '../../types';
 
 type VendorTab = 'all' | 'pending' | 'rejected';
@@ -28,16 +28,10 @@ export default function VendorList() {
   const fetchVendors = useCallback(async () => {
     setLoading(true);
     try {
-      const [allRes, pendingRes] = await Promise.allSettled([
-        vendorsApi.getAll(),
-        adminApi.getPendingVendors(),
-      ]);
-      if (allRes.status === 'fulfilled') {
-        setVendors(Array.isArray(allRes.value.data) ? allRes.value.data : []);
-      }
-      if (pendingRes.status === 'fulfilled') {
-        setPendingVendors(Array.isArray(pendingRes.value.data) ? pendingRes.value.data : []);
-      }
+      const res = await adminApi.getVendors();
+      const allData = Array.isArray(res.data) ? res.data : [];
+      setVendors(allData);
+      setPendingVendors(allData.filter(v => !v.is_approved && v.is_active !== false));
     } catch {
       toast.error('Failed to load vendors');
     } finally {

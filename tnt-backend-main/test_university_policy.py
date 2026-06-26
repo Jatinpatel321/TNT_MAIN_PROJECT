@@ -77,6 +77,7 @@ def seed_data(test_db_session):
         price=70,
         image_url="https://example.com/policy.png",
         is_available=True,
+        available_quantity=10,
     )
     test_db_session.add(menu_item)
     test_db_session.commit()

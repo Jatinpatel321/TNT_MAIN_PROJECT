@@ -9,6 +9,15 @@ export const adminApi = {
   getVendors: () =>
     api.get('/v1/admin/vendors'),
 
+  getVendorById: (id: number) =>
+    api.get(`/v1/admin/vendors/${id}`),
+
+  getVendorMenu: (id: number) =>
+    api.get(`/v1/admin/vendors/${id}/menu`),
+
+  getVendorSlots: (id: number) =>
+    api.get(`/v1/admin/vendors/${id}/slots`),
+
   getPendingVendors: async () => {
     const res = await api.get('/v1/admin/vendors');
     if (Array.isArray(res.data)) {

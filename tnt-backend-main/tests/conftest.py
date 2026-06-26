@@ -18,7 +18,13 @@ from app.database.session import get_db
 # ── In-memory SQLite test DB ────────────────────────────────────────────────
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(TEST_DATABASE_URL, echo=False)
+from sqlalchemy.pool import StaticPool
+engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+    echo=False
+)
 TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
@@ -53,7 +59,10 @@ def client(db_session) -> Generator:
         finally:
             pass
 
-    app.dependency_overrides[get_db] = override_get_db
+    from app.database.session import get_db as get_db_session
+    from app.core.deps import get_db as get_db_deps
+    app.dependency_overrides[get_db_session] = override_get_db
+    app.dependency_overrides[get_db_deps] = override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

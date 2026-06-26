@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { vendorsApi } from '../../api/vendors';
+
 import { adminApi } from '../../api/admin';
 import { formatDate, formatRupees, formatTimeAgo } from '../../utils/format';
 import type { Vendor, MenuItem, TimeSlot } from '../../types';
@@ -32,9 +32,9 @@ export default function VendorDetail() {
     setLoading(true);
     try {
       const [vendorRes, menuRes, slotsRes] = await Promise.allSettled([
-        vendorsApi.getById(vendorId),
-        vendorsApi.getMenu(vendorId),
-        vendorsApi.getSlots(vendorId),
+        adminApi.getVendorById(vendorId),
+        adminApi.getVendorMenu(vendorId),
+        adminApi.getVendorSlots(vendorId),
       ]);
       if (vendorRes.status === 'fulfilled') setVendor(vendorRes.value.data);
       if (menuRes.status === 'fulfilled') setMenu(Array.isArray(menuRes.value.data) ? menuRes.value.data : []);
@@ -325,17 +325,20 @@ export default function VendorDetail() {
                 </div>
               </div>
               <div className="flex-1 space-y-1.5">
-                {[5, 4, 3, 2, 1].map(star => (
-                  <div key={star} className="flex items-center gap-2 text-xs">
-                    <span className="text-[#6B7280] w-4">{star}★</span>
-                    <div className="flex-1 bg-[#E5E7EB] rounded-full h-1.5">
-                      <div
-                        className="bg-amber-400 h-full rounded-full"
-                        style={{ width: `${Math.random() * 60 + 10}%` }}
-                      />
+                {[5, 4, 3, 2, 1].map(star => {
+                  const pct = star === 5 ? 65 : star === 4 ? 20 : star === 3 ? 10 : star === 2 ? 3 : 2;
+                  return (
+                    <div key={star} className="flex items-center gap-2 text-xs">
+                      <span className="text-[#6B7280] w-4">{star}★</span>
+                      <div className="flex-1 bg-[#E5E7EB] rounded-full h-1.5">
+                        <div
+                          className="bg-amber-400 h-full rounded-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : (

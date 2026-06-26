@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Store, User, Phone, Tag, Shield, Edit3, Save, X, Users, Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Store, Edit3, Save, X, Users, Plus, Trash2, ToggleLeft, ToggleRight, User, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { vendorAuthApi } from '../../api/vendorAuth';
 import type { VendorProfile, VendorStaff } from '../../api/vendorAuth';
@@ -13,10 +13,6 @@ export default function VendorProfilePage() {
   const [formCategory, setFormCategory] = useState('');
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [staffForm, setStaffForm] = useState({ name: '', role: 'staff', phone: '', password: '' });
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const loadData = async () => {
     try {
@@ -34,6 +30,10 @@ export default function VendorProfilePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleUpdateProfile = async () => {
     try {

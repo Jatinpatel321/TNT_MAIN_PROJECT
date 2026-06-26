@@ -24,6 +24,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # ── Import ALL models so tables get registered ──────────────────────────────
+import app.database.init_db
 from app.database.base import Base
 from app.modules.users.model import User, UserRole
 from app.modules.orders.model import Order, OrderItem, OrderStatus
@@ -60,15 +61,24 @@ def reset_db():
     print("🧹 Clearing existing data …")
     db = SessionLocal()
     try:
-        db.execute(OrderItem.__table__.delete())
-        db.execute(Order.__table__.delete())
-        db.execute(Payment.__table__.delete())
-        db.execute(Complaint.__table__.delete())
-        db.execute(MenuItem.__table__.delete())
-        db.execute(Slot.__table__.delete())
-        db.execute(User.__table__.delete())
+        from sqlalchemy import text
+        table_names = list(Base.metadata.tables.keys())
+        if table_names:
+            tables_str = ", ".join([f'"{name}"' for name in table_names])
+            db.execute(text(f"TRUNCATE TABLE {tables_str} RESTART IDENTITY CASCADE;"))
         db.commit()
-        print("   ✓ All data cleared.")
+        print("   ✓ All data cleared via TRUNCATE CASCADE.")
+    except Exception as e:
+        db.rollback()
+        print(f"   ⚠️ TRUNCATE CASCADE failed: {e}. Trying direct delete...")
+        # Fallback to direct delete in case metadata is not fully populated
+        for table in reversed(Base.metadata.sorted_tables):
+            try:
+                db.execute(table.delete())
+                db.commit()
+            except Exception as ex:
+                db.rollback()
+                print(f"      Could not delete from {table.name}: {ex}")
     finally:
         db.close()
 

@@ -70,6 +70,7 @@ def seed_data(test_db_session):
         price=45,
         image_url="https://example.com/poha.png",
         is_available=True,
+        available_quantity=10,
     )
     test_db_session.add_all([slot, menu_item])
     test_db_session.commit()
@@ -134,4 +135,6 @@ def test_emergency_shutdown_blocks_and_unblocks_order_creation(client, seed_data
         f"/orders/{slot.id}",
         json=[{"menu_item_id": menu_item.id, "quantity": 1}],
     )
+    if allowed_resp.status_code != 200:
+        print("ERROR BODY:", allowed_resp.json())
     assert allowed_resp.status_code == 200

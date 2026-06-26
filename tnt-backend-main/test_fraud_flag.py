@@ -41,6 +41,13 @@ def utcnow_naive() -> datetime:
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def clear_dependency_overrides():
+    app.dependency_overrides.clear()
+    yield
+    app.dependency_overrides.clear()
+
+
 @pytest.fixture()
 def db_session():
     engine = create_engine(

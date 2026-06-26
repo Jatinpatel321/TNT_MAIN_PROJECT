@@ -39,14 +39,90 @@ from app.modules.notifications.model import NotificationType
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-# 👀 VIEW ALL VENDORS
 @router.get("/vendors")
 def list_vendors(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin"))
 ):
-    return jsonable_encoder(db.query(User).filter(User.role == UserRole.VENDOR).all())
+    vendors = db.query(User).filter(User.role == UserRole.VENDOR).order_by(User.created_at.desc()).all()
+    
+    # We will build a rich response similar to what the public API does, 
+    # but including all status fields for the admin.
+    from app.modules.vendors.router import _vendor_profile
+    result = []
+    for v in vendors:
+        profile = _vendor_profile(v.id, db)
+        result.append({
+            "id": v.id,
+            "name": v.name,
+            "phone": v.phone,
+            "vendor_type": v.vendor_type,
+            "is_approved": v.is_approved,
+            "is_active": v.is_active,
+            "created_at": v.created_at.isoformat() if v.created_at else None,
+            "rating": profile["rating"],
+            "location": profile["location"],
+        })
+    return jsonable_encoder(result)
 
+
+@router.get("/vendors/{vendor_id}")
+def get_vendor(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin"))
+):
+    vendor = db.query(User).filter(User.id == vendor_id, User.role == UserRole.VENDOR).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+        
+    from app.modules.vendors.router import _build_vendor_response
+    return _build_vendor_response(vendor, db, vendor.vendor_type or "food")
+
+@router.get("/vendors/{vendor_id}/menu")
+def get_vendor_menu(vendor_id: int, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
+    vendor = db.query(User).filter(User.id == vendor_id, User.role == UserRole.VENDOR).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+        
+    from app.modules.menu.model import MenuItem
+    from app.modules.menu.image_utils import menu_image_for
+    
+    menu_items = db.query(MenuItem).filter(MenuItem.vendor_id == vendor_id).all()
+    payload = []
+    for item in menu_items:
+        img_url = item.image_url or menu_image_for(item.name, vendor.vendor_type or "food")
+        payload.append({
+            "id": item.id,
+            "vendor_id": item.vendor_id,
+            "name": item.name,
+            "description": item.description or f"Delicious {item.name}",
+            "price": item.price,
+            "image_url": img_url,
+            "is_available": item.is_available,
+        })
+    return payload
+
+@router.get("/vendors/{vendor_id}/slots")
+def get_vendor_slots(vendor_id: int, db: Session = Depends(get_db), user=Depends(require_role("admin"))):
+    vendor = db.query(User).filter(User.id == vendor_id, User.role == UserRole.VENDOR).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+        
+    from app.modules.slots.model import Slot
+    slots = db.query(Slot).filter(Slot.vendor_id == vendor_id).order_by(Slot.start_time).all()
+    payload = []
+    for slot in slots:
+        payload.append({
+            "id": slot.id,
+            "vendor_id": slot.vendor_id,
+            "start_time": slot.start_time.isoformat(),
+            "end_time": slot.end_time.isoformat(),
+            "is_active": True,
+            "capacity": slot.max_orders,
+            "booked_count": slot.current_orders,
+        })
+    return payload
 
 # ✅ APPROVE VENDOR
 @router.post("/vendors/{vendor_id}/approve")
