@@ -11,6 +11,7 @@ class AuditLogEntry(BaseModel):
 
     id: int
     actor_id: Optional[int] = None
+    actor_name: Optional[str] = None
     actor_role: Optional[str] = None
     action: str
     action_category: str
@@ -25,6 +26,31 @@ class AuditLogEntry(BaseModel):
 
 
 class AuditLogListResponse(BaseModel):
+    logs: List[AuditLogEntry] = []
+    total: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 1
+
+
+class TopActor(BaseModel):
+    actor_id: Optional[int] = None
+    actor_name: str
+    event_count: int
+
+
+class AuditStatsResponse(BaseModel):
+    total_events: int
+    today_events: int
+    week_events: int
+    auth_events: int
+    order_events: int
+    flagged_events: int
+    category_counts: Dict[str, int]
+    top_actors: List[TopActor]
+
+
+class AuditTimelineResponse(BaseModel):
     logs: List[AuditLogEntry] = []
     total: int = 0
     page: int = 1

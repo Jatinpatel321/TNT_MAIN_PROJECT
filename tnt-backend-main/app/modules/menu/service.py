@@ -44,6 +44,21 @@ def create_menu_item(db: Session, vendor_id: int, data: MenuItemCreate) -> MenuI
         )
         db.add(inventory)
         db.commit()
+        
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.MENU_ITEM_CREATED,
+            action_category=AuditCategory.MENU,
+            actor_id=vendor_id,
+            actor_role="vendor",
+            entity_type="MenuItem",
+            entity_id=str(item.id),
+            after_state={"name": item.name, "price": item.price},
+        )
+    except Exception:
+        pass
     
     return item
 
@@ -102,8 +117,10 @@ def update_menu_item(db: Session, item_id: int, vendor_id: int, data: MenuItemUp
     if not item:
         return None
     
-    # Update fields
     update_data = data.model_dump(exclude_unset=True)
+    before_state = {c.name: getattr(item, c.name) for c in item.__table__.columns if c.name in update_data}
+    
+    # Update fields
     for field, value in update_data.items():
         setattr(item, field, value)
     
@@ -118,6 +135,23 @@ def update_menu_item(db: Session, item_id: int, vendor_id: int, data: MenuItemUp
     
     db.commit()
     db.refresh(item)
+    
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.MENU_ITEM_UPDATED,
+            action_category=AuditCategory.MENU,
+            actor_id=vendor_id,
+            actor_role="vendor",
+            entity_type="MenuItem",
+            entity_id=str(item.id),
+            before_state=before_state,
+            after_state=update_data,
+        )
+    except Exception:
+        pass
+        
     return item
 
 
@@ -131,8 +165,26 @@ def delete_menu_item(db: Session, item_id: int, vendor_id: int) -> bool:
     if not item:
         return False
     
+    name = item.name
+    
     db.delete(item)
     db.commit()
+    
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.MENU_ITEM_DELETED,
+            action_category=AuditCategory.MENU,
+            actor_id=vendor_id,
+            actor_role="vendor",
+            entity_type="MenuItem",
+            entity_id=str(item_id),
+            before_state={"name": name},
+        )
+    except Exception:
+        pass
+        
     return True
 
 
@@ -241,6 +293,8 @@ def update_inventory(db: Session, inventory_id: int, vendor_id: int, data: Inven
         return None
     
     update_data = data.model_dump(exclude_unset=True)
+    before_state = {c.name: getattr(inventory, c.name) for c in inventory.__table__.columns if c.name in update_data}
+    
     for field, value in update_data.items():
         setattr(inventory, field, value)
     
@@ -257,6 +311,23 @@ def update_inventory(db: Session, inventory_id: int, vendor_id: int, data: Inven
     
     db.commit()
     db.refresh(inventory)
+    
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.INVENTORY_UPDATED,
+            action_category=AuditCategory.INVENTORY,
+            actor_id=vendor_id,
+            actor_role="vendor",
+            entity_type="Inventory",
+            entity_id=str(inventory.id),
+            before_state=before_state,
+            after_state=update_data,
+        )
+    except Exception:
+        pass
+        
     return inventory
 
 
@@ -269,6 +340,8 @@ def restock_inventory(db: Session, inventory_id: int, vendor_id: int, quantity: 
     
     if not inventory:
         return None
+        
+    before_stock = inventory.current_stock
     
     inventory.current_stock += quantity
     inventory.menu_item.available_quantity = inventory.current_stock
@@ -281,6 +354,23 @@ def restock_inventory(db: Session, inventory_id: int, vendor_id: int, quantity: 
     
     db.commit()
     db.refresh(inventory)
+    
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.INVENTORY_RESTOCKED,
+            action_category=AuditCategory.INVENTORY,
+            actor_id=vendor_id,
+            actor_role="vendor",
+            entity_type="Inventory",
+            entity_id=str(inventory.id),
+            before_state={"current_stock": before_stock},
+            after_state={"current_stock": inventory.current_stock, "added": quantity},
+        )
+    except Exception:
+        pass
+        
     return inventory
 
 

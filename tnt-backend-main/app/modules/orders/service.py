@@ -88,6 +88,34 @@ def update_order_status(
 
     # Publish event to Redis pub/sub for real-time WebSocket delivery
     _publish_status_event(order, previous_status, new_status)
+    
+    # Audit log
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        
+        actor_id = None
+        actor_role = changed_by
+        if changed_by == "student":
+            actor_id = order.user_id
+        elif changed_by == "vendor":
+            actor_id = order.vendor_id
+            
+        prev_val = previous_status.value if hasattr(previous_status, "value") else str(previous_status)
+        new_val = new_status.value if hasattr(new_status, "value") else str(new_status)
+            
+        write_audit_log(
+            db=db,
+            action=AuditAction.ORDER_UPDATED,
+            action_category=AuditCategory.ORDER,
+            actor_id=actor_id,
+            actor_role=actor_role,
+            entity_type="Order",
+            entity_id=str(order.id),
+            before_state={"status": prev_val},
+            after_state={"status": new_val},
+        )
+    except Exception as e:
+        logger.error(f"Failed to write audit log for order {order.id}: {e}")
 
 
 def _publish_status_event(

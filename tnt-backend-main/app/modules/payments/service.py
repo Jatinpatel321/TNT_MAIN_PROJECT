@@ -280,6 +280,22 @@ def refund_payment(payment_id: int, user: dict, db):
             db=db
         )
 
+    try:
+        from app.modules.auditlog.service import write as write_audit_log, AuditAction, AuditCategory
+        write_audit_log(
+            db=db,
+            action=AuditAction.REFUND_ISSUED,
+            action_category=AuditCategory.PAYMENT,
+            actor_id=user.get("id"),
+            actor_role=user.get("role"),
+            entity_type="Payment",
+            entity_id=str(payment.id),
+            before_state={"status": "SUCCESS"},
+            after_state={"status": "REFUNDED", "razorpay_refund_id": refund["id"]},
+        )
+    except Exception:
+        pass
+
     return {
         "message": "Refund initiated successfully",
         "refund_id": refund["id"]

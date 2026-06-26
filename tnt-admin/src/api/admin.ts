@@ -108,10 +108,25 @@ export const adminApi = {
     page_size?: number;
     search?: string;
     action_category?: string;
+    actor_role?: string;
     date_from?: string;
     date_to?: string;
   }) =>
     api.get('/v1/admin/audit-logs', { params }),
+
+  getAuditStats: () =>
+    api.get('/v1/admin/audit-logs/stats'),
+
+  getAuditTimeline: (actorId: number, params?: { page?: number; page_size?: number }) =>
+    api.get(`/v1/admin/audit-logs/timeline/${actorId}`, { params }),
+
+  exportAuditLogs: (params?: {
+    actor_role?: string;
+    action_category?: string;
+    date_from?: string;
+    date_to?: string;
+  }) =>
+    api.get('/v1/admin/audit-logs/export', { params, responseType: 'blob' }),
 
   // Conflict resolution
   getConflicts: () =>

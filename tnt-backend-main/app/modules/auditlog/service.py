@@ -6,6 +6,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.modules.auditlog.model import AuditLog
+from app.modules.users.model import User
 
 
 # Action constants
@@ -20,11 +21,23 @@ class AuditAction:
     VENDOR_SUSPENDED = "vendor.suspended"
     ORDER_OVERRIDE = "order.status_overridden"
     ORDER_CANCELLED = "order.cancelled_by_admin"
+    ORDER_UPDATED = "order.updated"
     POLICY_UPDATED = "policy.updated"
     FACULTY_POLICY_UPDATED = "policy.faculty_priority_updated"
     VOUCHER_CREATED = "voucher.created"
     VOUCHER_DELETED = "voucher.deleted"
     ANNOUNCEMENT_SENT = "announcement.sent"
+    REFUND_ISSUED = "refund.issued"
+    REFUND_REJECTED = "refund.rejected"
+    MENU_ITEM_CREATED = "menu.item_created"
+    MENU_ITEM_UPDATED = "menu.item_updated"
+    MENU_ITEM_DELETED = "menu.item_deleted"
+    INVENTORY_UPDATED = "inventory.updated"
+    INVENTORY_RESTOCKED = "inventory.restocked"
+    SETTINGS_CHANGED = "settings.changed"
+    USER_LOGIN = "auth.user_login"
+    VENDOR_LOGIN = "auth.vendor_login"
+    ADMIN_LOGIN = "auth.admin_login"
 
 
 class AuditCategory:
@@ -35,6 +48,10 @@ class AuditCategory:
     POLICY = "policy"
     VOUCHER = "voucher"
     ANNOUNCEMENT = "announcement"
+    REFUND = "refund"
+    MENU = "menu"
+    INVENTORY = "inventory"
+    SETTINGS = "settings"
 
 
 def write(
@@ -81,6 +98,7 @@ def list_audit_logs(
     page: int = 1,
     page_size: int = 50,
     actor_id: Optional[int] = None,
+    actor_role: Optional[str] = None,
     action_category: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[str] = None,
@@ -89,11 +107,14 @@ def list_audit_logs(
     date_to: Optional[str] = None,
 ) -> Dict[str, Any]:
     from datetime import datetime
+    from sqlalchemy import or_
 
-    query = db.query(AuditLog)
+    query = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.actor_id == User.id)
 
     if actor_id:
         query = query.filter(AuditLog.actor_id == actor_id)
+    if actor_role:
+        query = query.filter(AuditLog.actor_role == actor_role)
     if action_category:
         query = query.filter(AuditLog.action_category == action_category)
     if entity_type:
@@ -101,7 +122,14 @@ def list_audit_logs(
     if entity_id:
         query = query.filter(AuditLog.entity_id == entity_id)
     if search:
-        query = query.filter(AuditLog.action.ilike(f"%{search}%"))
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                AuditLog.action.ilike(search_filter),
+                AuditLog.entity_type.ilike(search_filter),
+                AuditLog.entity_id.ilike(search_filter)
+            )
+        )
     if date_from:
         query = query.filter(AuditLog.created_at >= datetime.fromisoformat(date_from))
     if date_to:
@@ -109,12 +137,18 @@ def list_audit_logs(
 
     total = query.count()
     offset = (page - 1) * page_size
-    logs = (
+    results = (
         query.order_by(desc(AuditLog.created_at))
         .offset(offset)
         .limit(page_size)
         .all()
     )
+    
+    logs = []
+    for log, actor_name in results:
+        log_dict = {c.name: getattr(log, c.name) for c in log.__table__.columns}
+        log_dict["actor_name"] = actor_name
+        logs.append(log_dict)
 
     return {
         "logs": logs,
@@ -122,4 +156,66 @@ def list_audit_logs(
         "page": page,
         "page_size": page_size,
         "total_pages": max(1, -(-total // page_size)),
+    }
+
+
+def get_timeline(db: Session, actor_id: int, page: int = 1, page_size: int = 50) -> Dict[str, Any]:
+    query = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.actor_id == User.id)
+    query = query.filter(AuditLog.actor_id == actor_id)
+    total = query.count()
+    offset = (page - 1) * page_size
+    results = query.order_by(desc(AuditLog.created_at)).offset(offset).limit(page_size).all()
+    
+    logs = []
+    for log, actor_name in results:
+        log_dict = {c.name: getattr(log, c.name) for c in log.__table__.columns}
+        log_dict["actor_name"] = actor_name
+        logs.append(log_dict)
+
+    return {
+        "logs": logs,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": max(1, -(-total // page_size)),
+    }
+
+
+def get_summary_stats(db: Session) -> Dict[str, Any]:
+    from sqlalchemy import func
+    from datetime import datetime, timedelta
+    
+    now = datetime.utcnow()
+    yesterday = now - timedelta(days=1)
+    last_week = now - timedelta(days=7)
+    
+    total_events = db.query(AuditLog).count()
+    today_events = db.query(AuditLog).filter(AuditLog.created_at >= yesterday).count()
+    week_events = db.query(AuditLog).filter(AuditLog.created_at >= last_week).count()
+    
+    auth_events = db.query(AuditLog).filter(AuditLog.action_category == AuditCategory.AUTH).count()
+    order_events = db.query(AuditLog).filter(AuditLog.action_category == AuditCategory.ORDER).count()
+    flagged_events = db.query(AuditLog).filter(AuditLog.action_category.in_([AuditCategory.POLICY, AuditCategory.REFUND])).count()
+    
+    category_counts = db.query(AuditLog.action_category, func.count(AuditLog.id)).group_by(AuditLog.action_category).all()
+    
+    # Top actors
+    top_actors_query = db.query(
+        AuditLog.actor_id, User.full_name, func.count(AuditLog.id).label("event_count")
+    ).outerjoin(User, AuditLog.actor_id == User.id).group_by(AuditLog.actor_id, User.full_name).order_by(desc("event_count")).limit(5).all()
+    
+    top_actors = [
+        {"actor_id": r[0], "actor_name": r[1] or "System", "event_count": r[2]}
+        for r in top_actors_query
+    ]
+    
+    return {
+        "total_events": total_events,
+        "today_events": today_events,
+        "week_events": week_events,
+        "auth_events": auth_events,
+        "order_events": order_events,
+        "flagged_events": flagged_events,
+        "category_counts": {c[0]: c[1] for c in category_counts},
+        "top_actors": top_actors,
     }
