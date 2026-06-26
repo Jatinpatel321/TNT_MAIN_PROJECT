@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, extract, cast, Date as SADate, Integer, case
+from sqlalchemy import func, extract, cast, Date as SADate, Integer, case, text
 from sqlalchemy.orm import Session
 
 from app.core.redis_cache import cache_service
@@ -120,11 +120,11 @@ class KPIService:
             weekly_orders = [{"date": str(r[0]), "count": r[1]} for r in weekly_rows]
         else:
             weekly_query = self.db.query(
-                func.date_trunc("week", Order.created_at).label("week"),
+                func.date_trunc(text("'week'"), Order.created_at).label("week"),
                 func.count(Order.id).label("count")
             )
             weekly_query = self._apply_order_filters(weekly_query, date_from_dt, date_to_dt, department, vendor_id)
-            weekly_rows = weekly_query.group_by(func.date_trunc("week", Order.created_at)).order_by(func.date_trunc("week", Order.created_at)).all()
+            weekly_rows = weekly_query.group_by(func.date_trunc(text("'week'"), Order.created_at)).order_by(func.date_trunc(text("'week'"), Order.created_at)).all()
             weekly_orders = [{"date": str(r.week.date() if hasattr(r.week, 'date') else r.week), "count": r.count} for r in weekly_rows]
 
         # Monthly Trend
@@ -136,11 +136,11 @@ class KPIService:
             monthly_orders = [{"date": str(r[0]), "count": r[1]} for r in monthly_rows]
         else:
             monthly_query = self.db.query(
-                func.date_trunc("month", Order.created_at).label("month"),
+                func.date_trunc(text("'month'"), Order.created_at).label("month"),
                 func.count(Order.id).label("count")
             )
             monthly_query = self._apply_order_filters(monthly_query, date_from_dt, date_to_dt, department, vendor_id)
-            monthly_rows = monthly_query.group_by(func.date_trunc("month", Order.created_at)).order_by(func.date_trunc("month", Order.created_at)).all()
+            monthly_rows = monthly_query.group_by(func.date_trunc(text("'month'"), Order.created_at)).order_by(func.date_trunc(text("'month'"), Order.created_at)).all()
             monthly_orders = [{"date": str(r.month.date() if hasattr(r.month, 'date') else r.month), "count": r.count} for r in monthly_rows]
 
         total_orders = food_orders + stationery_orders
@@ -191,35 +191,53 @@ class KPIService:
         max_slots_sum = slot_res[1] or 0
         slot_utilization = round((current_slots_sum / max_slots_sum) * 100, 1) if max_slots_sum > 0 else 0.0
 
-        # Vendor Performance list
+        # Vendor Performance list (Optimized to prevent N+1 query loop)
+        from sqlalchemy import case
+
+        # Aggregate stats for all vendors in a single query
+        vendor_stats_query = self.db.query(
+            Order.vendor_id,
+            func.count(Order.id).label("orders_count"),
+            func.sum(case((Order.status == OrderStatus.CANCELLED, 1), else_=0)).label("cancelled_count"),
+            func.avg(Order.actual_completion_minutes).label("avg_wait")
+        ).group_by(Order.vendor_id)
+        vendor_stats_query = self._apply_order_filters(vendor_stats_query, date_from_dt, date_to_dt, department, None)
+        vendor_stats_res = vendor_stats_query.all()
+
+        stats_map = {
+            r.vendor_id: {
+                "orders_count": r.orders_count,
+                "cancelled_count": int(r.cancelled_count or 0),
+                "avg_wait": r.avg_wait
+            }
+            for r in vendor_stats_res
+        }
+
+        # Aggregate feedback overall ratings for all vendors in a single query
+        ratings_query = self.db.query(
+            Feedback.vendor_id,
+            func.avg(Feedback.overall_rating).label("avg_rating")
+        ).group_by(Feedback.vendor_id)
+        if date_from_dt:
+            ratings_query = ratings_query.filter(Feedback.created_at >= date_from_dt)
+        if date_to_dt:
+            ratings_query = ratings_query.filter(Feedback.created_at <= date_to_dt)
+        ratings_res = ratings_query.all()
+        ratings_map = {r.vendor_id: r.avg_rating for r in ratings_res}
+
         vendor_perf = []
         vendors = self.db.query(User).filter(User.role == UserRole.VENDOR).all()
         for v in vendors:
-            # Filters specific to this vendor
-            v_order_q = self.db.query(func.count(Order.id)).filter(Order.vendor_id == v.id)
-            v_order_q = self._apply_order_filters(v_order_q, date_from_dt, date_to_dt, department, None)
-            v_orders = v_order_q.scalar() or 0
+            v_stats = stats_map.get(v.id, {"orders_count": 0, "cancelled_count": 0, "avg_wait": None})
+            v_orders = v_stats["orders_count"]
 
             if v_orders == 0 and vendor_id and vendor_id != v.id:
                 continue
 
-            v_cancelled_q = self.db.query(func.count(Order.id)).filter(Order.vendor_id == v.id, Order.status == OrderStatus.CANCELLED)
-            v_cancelled_q = self._apply_order_filters(v_cancelled_q, date_from_dt, date_to_dt, department, None)
-            v_cancelled = v_cancelled_q.scalar() or 0
+            v_cancelled = v_stats["cancelled_count"]
             v_comp_rate = round(((v_orders - v_cancelled) / v_orders) * 100, 1) if v_orders > 0 else 100.0
-
-            # Wait time
-            v_wait_q = self.db.query(func.avg(Order.actual_completion_minutes)).filter(Order.vendor_id == v.id, Order.actual_completion_minutes.isnot(None))
-            v_wait_q = self._apply_order_filters(v_wait_q, date_from_dt, date_to_dt, department, None)
-            v_wait = v_wait_q.scalar()
-
-            # Ratings
-            ratings_q = self.db.query(func.avg(Feedback.overall_rating)).filter(Feedback.vendor_id == v.id)
-            if date_from_dt:
-                ratings_q = ratings_q.filter(Feedback.created_at >= date_from_dt)
-            if date_to_dt:
-                ratings_q = ratings_q.filter(Feedback.created_at <= date_to_dt)
-            avg_rating = ratings_q.scalar() or 5.0
+            v_wait = v_stats["avg_wait"]
+            avg_rating = ratings_map.get(v.id, 5.0) or 5.0
 
             vendor_perf.append({
                 "vendor_id": v.id,
@@ -351,95 +369,69 @@ class KPIService:
         points_redeemed_q = self._apply_order_filters(points_redeemed_q, date_from_dt, date_to_dt, department, vendor_id)
         points_redeemed = points_redeemed_q.scalar() or 0.0
 
-        # ── DEPARTMENT ANALYTICS ──────────────────────────────────────────────
-        dept_orders_q = self.db.query(
+        # ── DEPARTMENT ANALYTICS (Optimized into a single query)
+        from sqlalchemy import case, and_
+        dept_q = self.db.query(
             User.department,
             func.count(Order.id).label("order_count"),
-            func.count(func.distinct(Order.user_id)).label("active_users")
-        ).join(Order, User.id == Order.user_id)
-        dept_orders_q = self._apply_order_filters(dept_orders_q, date_from_dt, date_to_dt, None, vendor_id)
-        dept_orders_res = dept_orders_q.group_by(User.department).all()
-
-        dept_revenue_q = self.db.query(
-            User.department,
-            func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
+            func.count(func.distinct(Order.user_id)).label("active_users"),
+            func.coalesce(func.sum(case((Payment.status == PaymentStatus.SUCCESS, Payment.amount), else_=0)), 0).label("revenue_paise")
         ).join(Order, User.id == Order.user_id)\
-         .join(Payment, Order.id == Payment.order_id)\
-         .filter(Payment.status == PaymentStatus.SUCCESS)
-        dept_revenue_q = self._apply_order_filters(dept_revenue_q, date_from_dt, date_to_dt, None, vendor_id)
-        dept_revenue_res = {r.department: r.revenue_paise for r in dept_revenue_q.group_by(User.department).all()}
+         .outerjoin(Payment, Order.id == Payment.order_id)
+        dept_q = self._apply_order_filters(dept_q, date_from_dt, date_to_dt, None, vendor_id)
+        dept_res = dept_q.group_by(User.department).all()
 
         department_analytics = [
             {
                 "department": r.department or "Other/Unknown",
                 "order_count": r.order_count,
                 "active_users": r.active_users,
-                "revenue_inr": float(dept_revenue_res.get(r.department, 0)) / 100.0
+                "revenue_inr": float(r.revenue_paise) / 100.0
             }
-            for r in dept_orders_res
+            for r in dept_res
         ]
 
-        # ── FOOD & STATIONERY TRENDS ──────────────────────────────────────────
+        # ── FOOD, STATIONERY & REVENUE TRENDS (Optimized into a single combined query)
         if is_sqlite:
             day_field = func.strftime("%Y-%m-%d", Order.created_at).label("day")
-            food_trend_q = self.db.query(
-                day_field,
-                func.count(Order.id).label("count"),
-                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
-            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
-             .filter(Order.booking_type == "food", Payment.status == PaymentStatus.SUCCESS)
-            food_trend_q = self._apply_order_filters(food_trend_q, date_from_dt, date_to_dt, department, vendor_id)
-            food_trend_rows = food_trend_q.group_by(day_field).order_by(day_field).all()
-            food_trends = [{"date": str(r[0]), "orders": r[1], "revenue_inr": float(r[2]) / 100.0} for r in food_trend_rows]
-
-            stat_trend_q = self.db.query(
-                day_field,
-                func.count(Order.id).label("count"),
-                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
-            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
-             .filter(Order.booking_type == "stationery", Payment.status == PaymentStatus.SUCCESS)
-            stat_trend_q = self._apply_order_filters(stat_trend_q, date_from_dt, date_to_dt, department, vendor_id)
-            stat_trend_rows = stat_trend_q.group_by(day_field).order_by(day_field).all()
-            stationery_trends = [{"date": str(r[0]), "orders": r[1], "revenue_inr": float(r[2]) / 100.0} for r in stat_trend_rows]
-
-            rev_trend_q = self.db.query(
-                day_field,
-                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
-            ).join(Order, Payment.order_id == Order.id)\
-             .filter(Payment.status == PaymentStatus.SUCCESS)
-            rev_trend_q = self._apply_order_filters(rev_trend_q, date_from_dt, date_to_dt, department, vendor_id)
-            rev_trend_rows = rev_trend_q.group_by(day_field).order_by(day_field).all()
-            revenue_trends = [{"date": str(r[0]), "revenue_inr": float(r[1]) / 100.0} for r in rev_trend_rows]
         else:
             day_field = cast(Order.created_at, SADate).label("day")
-            food_trend_q = self.db.query(
-                day_field,
-                func.count(Order.id).label("count"),
-                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
-            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
-             .filter(Order.booking_type == "food", Payment.status == PaymentStatus.SUCCESS)
-            food_trend_q = self._apply_order_filters(food_trend_q, date_from_dt, date_to_dt, department, vendor_id)
-            food_trend_rows = food_trend_q.group_by(day_field).order_by(day_field).all()
-            food_trends = [{"date": str(r.day), "orders": r.count, "revenue_inr": float(r.revenue_paise) / 100.0} for r in food_trend_rows]
 
-            stat_trend_q = self.db.query(
-                day_field,
-                func.count(Order.id).label("count"),
-                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
-            ).join(Payment, Order.id == Payment.order_id, isouter=True)\
-             .filter(Order.booking_type == "stationery", Payment.status == PaymentStatus.SUCCESS)
-            stat_trend_q = self._apply_order_filters(stat_trend_q, date_from_dt, date_to_dt, department, vendor_id)
-            stat_trend_rows = stat_trend_q.group_by(day_field).order_by(day_field).all()
-            stationery_trends = [{"date": str(r.day), "orders": r.count, "revenue_inr": float(r.revenue_paise) / 100.0} for r in stat_trend_rows]
+        combined_trend_q = self.db.query(
+            day_field,
+            func.sum(case((and_(Order.booking_type == "food", Payment.status == PaymentStatus.SUCCESS), 1), else_=0)).label("food_orders"),
+            func.sum(case((and_(Order.booking_type == "food", Payment.status == PaymentStatus.SUCCESS), Payment.amount), else_=0)).label("food_revenue_paise"),
+            func.sum(case((and_(Order.booking_type == "stationery", Payment.status == PaymentStatus.SUCCESS), 1), else_=0)).label("stat_orders"),
+            func.sum(case((and_(Order.booking_type == "stationery", Payment.status == PaymentStatus.SUCCESS), Payment.amount), else_=0)).label("stat_revenue_paise"),
+            func.sum(case((Payment.status == PaymentStatus.SUCCESS, Payment.amount), else_=0)).label("total_revenue_paise")
+        ).outerjoin(Payment, Order.id == Payment.order_id)
+        
+        combined_trend_q = self._apply_order_filters(combined_trend_q, date_from_dt, date_to_dt, department, vendor_id)
+        
+        if is_sqlite:
+            combined_trend_rows = combined_trend_q.group_by(func.strftime("%Y-%m-%d", Order.created_at)).order_by(day_field).all()
+        else:
+            combined_trend_rows = combined_trend_q.group_by(cast(Order.created_at, SADate)).order_by(day_field).all()
 
-            rev_trend_q = self.db.query(
-                cast(Payment.created_at, SADate).label("day"),
-                func.coalesce(func.sum(Payment.amount), 0).label("revenue_paise")
-            ).join(Order, Payment.order_id == Order.id)\
-             .filter(Payment.status == PaymentStatus.SUCCESS)
-            rev_trend_q = self._apply_order_filters(rev_trend_q, date_from_dt, date_to_dt, department, vendor_id)
-            rev_trend_rows = rev_trend_q.group_by(cast(Payment.created_at, SADate)).order_by(cast(Payment.created_at, SADate)).all()
-            revenue_trends = [{"date": str(r.day), "revenue_inr": float(r.revenue_paise) / 100.0} for r in rev_trend_rows]
+        food_trends = []
+        stationery_trends = []
+        revenue_trends = []
+        for r in combined_trend_rows:
+            day_str = str(r[0])
+            food_trends.append({
+                "date": day_str,
+                "orders": int(r.food_orders or 0),
+                "revenue_inr": float(r.food_revenue_paise or 0) / 100.0
+            })
+            stationery_trends.append({
+                "date": day_str,
+                "orders": int(r.stat_orders or 0),
+                "revenue_inr": float(r.stat_revenue_paise or 0) / 100.0
+            })
+            revenue_trends.append({
+                "date": day_str,
+                "revenue_inr": float(r.total_revenue_paise or 0) / 100.0
+            })
 
         # ── PEAK HOUR ANALYSIS ────────────────────────────────────────────────
         if is_sqlite:

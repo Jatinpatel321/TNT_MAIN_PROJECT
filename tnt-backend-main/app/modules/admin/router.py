@@ -267,133 +267,141 @@ def mark_order_fraud(
 
 # 📊 ANALYTICS ENDPOINT
 @router.get("/analytics")
-def get_analytics(
+async def get_analytics(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin"))
 ) -> dict[str, Any]:
     from datetime import timedelta
+    from app.core.redis_cache import cache_service
 
-    now = utcnow_naive()
-    thirty_days_ago = now - timedelta(days=30)
-    this_week_start = now - timedelta(days=7)
-    last_week_start = now - timedelta(days=14)
+    def fetch_analytics():
+        now = utcnow_naive()
+        thirty_days_ago = now - timedelta(days=30)
+        this_week_start = now - timedelta(days=7)
+        last_week_start = now - timedelta(days=14)
 
-    total_users = db.query(User).count()
-    total_vendors = db.query(User).filter(User.role == UserRole.VENDOR).count()
-    total_students = db.query(User).filter(User.role == UserRole.STUDENT).count()
-    total_orders = db.query(Order).count()
-    total_revenue_paise = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.status == PaymentStatus.SUCCESS
-    ).scalar() or 0
+        total_users = db.query(User).count()
+        total_vendors = db.query(User).filter(User.role == UserRole.VENDOR).count()
+        total_students = db.query(User).filter(User.role == UserRole.STUDENT).count()
+        total_orders = db.query(Order).count()
+        total_revenue_paise = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.status == PaymentStatus.SUCCESS
+        ).scalar() or 0
 
-    from sqlalchemy import cast, Date as SADate, text
-    orders_by_day_rows = db.query(
-        cast(Order.created_at, SADate).label("day"),
-        func.count(Order.id).label("count"),
-    ).filter(Order.created_at >= thirty_days_ago)\
-     .group_by(cast(Order.created_at, SADate))\
-     .order_by(cast(Order.created_at, SADate))\
-     .all()
-    orders_by_day = [{"date": str(r.day), "orders": r.count} for r in orders_by_day_rows]
+        orders_by_day_rows = db.query(
+            func.date(Order.created_at).label("day"),
+            func.count(Order.id).label("count"),
+        ).filter(Order.created_at >= thirty_days_ago)\
+         .group_by(func.date(Order.created_at))\
+         .order_by(func.date(Order.created_at))\
+         .all()
+        orders_by_day = [{"date": str(r.day), "orders": r.count} for r in orders_by_day_rows]
 
-    revenue_by_day_rows = db.query(
-        cast(Payment.created_at, SADate).label("day"),
-        func.coalesce(func.sum(Payment.amount), 0).label("revenue"),
-    ).filter(
-        Payment.status == PaymentStatus.SUCCESS,
-        Payment.created_at >= thirty_days_ago,
-    ).group_by(cast(Payment.created_at, SADate))\
-     .order_by(cast(Payment.created_at, SADate))\
-     .all()
-    revenue_by_day = [{"date": str(r.day), "revenue_paise": int(r.revenue)} for r in revenue_by_day_rows]
+        revenue_by_day_rows = db.query(
+            func.date(Payment.created_at).label("day"),
+            func.coalesce(func.sum(Payment.amount), 0).label("revenue"),
+        ).filter(
+            Payment.status == PaymentStatus.SUCCESS,
+            Payment.created_at >= thirty_days_ago,
+        ).group_by(func.date(Payment.created_at))\
+         .order_by(func.date(Payment.created_at))\
+         .all()
+        revenue_by_day = [{"date": str(r.day), "revenue_paise": int(r.revenue)} for r in revenue_by_day_rows]
 
-    signups_by_day_rows = db.query(
-        cast(User.created_at, SADate).label("day"),
-        func.count(User.id).label("count"),
-    ).filter(User.created_at >= thirty_days_ago)\
-     .group_by(cast(User.created_at, SADate))\
-     .order_by(cast(User.created_at, SADate))\
-     .all()
-    signups_by_day = [{"date": str(r.day), "signups": r.count} for r in signups_by_day_rows]
+        signups_by_day_rows = db.query(
+            func.date(User.created_at).label("day"),
+            func.count(User.id).label("count"),
+        ).filter(User.created_at >= thirty_days_ago)\
+         .group_by(func.date(User.created_at))\
+         .order_by(func.date(User.created_at))\
+         .all()
+        signups_by_day = [{"date": str(r.day), "signups": r.count} for r in signups_by_day_rows]
 
-    status_rows = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
-    order_status = {row[0].value if row[0] else "unknown": row[1] for row in status_rows}
+        status_rows = db.query(Order.status, func.count(Order.id)).group_by(Order.status).all()
+        order_status = {row[0].value if row[0] else "unknown": row[1] for row in status_rows}
 
-    pay_rows = db.query(Payment.status, func.count(Payment.id)).group_by(Payment.status).all()
-    payment_status = {row[0].value if row[0] else "unknown": row[1] for row in pay_rows}
+        pay_rows = db.query(Payment.status, func.count(Payment.id)).group_by(Payment.status).all()
+        payment_status = {row[0].value if row[0] else "unknown": row[1] for row in pay_rows}
 
-    top_vendor_rows = db.query(
-        Order.vendor_id,
-        func.count(Order.id).label("order_count"),
-        func.coalesce(func.sum(Order.total_amount), 0).label("total_revenue"),
-    ).group_by(Order.vendor_id)\
-     .order_by(func.count(Order.id).desc())\
-     .limit(10).all()
-    top_vendors = [
-        {
-            "vendor_id": r.vendor_id,
-            "order_count": r.order_count,
-            "total_revenue_paise": int(r.total_revenue),
+        top_vendor_rows = db.query(
+            Order.vendor_id,
+            func.count(Order.id).label("order_count"),
+            func.coalesce(func.sum(Order.total_amount), 0).label("total_revenue"),
+        ).group_by(Order.vendor_id)\
+         .order_by(func.count(Order.id).desc())\
+         .limit(10).all()
+        top_vendors = [
+            {
+                "vendor_id": r.vendor_id,
+                "order_count": r.order_count,
+                "total_revenue_paise": int(r.total_revenue),
+            }
+            for r in top_vendor_rows
+        ]
+
+        from sqlalchemy import extract
+        peak_rows = db.query(
+            extract("hour", Order.created_at).label("hour"),
+            func.count(Order.id).label("count"),
+        ).group_by(extract("hour", Order.created_at))\
+         .order_by(extract("hour", Order.created_at))\
+         .all()
+        peak_hours = {int(r.hour): r.count for r in peak_rows}
+
+        this_week_orders = db.query(func.count(Order.id)).filter(
+            Order.created_at >= this_week_start
+        ).scalar() or 0
+        last_week_orders = db.query(func.count(Order.id)).filter(
+            Order.created_at >= last_week_start,
+            Order.created_at < this_week_start,
+        ).scalar() or 0
+
+        this_week_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.status == PaymentStatus.SUCCESS,
+            Payment.created_at >= this_week_start,
+        ).scalar() or 0
+        last_week_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.status == PaymentStatus.SUCCESS,
+            Payment.created_at >= last_week_start,
+            Payment.created_at < this_week_start,
+        ).scalar() or 0
+
+        total_flagged = db.query(func.count(Order.id)).filter(Order.fraud_flag == True).scalar() or 0
+        fraud_rate_pct = round(total_flagged / total_orders * 100, 2) if total_orders else 0.0
+
+        return {
+            "totals": {
+                "users": total_users,
+                "vendors": total_vendors,
+                "students": total_students,
+                "orders": total_orders,
+                "revenue_paise": int(total_revenue_paise),
+            },
+            "orders_by_day": orders_by_day,
+            "revenue_by_day": revenue_by_day,
+            "signups_by_day": signups_by_day,
+            "order_status": order_status,
+            "payment_status": payment_status,
+            "top_vendors": top_vendors,
+            "peak_hours": peak_hours,
+            "week_comparison": {
+                "this_week": {"orders": this_week_orders, "revenue_paise": int(this_week_revenue)},
+                "last_week": {"orders": last_week_orders, "revenue_paise": int(last_week_revenue)},
+                "order_delta": this_week_orders - last_week_orders,
+                "revenue_delta_paise": int(this_week_revenue) - int(last_week_revenue),
+            },
+            "fraud_stats": {
+                "total_flagged": total_flagged,
+                "fraud_rate_pct": fraud_rate_pct,
+            },
         }
-        for r in top_vendor_rows
-    ]
 
-    from sqlalchemy import extract
-    peak_rows = db.query(
-        extract("hour", Order.created_at).label("hour"),
-        func.count(Order.id).label("count"),
-    ).group_by(extract("hour", Order.created_at))\
-     .order_by(extract("hour", Order.created_at))\
-     .all()
-    peak_hours = {int(r.hour): r.count for r in peak_rows}
-
-    this_week_orders = db.query(func.count(Order.id)).filter(
-        Order.created_at >= this_week_start
-    ).scalar() or 0
-    last_week_orders = db.query(func.count(Order.id)).filter(
-        Order.created_at >= last_week_start,
-        Order.created_at < this_week_start,
-    ).scalar() or 0
-
-    this_week_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.status == PaymentStatus.SUCCESS,
-        Payment.created_at >= this_week_start,
-    ).scalar() or 0
-    last_week_revenue = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
-        Payment.status == PaymentStatus.SUCCESS,
-        Payment.created_at >= last_week_start,
-        Payment.created_at < this_week_start,
-    ).scalar() or 0
-
-    total_flagged = db.query(func.count(Order.id)).filter(Order.fraud_flag == True).scalar() or 0
-    fraud_rate_pct = round(total_flagged / total_orders * 100, 2) if total_orders else 0.0
-
-    return {
-        "totals": {
-            "users": total_users,
-            "vendors": total_vendors,
-            "students": total_students,
-            "orders": total_orders,
-            "revenue_paise": int(total_revenue_paise),
-        },
-        "orders_by_day": orders_by_day,
-        "revenue_by_day": revenue_by_day,
-        "signups_by_day": signups_by_day,
-        "order_status": order_status,
-        "payment_status": payment_status,
-        "top_vendors": top_vendors,
-        "peak_hours": peak_hours,
-        "week_comparison": {
-            "this_week": {"orders": this_week_orders, "revenue_paise": int(this_week_revenue)},
-            "last_week": {"orders": last_week_orders, "revenue_paise": int(last_week_revenue)},
-            "order_delta": this_week_orders - last_week_orders,
-            "revenue_delta_paise": int(this_week_revenue) - int(last_week_revenue),
-        },
-        "fraud_stats": {
-            "total_flagged": total_flagged,
-            "fraud_rate_pct": fraud_rate_pct,
-        },
-    }
+    return await cache_service.get_or_set(
+        category="analytics",
+        identifier="admin_general_analytics",
+        fetch_func=fetch_analytics,
+        ttl=300
+    )
 
 
 @router.get("/analytics/kpis", summary="Get aggregated institutional KPIs with filters")
@@ -560,7 +568,7 @@ def export_revenue(
 
 @router.get("/export/kpis", summary="Export KPIs as PDF or Excel")
 def export_kpis(
-    format: str = Query("excel", regex="^(excel|pdf)$"),
+    format: str = Query("excel", pattern="^(excel|pdf)$"),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     department: Optional[str] = Query(None),

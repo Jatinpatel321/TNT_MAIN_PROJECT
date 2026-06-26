@@ -17,7 +17,7 @@ class TestNotificationsAPI:
 
     def _create_vendor(self, db: Session) -> Vendor:
         """Helper to create a test vendor."""
-        user = User(phone="+919999999401", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999401", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -145,7 +145,7 @@ class TestNotificationModel:
         from app.modules.users.model import User, UserRole
         from app.modules.vendors.model import Vendor, VendorStatus
 
-        user = User(phone="+919999999402", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999402", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 

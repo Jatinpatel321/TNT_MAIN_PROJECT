@@ -17,7 +17,7 @@ class TestVendorProfileAPI:
 
     def _create_vendor(self, db: Session) -> Vendor:
         """Helper to create a test vendor."""
-        user = User(phone="+919999999801", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999801", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -128,7 +128,7 @@ class TestStaffManagementAPI:
 
     def _create_vendor_with_owner(self, db: Session) -> Vendor:
         """Helper to create vendor and return it."""
-        user = User(phone="+919999999802", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999802", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -302,7 +302,7 @@ class TestVendorProfileModel:
 
     def test_create_vendor_profile(self, db: Session):
         """Test creating vendor profile."""
-        user = User(phone="+919999999803", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999803", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -344,7 +344,7 @@ class TestVendorProfileModel:
 
     def test_create_staff_permission(self, db: Session):
         """Test creating staff permission."""
-        user = User(phone="+919999999804", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999804", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 

@@ -16,7 +16,7 @@ class TestAIServicesAPI:
 
     def _create_vendor(self, db: Session) -> Vendor:
         """Helper to create a test vendor."""
-        user = User(phone="+919999999001", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999001", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -104,7 +104,7 @@ class TestAIServicesAPI:
 
     def test_ai_with_no_historical_data(self, client: TestClient, db: Session):
         """Test AI endpoints with no historical data."""
-        user = User(phone="+919999999002", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999002", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 

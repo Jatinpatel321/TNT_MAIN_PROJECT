@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -11,7 +13,9 @@ from app.modules.vendors.model import Vendor, VendorStatus
 from app.modules.orders.model import Order, OrderItem, OrderStatus
 from app.modules.payments.model import Payment, PaymentStatus
 from app.modules.menu.model import MenuItem
+from app.modules.slots.model import Slot, SlotStatus
 from app.core.security import create_access_token
+from app.core.time_utils import utcnow_naive
 
 
 class TestAnalyticsAPI:
@@ -19,7 +23,7 @@ class TestAnalyticsAPI:
 
     def _create_vendor_with_orders(self, db: Session) -> Vendor:
         """Helper to create vendor with sample orders."""
-        user = User(phone="+919999999201", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999201", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -34,16 +38,30 @@ class TestAnalyticsAPI:
         db.commit()
         db.refresh(vendor)
 
+        # Create a slot (required by Order.slot_id NOT NULL)
+        now = utcnow_naive()
+        slot = Slot(
+            vendor_id=user.id,
+            start_time=now,
+            end_time=now + timedelta(hours=1),
+            max_orders=50,
+            current_orders=0,
+            status=SlotStatus.AVAILABLE,
+        )
+        db.add(slot)
+        db.commit()
+        db.refresh(slot)
+
         # Create menu items
         for i in range(3):
             item = MenuItem(
-                vendor_id=vendor.vendor_id,
+                vendor_id=user.id,
                 name=f"Item {i}",
                 description=f"Description {i}",
                 price=100 + i * 50,
                 category="main",
                 is_available=True,
-                preparation_time=10,
+                prep_time_minutes=10,
             )
             db.add(item)
         db.commit()
@@ -51,8 +69,9 @@ class TestAnalyticsAPI:
         # Create orders
         for i in range(5):
             order = Order(
-                vendor_id=vendor.vendor_id,
+                vendor_id=user.id,
                 user_id=user.id,
+                slot_id=slot.id,
                 total_amount=100 + i * 50,
                 status=OrderStatus.COMPLETED,
             )
@@ -73,8 +92,10 @@ class TestAnalyticsAPI:
         return vendor
 
     def _get_auth_header(self, vendor_id: int) -> dict:
-        """Helper to create auth header."""
-        token = create_access_token(vendor_id, "vendor_owner")
+        """Helper to create auth header for vendor."""
+        token = create_access_token(
+            {"sub": str(vendor_id), "role": "vendor_owner"}, 60
+        )
         return {"Authorization": f"Bearer {token}"}
 
     def test_get_daily_sales(self, client: TestClient, db: Session):
@@ -203,7 +224,7 @@ class TestAnalyticsAPI:
 
     def test_analytics_with_no_orders(self, client: TestClient, db: Session):
         """Test analytics with no orders returns empty data."""
-        user = User(phone="+919999999202", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999202", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -235,7 +256,7 @@ class TestAnalyticsModel:
         from app.modules.users.model import User, UserRole
         from app.modules.vendors.model import Vendor, VendorStatus
 
-        user = User(phone="+919999999203", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999203", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -250,9 +271,24 @@ class TestAnalyticsModel:
         db.commit()
         db.refresh(vendor)
 
+        # Create a slot required by Order
+        now = utcnow_naive()
+        slot = Slot(
+            vendor_id=user.id,
+            start_time=now,
+            end_time=now + timedelta(hours=1),
+            max_orders=50,
+            current_orders=0,
+            status=SlotStatus.AVAILABLE,
+        )
+        db.add(slot)
+        db.commit()
+        db.refresh(slot)
+
         order = Order(
-            vendor_id=vendor.vendor_id,
+            vendor_id=user.id,
             user_id=user.id,
+            slot_id=slot.id,
             total_amount=200,
             status=OrderStatus.COMPLETED,
         )

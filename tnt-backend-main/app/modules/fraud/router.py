@@ -59,7 +59,42 @@ def list_fraud_alerts(
     admin=Depends(require_role("admin")),
 ):
     """List fraud alerts with robust server-side paging and filtering."""
-    query = db.query(FraudAlert)
+    # 1. Optimised count query (no joins/labels to run counting at peak efficiency)
+    count_query = db.query(func.count(FraudAlert.id))
+    if alert_type:
+        count_query = count_query.filter(FraudAlert.alert_type == alert_type)
+    if severity:
+        count_query = count_query.filter(FraudAlert.severity == severity)
+    if status:
+        count_query = count_query.filter(FraudAlert.status == status)
+    if search:
+        count_query = count_query.filter(
+            or_(
+                FraudAlert.description.ilike(f"%{search}%"),
+                FraudAlert.alert_type.ilike(f"%{search}%"),
+            )
+        )
+    total = count_query.scalar()
+
+    # 2. Main query with left outer joins to solve N+1 database queries
+    from sqlalchemy.orm import aliased
+    VendorUser = aliased(User)
+
+    query = db.query(
+        FraudAlert,
+        User.phone.label("u_phone"),
+        User.name.label("u_name"),
+        User.full_name.label("u_fullname"),
+        Vendor.vendor_name.label("v_name"),
+        VendorUser.name.label("vu_name"),
+        VendorUser.full_name.label("vu_fullname")
+    ).select_from(FraudAlert).outerjoin(
+        User, FraudAlert.user_id == User.id
+    ).outerjoin(
+        Vendor, FraudAlert.vendor_id == Vendor.owner_id
+    ).outerjoin(
+        VendorUser, FraudAlert.vendor_id == VendorUser.id
+    )
 
     if alert_type:
         query = query.filter(FraudAlert.alert_type == alert_type)
@@ -75,9 +110,8 @@ def list_fraud_alerts(
             )
         )
 
-    total = query.count()
     offset = (page - 1) * page_size
-    alerts_raw = (
+    results = (
         query.order_by(desc(FraudAlert.created_at))
         .offset(offset)
         .limit(page_size)
@@ -85,26 +119,11 @@ def list_fraud_alerts(
     )
 
     alerts_list = []
-    for alert in alerts_raw:
-        user_phone = None
-        user_name = None
-        vendor_name = None
-
-        if alert.user_id:
-            u = db.query(User).filter(User.id == alert.user_id).first()
-            if u:
-                user_phone = u.phone
-                user_name = u.name or u.full_name
-
-        if alert.vendor_id:
-            v = db.query(Vendor).filter(Vendor.owner_id == alert.vendor_id).first()
-            if v:
-                vendor_name = v.vendor_name
-            else:
-                # fallback to user role checking
-                vu = db.query(User).filter(User.id == alert.vendor_id).first()
-                if vu:
-                    vendor_name = vu.name or vu.full_name
+    for row in results:
+        alert, u_phone, u_name, u_fullname, v_name, vu_name, vu_fullname = row
+        user_phone = u_phone
+        user_name = u_name or u_fullname
+        vendor_name = v_name or vu_name or vu_fullname
 
         alert_dict = {
             "id": alert.id,

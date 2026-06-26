@@ -57,10 +57,10 @@ def generate_kpi_excel(kpis: Dict[str, Any]) -> io.BytesIO:
     # Sheet 3: Vendor Performance
     vendors = kpis["operational_kpis"]["vendor_performance"]
     df_vendors = pd.DataFrame(vendors) if vendors else pd.DataFrame(columns=[
-        "vendor_id", "vendor_name", "orders_count", "completion_rate", "avg_wait_minutes", "rating"
+        "vendor_id", "vendor_name", "orders_count", "completion_rate", "avg_wait_minutes", "rating", "score"
     ])
     if not df_vendors.empty:
-        df_vendors.columns = ["Vendor ID", "Vendor Name", "Orders Processed", "Completion Rate (%)", "Avg Prep Time (mins)", "Avg Rating"]
+        df_vendors.columns = ["Vendor ID", "Vendor Name", "Orders Processed", "Completion Rate (%)", "Avg Prep Time (mins)", "Avg Rating", "Score"]
 
     # Write sheets to BytesIO Excel workbook
     with pd.ExcelWriter(output, engine="openpyxl") as writer:

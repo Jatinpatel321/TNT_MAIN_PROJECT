@@ -42,11 +42,17 @@ def list_audit_logs(
     )
 
 @router.get("/stats", response_model=AuditStatsResponse)
-def get_audit_stats(
+async def get_audit_stats(
     db: Session = Depends(get_db),
     user=Depends(require_role("admin")),
 ):
-    return service.get_summary_stats(db)
+    from app.core.redis_cache import cache_service
+    return await cache_service.get_or_set(
+        category="analytics",
+        identifier="audit_summary_stats",
+        fetch_func=lambda: service.get_summary_stats(db),
+        ttl=60
+    )
 
 @router.get("/timeline/{actor_id}", response_model=AuditTimelineResponse)
 def get_audit_timeline(

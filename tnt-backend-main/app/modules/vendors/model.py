@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import enum
 
+import bcrypt
 from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import relationship
 
@@ -49,6 +50,16 @@ class Vendor(Base):
         "VendorStaff", back_populates="vendor", cascade="all, delete-orphan"
     )
 
+    @staticmethod
+    def hash_password(plain: str) -> str:
+        """Hash a plain-text password using bcrypt."""
+        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+    @staticmethod
+    def verify_password(plain: str, hashed: str) -> bool:
+        """Verify a plain-text password against a bcrypt hash."""
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+
 
 class VendorStaff(Base):
     """Staff member employed by a vendor."""
@@ -69,3 +80,13 @@ class VendorStaff(Base):
 
     # ORM relationships
     vendor = relationship("Vendor", back_populates="staff_members")
+
+    @staticmethod
+    def hash_password(plain: str) -> str:
+        """Hash a plain-text password using bcrypt."""
+        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+    @staticmethod
+    def verify_password(plain: str, hashed: str) -> bool:
+        """Verify a plain-text password against a bcrypt hash."""
+        return bcrypt.checkpw(plain.encode(), hashed.encode())

@@ -23,6 +23,19 @@ class VendorAnalyticsService:
 
     def __init__(self, db: Session):
         self.db = db
+        self._sqlite = None
+
+    def _is_sqlite(self) -> bool:
+        """Detect if the underlying database is SQLite."""
+        if self._sqlite is None:
+            try:
+                # Get the active connection from the session and check dialect
+                conn = self.db.connection()
+                self._sqlite = "sqlite" in str(conn.dialect.name)
+            except Exception:
+                # Default to True (SQLite-safe) since we can't determine dialect
+                self._sqlite = True
+        return self._sqlite
 
     def _ensure_sample_data(self, vendor_id: int) -> bool:
         """Generate sample analytics data if insufficient real data exists."""
@@ -92,7 +105,7 @@ class VendorAnalyticsService:
                         order_id=order.id,
                         menu_item_id=item.id,
                         quantity=qty,
-                        price=price,
+                        price_at_time=price,
                     )
                     self.db.add(order_item)
 
@@ -154,17 +167,30 @@ class VendorAnalyticsService:
         end_date = utcnow_naive()
         start_date = end_date - timedelta(weeks=weeks)
 
-        weekly = self.db.query(
-            func.date_trunc("week", Order.created_at).label("week_start"),
-            func.count(Order.id).label("order_count"),
-            func.sum(Order.total_amount).label("revenue"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.status != OrderStatus.CANCELLED,
-            Order.created_at >= start_date,
-        ).group_by(func.date_trunc("week", Order.created_at)).order_by(
-            func.date_trunc("week", Order.created_at)
-        ).all()
+        if self._is_sqlite():
+            weekly = self.db.query(
+                func.strftime("%Y-W%W", Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.total_amount).label("revenue"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.status != OrderStatus.CANCELLED,
+                Order.created_at >= start_date,
+            ).group_by(func.strftime("%Y-W%W", Order.created_at)).order_by(
+                func.strftime("%Y-W%W", Order.created_at)
+            ).all()
+        else:
+            weekly = self.db.query(
+                func.date_trunc(text("'week'"), Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.total_amount).label("revenue"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.status != OrderStatus.CANCELLED,
+                Order.created_at >= start_date,
+            ).group_by(func.date_trunc(text("'week'"), Order.created_at)).order_by(
+                func.date_trunc(text("'week'"), Order.created_at)
+            ).all()
 
         weekly_data = []
         for row in weekly:
@@ -204,17 +230,30 @@ class VendorAnalyticsService:
         end_date = utcnow_naive()
         start_date = end_date - timedelta(days=30 * months)
 
-        monthly = self.db.query(
-            func.date_trunc("month", Order.created_at).label("month_start"),
-            func.count(Order.id).label("order_count"),
-            func.sum(Order.total_amount).label("revenue"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.status != OrderStatus.CANCELLED,
-            Order.created_at >= start_date,
-        ).group_by(func.date_trunc("month", Order.created_at)).order_by(
-            func.date_trunc("month", Order.created_at)
-        ).all()
+        if self._is_sqlite():
+            monthly = self.db.query(
+                func.strftime("%Y-%m", Order.created_at).label("month_start"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.total_amount).label("revenue"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.status != OrderStatus.CANCELLED,
+                Order.created_at >= start_date,
+            ).group_by(func.strftime("%Y-%m", Order.created_at)).order_by(
+                func.strftime("%Y-%m", Order.created_at)
+            ).all()
+        else:
+            monthly = self.db.query(
+                func.date_trunc(text("'month'"), Order.created_at).label("month_start"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.total_amount).label("revenue"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.status != OrderStatus.CANCELLED,
+                Order.created_at >= start_date,
+            ).group_by(func.date_trunc(text("'month'"), Order.created_at)).order_by(
+                func.date_trunc(text("'month'"), Order.created_at)
+            ).all()
 
         monthly_data = []
         for row in monthly:
@@ -344,7 +383,7 @@ class VendorAnalyticsService:
             MenuItem.price,
             func.count(OrderItem.id).label("order_count"),
             func.sum(OrderItem.quantity).label("total_quantity"),
-            func.sum(OrderItem.price * OrderItem.quantity).label("total_revenue"),
+            func.sum(OrderItem.price_at_time * OrderItem.quantity).label("total_revenue"),
         ).join(
             OrderItem, OrderItem.menu_item_id == MenuItem.id
         ).join(

@@ -17,7 +17,7 @@ class TestPromotionsAPI:
 
     def _create_vendor(self, db: Session) -> Vendor:
         """Helper to create a test vendor."""
-        user = User(phone="+919999999301", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999301", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -203,7 +203,7 @@ class TestPromotionModel:
         from app.modules.users.model import User, UserRole
         from app.modules.vendors.model import Vendor, VendorStatus
 
-        user = User(phone="+919999999302", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999302", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 

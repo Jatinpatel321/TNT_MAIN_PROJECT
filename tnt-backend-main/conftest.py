@@ -40,6 +40,8 @@ def _auto_fake_redis(monkeypatch):
     # otp_service uses "from app.core.redis import redis_client" (local binding)
     # so it must be patched on the otp_service module directly.
     monkeypatch.setattr("app.modules.auth.otp_service.redis_client", fake)
+    # Patch cache_service.redis_client to prevent cache state bleed between tests
+    monkeypatch.setattr("app.core.redis_cache.cache_service.redis_client", fake)
     # notifications.service imports redis_client inside function body,
     # so it resolves from app.core.redis at call time — already patched above.
 

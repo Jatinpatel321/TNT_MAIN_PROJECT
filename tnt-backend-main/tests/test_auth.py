@@ -17,7 +17,7 @@ class TestVendorAuthAPI:
     def test_register_vendor_success(self, client: TestClient, db: Session):
         """Test successful vendor registration."""
         # Create user first
-        user = User(phone="+919999999901", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999901", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -39,7 +39,7 @@ class TestVendorAuthAPI:
 
     def test_register_vendor_duplicate_owner(self, client: TestClient, db: Session):
         """Test duplicate vendor registration fails."""
-        user = User(phone="+919999999902", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999902", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -81,7 +81,7 @@ class TestVendorAuthAPI:
 
     def test_login_vendor_owner_success(self, client: TestClient, db: Session):
         """Test successful vendor owner login."""
-        user = User(phone="+919999999903", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999903", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -108,7 +108,7 @@ class TestVendorAuthAPI:
 
     def test_login_vendor_wrong_password(self, client: TestClient, db: Session):
         """Test login with wrong password fails."""
-        user = User(phone="+919999999904", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999904", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -130,7 +130,7 @@ class TestVendorAuthAPI:
 
     def test_login_vendor_suspended(self, client: TestClient, db: Session):
         """Test suspended vendor cannot login."""
-        user = User(phone="+919999999905", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999905", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -152,7 +152,7 @@ class TestVendorAuthAPI:
 
     def test_login_staff_success(self, client: TestClient, db: Session):
         """Test successful staff login."""
-        user = User(phone="+919999999906", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999906", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -190,7 +190,7 @@ class TestVendorAuthAPI:
 
     def test_login_staff_inactive(self, client: TestClient, db: Session):
         """Test inactive staff cannot login."""
-        user = User(phone="+919999999907", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999907", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -225,7 +225,7 @@ class TestVendorAuthAPI:
 
     def test_refresh_token_success(self, client: TestClient, db: Session):
         """Test successful token refresh."""
-        user = User(phone="+919999999908", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999908", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -265,7 +265,7 @@ class TestVendorAuthAPI:
 
     def test_get_current_vendor_success(self, client: TestClient, db: Session):
         """Test getting current vendor info."""
-        user = User(phone="+919999999909", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999909", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 

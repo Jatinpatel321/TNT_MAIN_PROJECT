@@ -91,8 +91,6 @@ def write(
     db.add(entry)
     db.flush()
     return entry
-
-
 def list_audit_logs(
     db: Session,
     page: int = 1,
@@ -109,21 +107,24 @@ def list_audit_logs(
     from datetime import datetime
     from sqlalchemy import or_
 
-    query = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.actor_id == User.id)
+    # Count query (no join)
+    from sqlalchemy import func
+    total_query = db.query(func.count(AuditLog.id))
 
+    filters = []
     if actor_id:
-        query = query.filter(AuditLog.actor_id == actor_id)
+        filters.append(AuditLog.actor_id == actor_id)
     if actor_role:
-        query = query.filter(AuditLog.actor_role == actor_role)
+        filters.append(AuditLog.actor_role == actor_role)
     if action_category:
-        query = query.filter(AuditLog.action_category == action_category)
+        filters.append(AuditLog.action_category == action_category)
     if entity_type:
-        query = query.filter(AuditLog.entity_type == entity_type)
+        filters.append(AuditLog.entity_type == entity_type)
     if entity_id:
-        query = query.filter(AuditLog.entity_id == entity_id)
+        filters.append(AuditLog.entity_id == entity_id)
     if search:
         search_filter = f"%{search}%"
-        query = query.filter(
+        filters.append(
             or_(
                 AuditLog.action.ilike(search_filter),
                 AuditLog.entity_type.ilike(search_filter),
@@ -131,11 +132,19 @@ def list_audit_logs(
             )
         )
     if date_from:
-        query = query.filter(AuditLog.created_at >= datetime.fromisoformat(date_from))
+        filters.append(AuditLog.created_at >= datetime.fromisoformat(date_from))
     if date_to:
-        query = query.filter(AuditLog.created_at <= datetime.fromisoformat(date_to))
+        filters.append(AuditLog.created_at <= datetime.fromisoformat(date_to))
 
-    total = query.count()
+    if filters:
+        total_query = total_query.filter(*filters)
+    total = total_query.scalar()
+
+    # Data query with outer join
+    query = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.actor_id == User.id)
+    if filters:
+        query = query.filter(*filters)
+
     offset = (page - 1) * page_size
     results = (
         query.order_by(desc(AuditLog.created_at))
@@ -160,9 +169,11 @@ def list_audit_logs(
 
 
 def get_timeline(db: Session, actor_id: int, page: int = 1, page_size: int = 50) -> Dict[str, Any]:
+    from sqlalchemy import func
+    total = db.query(func.count(AuditLog.id)).filter(AuditLog.actor_id == actor_id).scalar()
+
     query = db.query(AuditLog, User.full_name.label("actor_name")).outerjoin(User, AuditLog.actor_id == User.id)
     query = query.filter(AuditLog.actor_id == actor_id)
-    total = query.count()
     offset = (page - 1) * page_size
     results = query.order_by(desc(AuditLog.created_at)).offset(offset).limit(page_size).all()
     
@@ -182,22 +193,31 @@ def get_timeline(db: Session, actor_id: int, page: int = 1, page_size: int = 50)
 
 
 def get_summary_stats(db: Session) -> Dict[str, Any]:
-    from sqlalchemy import func
+    from sqlalchemy import func, case
     from datetime import datetime, timedelta
     
     now = datetime.utcnow()
     yesterday = now - timedelta(days=1)
     last_week = now - timedelta(days=7)
     
-    total_events = db.query(AuditLog).count()
-    today_events = db.query(AuditLog).filter(AuditLog.created_at >= yesterday).count()
-    week_events = db.query(AuditLog).filter(AuditLog.created_at >= last_week).count()
+    # 1. Single aggregate query for total, today, and weekly counts
+    stats = db.query(
+        func.count(AuditLog.id).label("total"),
+        func.sum(case((AuditLog.created_at >= yesterday, 1), else_=0)).label("today"),
+        func.sum(case((AuditLog.created_at >= last_week, 1), else_=0)).label("week")
+    ).first()
     
-    auth_events = db.query(AuditLog).filter(AuditLog.action_category == AuditCategory.AUTH).count()
-    order_events = db.query(AuditLog).filter(AuditLog.action_category == AuditCategory.ORDER).count()
-    flagged_events = db.query(AuditLog).filter(AuditLog.action_category.in_([AuditCategory.POLICY, AuditCategory.REFUND])).count()
+    total_events = int(stats.total or 0)
+    today_events = int(stats.today or 0)
+    week_events = int(stats.week or 0)
     
-    category_counts = db.query(AuditLog.action_category, func.count(AuditLog.id)).group_by(AuditLog.action_category).all()
+    # 2. Category counts in one query (helps avoid separate DB calls for AUTH/ORDER/POLICY/REFUND counts)
+    category_counts_rows = db.query(AuditLog.action_category, func.count(AuditLog.id)).group_by(AuditLog.action_category).all()
+    category_counts = {c[0]: c[1] for c in category_counts_rows}
+    
+    auth_events = category_counts.get(AuditCategory.AUTH, 0)
+    order_events = category_counts.get(AuditCategory.ORDER, 0)
+    flagged_events = category_counts.get(AuditCategory.POLICY, 0) + category_counts.get(AuditCategory.REFUND, 0)
     
     # Top actors
     top_actors_query = db.query(
@@ -216,6 +236,6 @@ def get_summary_stats(db: Session) -> Dict[str, Any]:
         "auth_events": auth_events,
         "order_events": order_events,
         "flagged_events": flagged_events,
-        "category_counts": {c[0]: c[1] for c in category_counts},
+        "category_counts": category_counts,
         "top_actors": top_actors,
     }

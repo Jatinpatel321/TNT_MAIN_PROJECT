@@ -12,12 +12,12 @@ class AuditLog(Base):
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
 
     # Actor
-    actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     actor_role = Column(String(50), nullable=True)
 
     # Action — use dot notation: "vendor.approved", "user.blocked", "policy.updated"
     action = Column(String(100), nullable=False)
-    action_category = Column(String(50), nullable=False)
+    action_category = Column(String(50), nullable=False, index=True)
 
     # Target entity
     entity_type = Column(String(100), nullable=True)
@@ -36,4 +36,5 @@ class AuditLog(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+        index=True,
     )

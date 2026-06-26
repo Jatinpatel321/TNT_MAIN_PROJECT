@@ -18,11 +18,11 @@ class TestOrdersAPI:
 
     def _create_vendor_and_user(self, db: Session) -> tuple[Vendor, User]:
         """Helper to create vendor and user."""
-        user = User(phone="+919999999601", role=UserRole.STUDENT, is_verified=True)
+        user = User(phone="+919999999601", role=UserRole.STUDENT, is_active=True)
         db.add(user)
         db.commit()
 
-        vendor_user = User(phone="+919999999602", role=UserRole.VENDOR, is_verified=True)
+        vendor_user = User(phone="+919999999602", role=UserRole.VENDOR, is_active=True)
         db.add(vendor_user)
         db.commit()
 
@@ -292,11 +292,11 @@ class TestOrderModel:
         from app.modules.users.model import User, UserRole
         from app.modules.vendors.model import Vendor, VendorStatus
 
-        user = User(phone="+919999999603", role=UserRole.STUDENT, is_verified=True)
+        user = User(phone="+919999999603", role=UserRole.STUDENT, is_active=True)
         db.add(user)
         db.commit()
 
-        vendor_user = User(phone="+919999999604", role=UserRole.VENDOR, is_verified=True)
+        vendor_user = User(phone="+919999999604", role=UserRole.VENDOR, is_active=True)
         db.add(vendor_user)
         db.commit()
 

@@ -19,7 +19,7 @@ class TestSettlementsAPI:
 
     def _create_vendor_with_payments(self, db: Session) -> Vendor:
         """Helper to create vendor with payments."""
-        user = User(phone="+919999999101", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999101", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -195,7 +195,7 @@ class TestSettlementsAPI:
 
     def test_wallet_auto_creation(self, client: TestClient, db: Session):
         """Test wallet is auto-created on first access."""
-        user = User(phone="+919999999102", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999102", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -231,7 +231,7 @@ class TestSettlementModels:
         from app.modules.users.model import User, UserRole
         from app.modules.vendors.model import Vendor, VendorStatus
 
-        user = User(phone="+919999999103", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999103", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
@@ -268,7 +268,7 @@ class TestSettlementModels:
         from app.modules.users.model import User, UserRole
         from app.modules.vendors.model import Vendor, VendorStatus
 
-        user = User(phone="+919999999104", role=UserRole.VENDOR, is_verified=True)
+        user = User(phone="+919999999104", role=UserRole.VENDOR, is_active=True)
         db.add(user)
         db.commit()
 
