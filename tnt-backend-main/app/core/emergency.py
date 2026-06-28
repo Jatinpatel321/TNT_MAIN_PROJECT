@@ -21,7 +21,8 @@ def is_emergency_shutdown_enabled() -> bool:
     try:
         cached = redis_client.get(EMERGENCY_SHUTDOWN_KEY)
         if cached is not None:
-            return str(cached, "utf-8").strip() in {"1", "true", "True", "yes", "on"}
+            cached_str = cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+            return cached_str.strip() in {"1", "true", "True", "yes", "on"}
     except Exception:
         pass
 

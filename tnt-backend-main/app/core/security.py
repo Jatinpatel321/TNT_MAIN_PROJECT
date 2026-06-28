@@ -157,7 +157,7 @@ def require_role(required_role: str):
 
 
 def get_current_user_id(
-    request: Request,
+    request: Request | None = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
@@ -170,7 +170,8 @@ def get_current_user_id(
             try:
                 from app.core import security_monitor
                 from app.core.rate_limit import _client_ip
-                security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="Invalid token payload")
+                ip = _client_ip(request) if request else "127.0.0.1"
+                security_monitor.record_jwt_failure(ip=ip, token_preview=token[:15] if token else "", reason="Invalid token payload")
             except Exception:
                 pass
             raise HTTPException(status_code=401, detail="Invalid token payload")
@@ -179,7 +180,8 @@ def get_current_user_id(
         try:
             from app.core import security_monitor
             from app.core.rate_limit import _client_ip
-            security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="JWTError")
+            ip = _client_ip(request) if request else "127.0.0.1"
+            security_monitor.record_jwt_failure(ip=ip, token_preview=token[:15] if token else "", reason="JWTError")
         except Exception:
             pass
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -187,7 +189,8 @@ def get_current_user_id(
         try:
             from app.core import security_monitor
             from app.core.rate_limit import _client_ip
-            security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="Invalid token subject")
+            ip = _client_ip(request) if request else "127.0.0.1"
+            security_monitor.record_jwt_failure(ip=ip, token_preview=token[:15] if token else "", reason="Invalid token subject")
         except Exception:
             pass
         raise HTTPException(status_code=401, detail="Invalid token subject")
@@ -204,7 +207,9 @@ def get_current_user_id(
         try:
             from app.core import security_monitor
             from app.core.rate_limit import _client_ip
-            security_monitor.record_api_abuse(ip=_client_ip(request), path=request.url.path, user_id=user_id, reason="Blocked user account access attempt")
+            ip = _client_ip(request) if request else "127.0.0.1"
+            path = request.url.path if request else "/unknown"
+            security_monitor.record_api_abuse(ip=ip, path=path, user_id=user_id, reason="Blocked user account access attempt")
         except Exception:
             pass
         raise HTTPException(status_code=403, detail=_BLOCKED_USER_DETAIL)

@@ -34,6 +34,8 @@ const FraudInvestigation = lazy(() => import('../pages/fraud/FraudInvestigation'
 const SecurityDashboard = lazy(() => import('../pages/security/SecurityDashboard'));
 const SystemHealth = lazy(() => import('../pages/health/SystemHealth'));
 
+const WastageDashboard = lazy(() => import('../pages/dashboard/WastageDashboard'));
+
 // Page loading fallback
 function PageLoader() {
   return (
@@ -129,6 +131,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: 'complaints', element: <Complaints /> },
+      { path: 'wastage', element: <WastageDashboard /> },
       {
         path: 'rewards',
         element: <RewardsLayout />,

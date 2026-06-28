@@ -101,3 +101,46 @@ Signal APIs are now owned by the AI module.
 	- `GET /ai/signals/slot-suggestions`
 	- `GET /ai/signals/reorder-prompts`
 - Legacy `/signals/*` endpoints are removed and return `404`.
+
+## Training ML Models
+
+To generate synthetic training data, run the training pipeline for all models, and save the resulting artifacts to the registry, run the following standalone script:
+
+```bash
+python seed_and_train.py
+```
+
+### Expected Output
+
+```
+Initializing database session...
+Step 1: Seeding synthetic training data...
+Starting AI seed data generation...
+Generating categories...
+  ✓ Generated 10 categories
+Generating 10 vendors...
+  ✓ Generated 10 vendors
+...
+✓ All seed data generated successfully!
+Step 2: Running training pipeline...
+Training ETA Prediction...
+Finished training ETA Prediction: success
+...
+================================================================================
+                       ML MODEL TRAINING PIPELINE SUMMARY                       
+================================================================================
+Model Name                | Features | Metric Value (RMSE/Acc)   | Artifact Path
+--------------------------------------------------------------------------------
+ETA Prediction            | 7        | RMSE: 2.1032              | ml_models/eta_prediction/eta_prediction_v1.pkl
+Demand Forecasting        | 9        | RMSE: 1.4589              | ml_models/demand_forecast/demand_forecast_v1.pkl
+Slot Recommendation       | 10       | RMSE: 4.8912              | ml_models/slot_recommendation/slot_recommendation_v1.pkl
+Recommendation Engine     | 0        | ExpVar: 0.8920            | ml_models/recommendation_engine/recommendation_engine_v1.pkl
+Vendor Ranking            | 15       | RMSE: 3.1254              | ml_models/vendor_ranking/vendor_ranking_v1.pkl
+Fraud Detection           | 6        | Accuracy: 0.9650          | ml_models/fraud_detection/fraud_detection_v1.pkl
+================================================================================
+```
+
+### Artifacts Storage
+
+Trained model artifacts (.pkl files) are stored on disk under the directory specified by the `MODEL_STORAGE_DIR` environment variable (defaults to `ml_models/` at the project root).
+

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 
 export const settlementApi = {
   getRevenue: () => axios.get(`${API_BASE_URL}/v1/vendors/settlement/revenue`),

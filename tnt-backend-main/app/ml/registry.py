@@ -74,15 +74,6 @@ class ModelRegistry:
 
         session, should_close = ModelRegistry._get_session()
         try:
-            # Determine next version_num for this model_name
-            version_num = (
-                session.execute(
-                    select(func.coalesce(func.max(MlModel.model_version), sql_text("0")))
-                    .where(MlModel.model_name == model_type)
-                )
-                .scalar()
-            )
-
             # `model_version` column stores a version label string; we instead
             # infer version number by counting rows for this model_type.
             # This keeps DB schema simple and robust.
@@ -145,6 +136,25 @@ class ModelRegistry:
         finally:
             if should_close:
                 session.close()
+
+    @staticmethod
+    def save_model(
+        model: Any,
+        model_type: str,
+        metrics: Optional[dict[str, float]] = None,
+        hyperparams: Optional[dict[str, Any]] = None,
+        features: Optional[list[str]] = None,
+        description: str = "",
+    ) -> str:
+        """Alias for save() for backward compatibility."""
+        return ModelRegistry.save(
+            model=model,
+            model_type=model_type,
+            metrics=metrics,
+            hyperparams=hyperparams,
+            features=features,
+            description=description,
+        )
 
     @staticmethod
     def load(model_type: str, version_id: Optional[str] = None) -> Optional[tuple[Any, dict[str, Any]]]:

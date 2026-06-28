@@ -29,6 +29,8 @@ from app.modules.orders.model import Order, OrderItem, OrderStatus
 from app.modules.users.model import User
 from app.modules.feedback.model import VendorReview
 from app.modules.recommendations.models import UserPreferenceSnapshot
+from app.modules.slots.model import Slot
+import json
 
 logger = logging.getLogger("tnt.recommendations.ranking")
 
@@ -214,37 +216,80 @@ class RecommendationRankingService:
         # Factor 2: Category preference (0-0.2)
         category_score = 0.0
         if snapshot and snapshot.favourite_categories:
-            for cat in snapshot.favourite_categories:
-                if cat["category"] == menu_item.category:
-                    category_score = min(0.2, cat["score"] / 500 * 0.2)
-                    break
+            try:
+                fav_cats = json.loads(snapshot.favourite_categories) if isinstance(snapshot.favourite_categories, str) else snapshot.favourite_categories
+                for cat in fav_cats:
+                    if cat["category"] == menu_item.category:
+                        category_score = min(0.2, cat["score"] / 500 * 0.2)
+                        break
+            except Exception:
+                pass
 
         # Factor 3: Vendor preference (0-0.2)
         vendor_score = 0.0
         if snapshot and snapshot.favourite_vendors:
-            for vendor in snapshot.favourite_vendors:
-                if vendor["vendor_id"] == menu_item.vendor_id:
-                    vendor_score = min(0.2, vendor["score"] / 500 * 0.2)
-                    break
+            try:
+                fav_vends = json.loads(snapshot.favourite_vendors) if isinstance(snapshot.favourite_vendors, str) else snapshot.favourite_vendors
+                for vendor in fav_vends:
+                    if vendor["vendor_id"] == menu_item.vendor_id:
+                        vendor_score = min(0.2, vendor["score"] / 500 * 0.2)
+                        break
+            except Exception:
+                pass
 
         # Factor 4: Time-of-day preference (0-0.2)
         time_score = 0.0
         if snapshot and snapshot.preferred_timings:
-            preferred_hour = snapshot.preferred_timings.get("preferred_hour", 12)
-            current_hour = utcnow_naive().hour
-            hour_diff = abs(preferred_hour - current_hour)
-            if hour_diff <= 2:
-                time_score = 0.2
-            elif hour_diff <= 4:
-                time_score = 0.1
+            try:
+                pref_times = json.loads(snapshot.preferred_timings) if isinstance(snapshot.preferred_timings, str) else snapshot.preferred_timings
+                preferred_hour = pref_times.get("preferred_hour", 12)
+                current_hour = utcnow_naive().hour
+                hour_diff = abs(preferred_hour - current_hour)
+                if hour_diff <= 2:
+                    time_score = 0.2
+                elif hour_diff <= 4:
+                    time_score = 0.1
+            except Exception:
+                pass
 
-        # Total affinity score
+        # Default heuristic score
         affinity_score = history_score + category_score + vendor_score + time_score
+        method = "heuristic"
+
+        # Try ML SVD model inference (AI preference learning)
+        try:
+            from app.ml.registry import ModelRegistry
+            model_data = ModelRegistry.load("recommendation_engine")
+            if model_data is not None:
+                model_package, _ = model_data
+                if model_package.get("type") == "collaborative_filtering_svd":
+                    user_encoder = model_package.get("user_encoder", {})
+                    item_encoder = model_package.get("item_encoder", {})
+                    if user_id in user_encoder and menu_item_id in item_encoder:
+                        u_idx = user_encoder[user_id]
+                        i_idx = item_encoder[menu_item_id]
+                        u_factors = model_package["user_factors"]
+                        i_factors = model_package["item_factors"]
+                        import numpy as np
+                        ml_val = float(np.dot(u_factors[u_idx], i_factors[i_idx]))
+                        # interaction strength is capped at 10, scale to 0.0-1.0
+                        affinity_score = max(0.0, min(1.0, ml_val / 10.0))
+                        method = "ml_svd"
+                elif model_package.get("type") == "popularity_based":
+                    popularity_list = model_package.get("popularity", [])
+                    for rank, pop_item in enumerate(popularity_list):
+                        if pop_item.get("item_id") == menu_item_id:
+                            affinity_score = max(0.0, 1.0 - (rank / max(len(popularity_list), 1)))
+                            method = "ml_popularity"
+                            break
+        except Exception as e:
+            logger.error("Failed ML affinity inference, falling back to heuristic: %s", e)
 
         return {
             "affinity_score": round(affinity_score, 2),
             "order_count": order_count,
             "last_ordered": order_history.last_ordered.isoformat() if order_history.last_ordered else None,
+            "method": method,
             "factors": {
                 "history_score": round(history_score, 2),
                 "category_score": round(category_score, 2),
@@ -597,3 +642,211 @@ class RecommendationRankingService:
             "reason": reason,
             "insights": insights,
         }
+
+    def rank_slots(
+        self, user_id: int, slots: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Rank slots using slot_recommendation ML model with fallback to heuristics."""
+        from app.ml.registry import ModelRegistry
+        import numpy as np
+
+        model_data = None
+        try:
+            model_data = ModelRegistry.load("slot_recommendation")
+        except Exception as e:
+            logger.error("Failed to load slot_recommendation model: %s", e)
+
+        ranked_slots = []
+        for s_data in slots:
+            slot_id = s_data.get("slot_id") or s_data.get("id")
+            slot = self.db.query(Slot).filter(Slot.id == slot_id).first()
+            if not slot:
+                continue
+
+            # Compute features
+            avg_completion = self.db.query(func.avg(Order.actual_completion_minutes)).filter(
+                Order.slot_id == slot.id,
+                Order.actual_completion_minutes.isnot(None),
+            ).scalar() or 15.0
+
+            occupancy = slot.current_orders / max(slot.max_orders, 1)
+            hour = slot.start_time.hour if slot.start_time else 12
+            weekday = slot.start_time.weekday() if slot.start_time else 0
+            is_rush = 1 if (12 <= hour <= 14 or 19 <= hour <= 21) else 0
+
+            features = np.array([[
+                float(occupancy),
+                float(hour),
+                float(weekday),
+                float(is_rush),
+                float(avg_completion),
+                float(slot.max_orders),
+            ]])
+
+            ml_score = None
+            method = "heuristic"
+            if model_data is not None:
+                try:
+                    model, _ = model_data
+                    ml_score = float(model.predict(features)[0])
+                    # Higher quality score = lower occupancy and wait. Invert occupancy target.
+                    score = 1.0 - max(0.0, min(1.0, ml_score))
+                    method = "ml"
+                except Exception as e:
+                    logger.error("Failed ML slot prediction: %s", e)
+
+            if ml_score is None:
+                score = 1.0 - occupancy
+
+            ranked_slots.append({
+                **s_data,
+                "score": round(score, 3),
+                "method": method,
+            })
+
+        ranked_slots.sort(key=lambda x: x["score"], reverse=True)
+        return ranked_slots
+
+    def rank_vendors(
+        self, vendors: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Rank vendors using vendor_ranking ML model with fallback."""
+        from app.ml.registry import ModelRegistry
+        import numpy as np
+
+        model_data = None
+        try:
+            model_data = ModelRegistry.load("vendor_ranking")
+        except Exception as e:
+            logger.error("Failed to load vendor_ranking model: %s", e)
+
+        ranked_vendors = []
+        for v_data in vendors:
+            vendor_id = v_data.get("vendor_id") or v_data.get("id")
+            
+            # Fetch vendor metrics
+            thirty_days_ago = utcnow_naive() - timedelta(days=30)
+            total_orders = self.db.query(func.count(Order.id)).filter(
+                Order.vendor_id == vendor_id, Order.created_at >= thirty_days_ago
+            ).scalar() or 0
+
+            completed = self.db.query(func.count(Order.id)).filter(
+                Order.vendor_id == vendor_id,
+                Order.status.in_([OrderStatus.COMPLETED, OrderStatus.PICKED, OrderStatus.READY]),
+                Order.created_at >= thirty_days_ago,
+            ).scalar() or 0
+
+            cancelled = self.db.query(func.count(Order.id)).filter(
+                Order.vendor_id == vendor_id,
+                Order.status == OrderStatus.CANCELLED,
+                Order.created_at >= thirty_days_ago,
+            ).scalar() or 0
+
+            repeat_customers = self.db.query(
+                Order.user_id
+            ).filter(
+                Order.vendor_id == vendor_id, Order.created_at >= thirty_days_ago
+            ).group_by(Order.user_id).having(func.count(Order.id) > 1).count()
+
+            unique_customers = self.db.query(Order.user_id).filter(
+                Order.vendor_id == vendor_id, Order.created_at >= thirty_days_ago
+            ).distinct().count()
+
+            avg_rating = self.db.query(func.avg(VendorReview.rating)).filter(
+                VendorReview.vendor_id == vendor_id
+            ).scalar() or 0.0
+
+            completion_rate = completed / max(total_orders, 1)
+            repeat_rate = repeat_customers / max(unique_customers, 1)
+
+            features = np.array([[
+                float(completion_rate),
+                float(avg_rating),
+                float(repeat_rate),
+                float(cancelled),
+                float(cancelled),
+                float(total_orders),
+            ]])
+
+            ml_score = None
+            method = "heuristic"
+            if model_data is not None:
+                try:
+                    model, _ = model_data
+                    ml_score = float(model.predict(features)[0])
+                    score = max(0.0, min(100.0, ml_score * 100))
+                    method = "ml"
+                except Exception as e:
+                    logger.error("Failed ML vendor ranking: %s", e)
+
+            if ml_score is None:
+                score = completion_rate * 100
+
+            ranked_vendors.append({
+                **v_data,
+                "score": round(score, 2),
+                "method": method,
+            })
+
+        ranked_vendors.sort(key=lambda x: x["score"], reverse=True)
+        return ranked_vendors
+
+    def rank_offers(
+        self, user_id: int, offers: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Rank promotional offers using SVD item affinity."""
+        from app.ml.registry import ModelRegistry
+        import numpy as np
+
+        model_data = None
+        try:
+            model_data = ModelRegistry.load("recommendation_engine")
+        except Exception as e:
+            logger.error("Failed to load recommendation_engine for offers: %s", e)
+
+        user_encoder, item_encoder, u_factors, i_factors = {}, {}, None, None
+        if model_data is not None:
+            model_package, _ = model_data
+            if model_package.get("type") == "collaborative_filtering_svd":
+                user_encoder = model_package.get("user_encoder", {})
+                item_encoder = model_package.get("item_encoder", {})
+                u_factors = model_package["user_factors"]
+                i_factors = model_package["item_factors"]
+
+        ranked_offers = []
+        for o_data in offers:
+            vendor_id = o_data.get("vendor_id")
+            discount_val = o_data.get("discount_value") or 10.0
+
+            # Find user affinity for this vendor's menu items
+            menu_items = self.db.query(MenuItem).filter(MenuItem.vendor_id == vendor_id).all()
+            
+            affinity_scores = []
+            method = "heuristic"
+            if u_factors is not None and user_id in user_encoder:
+                for item in menu_items:
+                    if item.id in item_encoder:
+                        u_idx = user_encoder[user_id]
+                        i_idx = item_encoder[item.id]
+                        ml_val = float(np.dot(u_factors[u_idx], i_factors[i_idx]))
+                        affinity_scores.append(max(0.0, min(1.0, ml_val / 10.0)))
+                if affinity_scores:
+                    method = "ml_svd"
+            
+            if not affinity_scores:
+                ordered_count = self.db.query(Order).filter(
+                    Order.user_id == user_id, Order.vendor_id == vendor_id
+                ).count()
+                affinity_scores.append(min(1.0, ordered_count / 10.0))
+
+            avg_affinity = sum(affinity_scores) / len(affinity_scores) if affinity_scores else 0.1
+            score = avg_affinity * discount_val
+
+            ranked_offers.append({
+                **o_data,
+                "score": round(score, 2),
+                "method": method,
+            })
+
+        ranked_offers.sort(key=lambda x: x["score"], reverse=True)
+        return ranked_offers

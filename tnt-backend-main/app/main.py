@@ -33,6 +33,32 @@ async def lifespan(app: FastAPI):
     if settings.DB_REVISION_GUARD:
         verify_database_revision()
 
+    # Startup check for ML models
+    try:
+        from app.ml.registry import ModelRegistry
+        import logging
+        startup_logger = logging.getLogger("tnt.ml.startup")
+        expected_models = [
+            "eta_prediction",
+            "demand_forecast",
+            "slot_recommendation",
+            "recommendation_engine",
+            "vendor_ranking",
+            "fraud_detection",
+        ]
+        for model_name in expected_models:
+            model_data = ModelRegistry.load(model_name)
+            if model_data is None:
+                startup_logger.warning(
+                    f"ML model artifact for '{model_name}' is absent or inactive. "
+                    f"Please run seed_and_train.py to train it."
+                )
+    except Exception as e:
+        import logging
+        logging.getLogger("tnt.ml.startup").warning(
+            f"Could not perform ML model startup check: {e}"
+        )
+
     import sys
     # Only run the lifecycle simulator in non-production environments and not during pytest
     if settings.APP_ENV != "production" and "pytest" not in sys.modules:

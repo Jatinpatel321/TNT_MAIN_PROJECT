@@ -10,8 +10,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
+import app.database.init_db  # Ensure all SQLAlchemy models are registered
 import numpy as np
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, text
 from sqlalchemy.orm import Session
 
 from app.core.time_utils import utcnow_naive
@@ -100,11 +101,10 @@ def extract_eta_training_data(db: Session, days: int = 90) -> tuple[np.ndarray, 
     since = utcnow_naive() - timedelta(days=days)
     rows = db.query(
         Order.id, Order.vendor_id, Order.slot_id, Order.created_at,
-        Order.actual_completion_minutes,
+        func.coalesce(Order.actual_completion_minutes, Order.eta_minutes).label("actual_completion_minutes"),
         Slot.current_orders, Slot.max_orders,
     ).join(Slot, Order.slot_id == Slot.id).filter(
         Order.created_at >= since,
-        Order.actual_completion_minutes.isnot(None),
         Order.status.in_([OrderStatus.COMPLETED, OrderStatus.PICKED, OrderStatus.READY]),
     ).all()
 
@@ -145,16 +145,16 @@ def extract_demand_features(db: Session, vendor_id: int,
     since = utcnow_naive() - timedelta(days=days)
 
     hourly_counts = db.query(
-        func.date_trunc("hour", Order.created_at).label("hour_bucket"),
+        func.date_trunc(text("'hour'"), Order.created_at).label("hour_bucket"),
         func.count(Order.id).label("order_count"),
     ).filter(
         Order.vendor_id == vendor_id,
         Order.created_at >= since,
         Order.status.notin_([OrderStatus.CANCELLED]),
     ).group_by(
-        func.date_trunc("hour", Order.created_at)
+        func.date_trunc(text("'hour'"), Order.created_at)
     ).order_by(
-        func.date_trunc("hour", Order.created_at)
+        func.date_trunc(text("'hour'"), Order.created_at)
     ).all()
 
     X_list, y_list = [], []

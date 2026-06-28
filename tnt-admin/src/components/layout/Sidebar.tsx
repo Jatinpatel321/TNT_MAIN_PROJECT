@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Store, ShoppingBag, MessageSquareWarning,
   Gift, Printer, Brain, BookOpen, Megaphone, Shield, Settings,
-  ChevronLeft, ChevronRight, Zap, Activity, ClipboardList, Siren, Database, AlertTriangle, ShieldCheck, ShieldAlert
+  ChevronLeft, ChevronRight, Zap, Activity, ClipboardList, Siren, Database, AlertTriangle, ShieldCheck, ShieldAlert, Trash2
 } from 'lucide-react';
 import logo from '../../assets/TAP N TAKE_page-0001 (1).jpg';
 import { useUIStore } from '../../store/uiStore';
@@ -18,6 +18,7 @@ const navItems = [
   { path: '/vendors', label: 'Vendors', icon: Store, badge: 'pendingVendors' as const },
   { path: '/orders', label: 'Orders', icon: ShoppingBag },
   { path: '/complaints', label: 'Complaints', icon: MessageSquareWarning, badge: 'openComplaints' as const },
+  { path: '/wastage', label: 'Wastage', icon: Trash2 },
   { path: '/rewards', label: 'Rewards', icon: Gift },
   { path: '/stationery', label: 'Stationery', icon: Printer },
   { path: '/ai', label: 'AI Intelligence', icon: Brain },

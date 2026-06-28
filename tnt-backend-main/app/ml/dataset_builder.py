@@ -170,9 +170,9 @@ class DatasetBuilder:
             Order.actual_completion_minutes,
             Order.created_at,
             Order.status,
-            func.date_part('dow', Order.created_at).label("day_of_week"),
-            func.date_part('hour', Order.created_at).label("hour_of_day"),
-            func.date_part('month', Order.created_at).label("month"),
+            extract('dow', Order.created_at).label("day_of_week"),
+            extract('hour', Order.created_at).label("hour_of_day"),
+            extract('month', Order.created_at).label("month"),
         ).filter(
             Order.created_at.between(start_date, end_date),
             Order.actual_completion_minutes.isnot(None),  # Only orders with actual times
@@ -193,9 +193,9 @@ class DatasetBuilder:
                 Order.actual_completion_minutes,
                 Order.created_at,
                 Order.status,
-                func.date_part('dow', Order.created_at).label("day_of_week"),
-                func.date_part('hour', Order.created_at).label("hour_of_day"),
-                func.date_part('month', Order.created_at).label("month"),
+                extract('dow', Order.created_at).label("day_of_week"),
+                extract('hour', Order.created_at).label("hour_of_day"),
+                extract('month', Order.created_at).label("month"),
             ).filter(
                 Order.created_at.between(start_date, end_date),
                 Order.status.notin_([OrderStatus.CANCELLED]),
@@ -290,9 +290,9 @@ class DatasetBuilder:
         hourly = self.db.query(
             Order.vendor_id,
             func.date(Order.created_at).label("order_date"),
-            func.date_part('hour', Order.created_at).label("hour"),
-            func.date_part('dow', Order.created_at).label("day_of_week"),
-            func.date_part('month', Order.created_at).label("month"),
+            extract('hour', Order.created_at).label("hour"),
+            extract('dow', Order.created_at).label("day_of_week"),
+            extract('month', Order.created_at).label("month"),
             func.count(Order.id).label("order_count"),
         ).filter(
             Order.created_at.between(start_date, end_date),
@@ -300,9 +300,9 @@ class DatasetBuilder:
         ).group_by(
             Order.vendor_id,
             func.date(Order.created_at),
-            func.date_part('hour', Order.created_at),
-            func.date_part('dow', Order.created_at),
-            func.date_part('month', Order.created_at),
+            extract('hour', Order.created_at),
+            extract('dow', Order.created_at),
+            extract('month', Order.created_at),
         ).all()
 
         rows = []
@@ -321,8 +321,8 @@ class DatasetBuilder:
             # Historical average for this vendor-hour-weekday
             hist_avg = self.db.query(func.avg(Order.id)).filter(
                 Order.vendor_id == h.vendor_id,
-                func.date_part('hour', Order.created_at) == int(h.hour),
-                func.date_part('dow', Order.created_at) == int(h.day_of_week),
+                extract('hour', Order.created_at) == int(h.hour),
+                extract('dow', Order.created_at) == int(h.day_of_week),
                 Order.created_at < h.order_date,
             ).scalar() or 0
 
@@ -610,7 +610,15 @@ class DatasetBuilder:
             })
 
         df = pd.DataFrame(rows)
-        logger.info(f"Recommendation dataset: {len(df)} interactions, {df['user_id'].nunique()} users, {df['item_id'].nunique()} items")
+        if df.empty:
+            df = pd.DataFrame(columns=[
+                "user_id", "item_id", "vendor_id", "item_name", "vendor_name",
+                "vendor_type", "category", "price_paise", "order_count",
+                "total_quantity", "days_since_last", "interaction_strength"
+            ])
+            logger.info("Recommendation dataset is empty: 0 interactions, 0 users, 0 items")
+        else:
+            logger.info(f"Recommendation dataset: {len(df)} interactions, {df['user_id'].nunique()} users, {df['item_id'].nunique()} items")
         return df
 
     # ── Helper Methods ──────────────────────────────────────────────────────

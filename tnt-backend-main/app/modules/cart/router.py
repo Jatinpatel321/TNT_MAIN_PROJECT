@@ -54,6 +54,10 @@ class CheckoutRequest(BaseModel):
         default=None,
         description="Optional voucher code to apply discount at checkout.",
     )
+    points_to_redeem: float | None = Field(
+        default=None,
+        description="Optional rewards points to redeem at checkout.",
+    )
 
 
 def _generate_pickup_token() -> str:
@@ -116,6 +120,7 @@ def _checkout_order_from_cart(
     payment_method: str | None = None,
     pickup_time: str | None = None,
     voucher_code: str | None = None,
+    points_to_redeem: float | None = None,
 ) -> tuple[dict, int]:
     cart = _get_cart(db_user.id)
     if not cart["items"]:
@@ -142,6 +147,21 @@ def _checkout_order_from_cart(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Voucher error: {str(e)}")
 
+    # ── Apply points discount ────────────────────────────────────────
+    points_discount_amount = 0
+    if points_to_redeem and points_to_redeem > 0:
+        try:
+            from app.modules.rewards.service import redeem_points_for_order
+            res = redeem_points_for_order(
+                user_id=db_user.id,
+                order_id=order.id,
+                points_to_redeem=points_to_redeem,
+                db=db
+            )
+            points_discount_amount = res.get("discount_amount_paise", 0)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Rewards error: {str(e)}")
+
     # ── Generate pickup token and attach to order ─────────────────────
     pickup_token = _generate_pickup_token()
     order.qr_code = pickup_token
@@ -164,7 +184,7 @@ def _checkout_order_from_cart(
         "pickup_token": pickup_token,
         "status": "Order placed",
         "total_amount": order.total_amount,
-        "discount_amount": discount_amount,
+        "discount_amount": discount_amount + points_discount_amount,
         "eta_minutes": eta_minutes,
         "payment_method": payment_method or "UPI",
         "pickup_load_label": get_load_label(slot.current_orders, slot.max_orders),
@@ -288,6 +308,7 @@ def checkout_cart_simple(
     payment_method = (payload.payment_method if payload else None)
     pickup_time = (payload.pickup_time if payload else None)
     voucher_code = (payload.voucher_code if payload else None)
+    points_to_redeem = (payload.points_to_redeem if payload else None)
 
     if slot_id is None:
         vendor_id = cart.get("vendor_id")
@@ -303,7 +324,7 @@ def checkout_cart_simple(
             raise HTTPException(status_code=400, detail="No available slots for this vendor — supply slot_id explicitly")
         slot_id = slot.id
 
-    response, _ = _checkout_order_from_cart(slot_id, db_user, db, payment_method, pickup_time, voucher_code)
+    response, _ = _checkout_order_from_cart(slot_id, db_user, db, payment_method, pickup_time, voucher_code, points_to_redeem)
     return response
 
 

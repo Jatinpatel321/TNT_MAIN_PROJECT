@@ -433,8 +433,8 @@ class TestOrderServiceBoost:
         engine, db = _build_session()
         try:
             vendor, student, slot, order = self._setup_placed_order(db)
-            # Need order in CONFIRMED state first
-            order.status = OrderStatus.CONFIRMED
+            # Need order in PREPARING state first
+            order.status = OrderStatus.PREPARING
             db.commit()
             with patch("app.modules.notifications.service.send_sms"):
                 client = _make_client(db, vendor)

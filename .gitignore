@@ -28,8 +28,6 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -84,7 +82,7 @@ ipython_config.py
 # pyenv
 .python-version
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+# PEP 582; used by e.g. github.com/davidmankin/pyflow
 __pypackages__/
 
 # Celery stuff
@@ -132,6 +130,10 @@ yarn.lock
 .gradle/
 build/
 
+# Expo
+.expo/
+*.jks
+
 # IDE
 .idea/
 .vscode/
@@ -141,6 +143,8 @@ build/
 *.swp
 *.log
 *.db
-android/.gradle/
-android/build/
-ios/build/
+backups/
+uploads/
+
+# ML models (tracked separately via git LFS or explicit add)
+# *.pkl

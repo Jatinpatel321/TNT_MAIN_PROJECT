@@ -5,6 +5,9 @@ export const adminApi = {
   getAnalytics: () =>
     api.get('/v1/admin/analytics'),
 
+  getWastageAnalytics: () =>
+    api.get('/v1/admin/analytics/wastage'),
+
   // Vendor management
   getVendors: () =>
     api.get('/v1/admin/vendors'),

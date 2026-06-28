@@ -12,7 +12,7 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_DELAY = 1000;
 const MAX_DELAY = 30000;
 const WS_BASE_URL = __DEV__
-  ? 'ws://localhost:8000'
+  ? 'ws://localhost:8001'
   : 'wss://api.tnt-campus.com';
 
 /**

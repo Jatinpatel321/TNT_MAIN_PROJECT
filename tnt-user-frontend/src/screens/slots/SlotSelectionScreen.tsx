@@ -28,6 +28,7 @@ import { mockPayment, type PaymentMethod } from '../../services/paymentService';
 import { toApiError } from '../../services/apiClient';
 import { checkout, type CheckoutResponse } from '../../services/cartService';
 import { useCart } from '../../context/CartContext';
+import { getPoints } from '../../services/rewardsService';
 import { formatTimeRange } from '../../utils/format';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SlotSelection' | 'Checkout'>;
@@ -59,13 +60,26 @@ const STATUS_CONFIG: Record<SlotVisualStatus, { color: string; bg: string; label
 
 export function SlotSelectionScreen({ route, navigation }: Props) {
   const { vendorId, stationeryItems } = route.params;
-  const { clearCart } = useCart();
+  const { cart, clearCart } = useCart();
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [estimatedReady, setEstimatedReady] = useState<string | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [booking, setBooking] = useState(false);
+  const [userPoints, setUserPoints] = useState<number>(0);
+  const [redeemPointsChecked, setRedeemPointsChecked] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await getPoints();
+        setUserPoints(p.current_points || 0);
+      } catch (e) {
+        // silent fallback
+      }
+    })();
+  }, []);
 
   // Combined booking state: stationery toggle
   const [addStationery, setAddStationery] = useState(stationeryItems != null && stationeryItems.length > 0);
@@ -143,7 +157,8 @@ export function SlotSelectionScreen({ route, navigation }: Props) {
         setShowPayModal(true);
       } else {
         // Standard food-only checkout
-        const res: CheckoutResponse = await checkout(selectedSlot.id, selectedMethod);
+        const pointsToRedeem = redeemPointsChecked ? Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10)) : undefined;
+        const res: CheckoutResponse = await checkout(selectedSlot.id, selectedMethod, undefined, pointsToRedeem);
         void clearCart();
         setPendingOrderId(res.order_id);
         setPendingOrderAmount(res.total_amount);
@@ -225,6 +240,26 @@ export function SlotSelectionScreen({ route, navigation }: Props) {
               ))}
             </View>
           )}
+        </View>
+      )}
+
+      {/* Rewards Points toggle */}
+      {userPoints > 0 && (
+        <View style={styles.stationeryToggle}>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <MaterialCommunityIcons name="star-circle-outline" size={20} color="#D97706" />
+              <Text style={styles.toggleLabel}>
+                Redeem {Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10))} points for ₹{(Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10)) * 0.1).toFixed(2)} discount
+              </Text>
+            </View>
+            <Switch
+              value={redeemPointsChecked}
+              onValueChange={setRedeemPointsChecked}
+              trackColor={{ false: '#E5E7EB', true: '#FDE68A' }}
+              thumbColor={redeemPointsChecked ? '#D97706' : '#9CA3AF'}
+            />
+          </View>
         </View>
       )}
 
@@ -318,6 +353,13 @@ export function SlotSelectionScreen({ route, navigation }: Props) {
                   <View style={styles.lockBadge}>
                     <MaterialCommunityIcons name="lock" size={12} color="#DC2626" />
                     <Text style={styles.lockText}>Locked by vendor</Text>
+                  </View>
+                )}
+
+                {slot.express_pickup_eligible && isSelectable && (
+                  <View style={styles.expressBadge}>
+                    <MaterialCommunityIcons name="lightning-bolt" size={12} color="#0891B2" />
+                    <Text style={styles.expressText}>Express Pickup</Text>
                   </View>
                 )}
 
@@ -588,6 +630,21 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
     alignSelf: 'flex-start',
+  },
+  expressBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  expressText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0891B2',
   },
   lockText: {
     fontSize: 11,

@@ -9,6 +9,11 @@ def validate_production_settings(app_env: str, cors_origins: list[str]) -> None:
     if app_env != "production":
         return
 
+    import os
+    otp_hmac_key = os.getenv("OTP_HMAC_KEY", "dev_otp_key_change_in_production")
+    if otp_hmac_key == "dev_otp_key_change_in_production":
+        raise RuntimeError("OTP_HMAC_KEY cannot use default development value in production environment")
+
     if not cors_origins:
         raise RuntimeError("CORS_ORIGINS cannot be empty in production")
 

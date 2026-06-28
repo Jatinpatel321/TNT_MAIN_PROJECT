@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { registerFCMToken } from '../services/pushRegistrationService';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 
 interface User {
   id: number;
@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (vendorId: number, password: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/v1/vendor/login`, {
+      const response = await axios.post(`${API_BASE_URL}/vendor/login`, {
         vendor_id: vendorId,
         password,
       });

@@ -290,6 +290,38 @@ class SmartRecommendationEngine:
                     a["reason"] = "Recommended for you"
                     results.append(a)
 
+        # Try to load ML recommendation engine model
+        model_data = None
+        try:
+            from app.ml.registry import ModelRegistry
+            model_data = ModelRegistry.load("recommendation_engine")
+        except Exception as e:
+            logger.error("Failed to load recommendation_engine in smart_engine.py: %s", e)
+
+        # Score candidates with ML SVD if available
+        if model_data is not None:
+            try:
+                model_package, _ = model_data
+                if model_package.get("type") == "collaborative_filtering_svd":
+                    user_encoder = model_package.get("user_encoder", {})
+                    item_encoder = model_package.get("item_encoder", {})
+                    u_factors = model_package["user_factors"]
+                    i_factors = model_package["item_factors"]
+                    
+                    if user_id in user_encoder:
+                        u_idx = user_encoder[user_id]
+                        import numpy as np
+                        for item in results:
+                            item_id = item["id"]
+                            if item_id in item_encoder:
+                                i_idx = item_encoder[item_id]
+                                ml_val = float(np.dot(u_factors[u_idx], i_factors[i_idx]))
+                                item["score"] = round(max(0.0, min(1.0, ml_val / 10.0)), 2)
+                                item["reason"] = "Recommended by AI preference learning"
+            except Exception as e:
+                logger.error("Failed SVD scoring in _recommended_for_you: %s", e)
+
+        results.sort(key=lambda x: x["score"], reverse=True)
         return results[:limit]
 
     # ── Trending Near You (time-of-day + campus-wide) ──────────────────
@@ -441,6 +473,8 @@ class SmartRecommendationEngine:
                                limit: int = 10) -> list[dict[str, Any]]:
         """Score and rank vendors for this user based on preferences."""
         from app.modules.vendors.profile_models import VendorProfile
+        from app.ml.registry import ModelRegistry
+        import numpy as np
 
         preferred_ids = set()
         if snapshot:
@@ -452,18 +486,16 @@ class SmartRecommendationEngine:
             .all()
         )
 
+        # Try to load vendor ranking model
+        model_data = None
+        try:
+            model_data = ModelRegistry.load("vendor_ranking")
+        except Exception as e:
+            logger.error("Failed to load vendor_ranking model: %s", e)
+
+        thirty_days_ago = utcnow_naive() - timedelta(days=30)
         results = []
         for v in vendors:
-            base_score = 30.0
-
-            # Frequency bonus from snapshot
-            freq_bonus = 0.0
-            if snapshot:
-                for fv in snapshot.favourite_vendors:
-                    if fv["vendor_id"] == v.id:
-                        freq_bonus = min(fv["score"] / 2, 40)
-                        break
-
             # Load-based adjustment
             current_slots = self.db.query(Slot).filter(Slot.vendor_id == v.id).all()
             total_cap = sum(s.max_orders for s in current_slots) or 1
@@ -475,13 +507,71 @@ class SmartRecommendationEngine:
             avg_rating = (
                 self.db.query(func.avg(VendorReview.rating))
                 .filter(VendorReview.vendor_id == v.id)
-                .scalar() or 0
+                .scalar() or 3.0
             )
+
+            # Heuristic calculation
+            base_score = 30.0
+            freq_bonus = 0.0
+            if snapshot:
+                for fv in snapshot.favourite_vendors:
+                    if fv["vendor_id"] == v.id:
+                        freq_bonus = min(fv["score"] / 2, 40)
+                        break
             rating_bonus = float(avg_rating) * 5
-
             total_score = base_score + freq_bonus + load_bonus + rating_bonus
+            method = "heuristic"
 
-            # Live load label
+            # Use ML if available
+            if model_data is not None:
+                try:
+                    model, _ = model_data
+                    recent_orders = self.db.query(func.count(Order.id)).filter(
+                        Order.vendor_id == v.id, Order.created_at >= thirty_days_ago
+                    ).scalar() or 0
+                    
+                    completed_orders = self.db.query(func.count(Order.id)).filter(
+                        Order.vendor_id == v.id,
+                        Order.status.in_([OrderStatus.COMPLETED, OrderStatus.PICKED, OrderStatus.READY]),
+                        Order.created_at >= thirty_days_ago,
+                    ).scalar() or 0
+
+                    cancelled_orders = self.db.query(func.count(Order.id)).filter(
+                        Order.vendor_id == v.id,
+                        Order.status == OrderStatus.CANCELLED,
+                        Order.created_at >= thirty_days_ago,
+                    ).scalar() or 0
+
+                    repeat_customers = self.db.query(
+                        Order.user_id
+                    ).filter(
+                        Order.vendor_id == v.id, Order.created_at >= thirty_days_ago
+                    ).group_by(Order.user_id).having(func.count(Order.id) > 1).count()
+
+                    unique_customers = self.db.query(Order.user_id).filter(
+                        Order.vendor_id == v.id, Order.created_at >= thirty_days_ago
+                    ).distinct().count()
+
+                    c_rate = completed_orders / max(recent_orders, 1)
+                    r_rate = repeat_customers / max(unique_customers, 1)
+
+                    features = np.array([[
+                        float(c_rate),
+                        float(avg_rating),
+                        float(r_rate),
+                        float(cancelled_orders),
+                        float(cancelled_orders),
+                        float(recent_orders),
+                    ]])
+
+                    ml_score = float(model.predict(features)[0])
+                    total_score = max(0.0, min(100.0, ml_score * 100))
+                    # Adjust for live slot utilization dynamically
+                    total_score = total_score * (1.0 - utilization * 0.2)
+                    method = "ml"
+                except Exception as e:
+                    logger.error("Failed vendor ML prediction: %s", e)
+
             if utilization >= 0.9:
                 load_label = "HIGH"
             elif utilization >= 0.6:
@@ -508,6 +598,7 @@ class SmartRecommendationEngine:
                 "live_load": load_label,
                 "express_pickup": utilization < 0.5,
                 "reason": reason,
+                "method": method,
             })
 
         results.sort(key=lambda x: x["rank_score"], reverse=True)

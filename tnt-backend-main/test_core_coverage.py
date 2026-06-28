@@ -177,6 +177,10 @@ class TestGetCurrentUserEdgeCases:
 # ═══════════════════════════════════════════════════════════════════════════
 
 class TestValidateProductionSettings:
+    @pytest.fixture(autouse=True)
+    def setup_safe_otp_key(self, monkeypatch):
+        monkeypatch.setenv("OTP_HMAC_KEY", "safe_prod_otp_key_123")
+
     def test_non_production_is_noop(self):
         from app.core.startup_checks import validate_production_settings
         # Should not raise for non-production environments
@@ -336,10 +340,11 @@ class TestMenuFileUpload:
         mock_file = MagicMock()
         mock_file.content_type = "text/plain"
         mock_file.filename = "test.txt"
+        mock_file.file.read.return_value = b"some text file content"
         with pytest.raises(HTTPException) as exc_info:
             save_menu_image(mock_file)
-        assert exc_info.value.status_code == 400
-        assert "Invalid image format" in exc_info.value.detail
+        assert exc_info.value.status_code == 415
+        assert "Unsupported file type" in exc_info.value.detail
 
     def test_valid_jpeg_saves_and_returns_path(self, tmp_path):
         from app.core.file_upload import save_menu_image

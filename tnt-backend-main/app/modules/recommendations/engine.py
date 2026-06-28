@@ -344,6 +344,14 @@ class RecommendationEngine:
             .all()
         }
 
+        # Try to load ML recommendation engine model
+        model_data = None
+        try:
+            from app.ml.registry import ModelRegistry
+            model_data = ModelRegistry.load("recommendation_engine")
+        except Exception as e:
+            logger.error("Failed to load recommendation_engine in engine.py: %s", e)
+
         results: list[dict[str, Any]] = []
         seen_ids: set[int] = set()
 
@@ -354,7 +362,30 @@ class RecommendationEngine:
                 seen_ids.add(mi.id)
                 d = self._item_to_dict(mi, reason="You order this often")
                 d["times_ordered"] = freq[mid]
-                d["score"] = round(min(1.0, freq[mid] / 10), 2)
+                
+                # Heuristic score
+                score = round(min(1.0, freq[mid] / 10), 2)
+                
+                # Try ML SVD score
+                if model_data is not None:
+                    try:
+                        model_package, _ = model_data
+                        if model_package.get("type") == "collaborative_filtering_svd":
+                            user_encoder = model_package.get("user_encoder", {})
+                            item_encoder = model_package.get("item_encoder", {})
+                            if user_id in user_encoder and mi.id in item_encoder:
+                                u_idx = user_encoder[user_id]
+                                i_idx = item_encoder[mi.id]
+                                u_factors = model_package["user_factors"]
+                                i_factors = model_package["item_factors"]
+                                import numpy as np
+                                ml_val = float(np.dot(u_factors[u_idx], i_factors[i_idx]))
+                                score = round(max(0.0, min(1.0, ml_val / 10.0)), 2)
+                                d["reason"] = "Recommended by AI preference learning"
+                    except Exception as e:
+                        logger.error("ML personalized item scoring failed: %s", e)
+
+                d["score"] = score
                 results.append(d)
 
         # Inject association-rule pairings from user's history items

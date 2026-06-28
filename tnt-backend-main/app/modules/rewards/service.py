@@ -401,6 +401,78 @@ def redeem_voucher(code: str, user_id: int, order_id: int, db: Session) -> dict:
     }
 
 
+def redeem_points_for_order(user_id: int, order_id: int, points_to_redeem: float, db: Session) -> dict:
+    """Redeem points at checkout and apply discount directly to the order.
+    
+    10 points = 1 INR (100 paise) discount.
+    """
+    from app.modules.rewards.model import RewardPoints, RewardRedemption, RedemptionType, RewardTransaction, RewardType
+    from app.modules.orders.model import Order
+
+    order = db.query(Order).filter(Order.id == order_id, Order.user_id == user_id).first()
+    if not order:
+        raise ValueError("Order not found")
+
+    # Check balance
+    reward_points = db.query(RewardPoints).filter(RewardPoints.user_id == user_id).first()
+    if not reward_points or reward_points.points < points_to_redeem:
+        raise ValueError("Insufficient points")
+
+    # Calculate discount value: 1 point = 10 paise, so points_to_redeem * 10 paise = points_to_redeem * 10 in paise
+    discount_amount_paise = int(points_to_redeem * 10)
+    discount_amount_paise = min(discount_amount_paise, int(order.total_amount or 0))
+
+    if discount_amount_paise <= 0:
+        raise ValueError("Points discount resolves to zero")
+
+    # Deduct discount
+    order.total_amount = int(order.total_amount or 0) - discount_amount_paise
+
+    # Create redemption record
+    redemption = RewardRedemption(
+        user_id=user_id,
+        redemption_type=RedemptionType.DISCOUNT_FIXED,
+        points_used=points_to_redeem,
+        value=discount_amount_paise / 100.0,
+        description=f"Redeemed {points_to_redeem} points for discount of ₹{discount_amount_paise / 100.0:.2f}",
+        order_id=order_id
+    )
+    db.add(redemption)
+
+    # Also log a reward transaction so there is audit trail
+    transaction = RewardTransaction(
+        user_id=user_id,
+        reward_type=RewardType.VOUCHER_REDEMPTION,
+        points=-points_to_redeem,
+        description=f"Redeemed {points_to_redeem} points at checkout for ₹{discount_amount_paise / 100.0:.2f} discount",
+        order_id=order_id
+    )
+    db.add(transaction)
+
+    # Update points balance
+    reward_points.points -= points_to_redeem
+    reward_points.total_redeemed += points_to_redeem
+
+    # Add ledger entry
+    from app.modules.ledger.service import add_ledger_entry
+    from app.modules.ledger.model import LedgerType, LedgerSource
+    add_ledger_entry(
+        order_id=order.id,
+        amount=discount_amount_paise,
+        entry_type=LedgerType.DEBIT,
+        source=LedgerSource.VOUCHER,  # Safe fallback matching model enum definition
+        db=db,
+        description=f"Rewards discount applied ({points_to_redeem} points)",
+    )
+
+    db.commit()
+    return {
+        "points_used": points_to_redeem,
+        "discount_amount_paise": discount_amount_paise,
+        "updated_order_total_paise": order.total_amount
+    }
+
+
 def get_offpeak_policy(db: Session) -> dict:
     policy = db.query(OffPeakRewardPolicy).order_by(OffPeakRewardPolicy.id.desc()).first()
     if not policy:

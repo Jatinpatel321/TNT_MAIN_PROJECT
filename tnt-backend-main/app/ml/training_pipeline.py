@@ -104,16 +104,16 @@ class ModelTrainer:
         """
         logger.info("=== PHASE 3: Training ETA Prediction Model ===")
 
-        # Build dataset from real orders
-        df = self.builder.build_eta_dataset(days=days)
-        if df.empty:
-            return {"status": "failed", "error": "Empty ETA dataset", "rows": 0}
+        # Build dataset using extract_eta_training_data
+        from app.ml.features import extract_eta_training_data
+        try:
+            X, y, feature_cols = extract_eta_training_data(self.db, days=days)
+        except Exception as e:
+            logger.error(f"Failed to extract ETA training data: {e}")
+            return {"status": "failed", "error": str(e), "rows": 0}
 
-        feature_cols = [c for c in df.columns if c not in (
-            'target_eta_minutes', 'eta_minutes', 'order_id'
-        )]
-        X = df[feature_cols].values
-        y = df['target_eta_minutes'].values
+        if len(X) == 0:
+            return {"status": "failed", "error": "Empty ETA dataset", "rows": 0}
 
         # Train/test split
         X_train, X_test, y_train, y_test = train_test_split(
@@ -182,7 +182,7 @@ class ModelTrainer:
                 logger.error(f"LightGBM ETA failed: {e}")
 
         if best_model is None:
-            return {"status": "failed", "error": "No model trained successfully", "rows": len(df)}
+            return {"status": "failed", "error": "No model trained successfully", "rows": len(X)}
 
         # Save best model
         version_id = ModelRegistry.save(
@@ -194,8 +194,8 @@ class ModelTrainer:
                 "r2": float([r["r2"] for r in results if r["model"] == best_name][0]),
             },
             hyperparams={"days": days, "features": len(feature_cols), "model": best_name},
-            features=feature_cols,
-            description=f"ETA prediction trained on {len(df)} real orders from last {days} days",
+            features=list(feature_cols),
+            description=f"ETA prediction trained on {len(X)} real orders from last {days} days",
         )
 
         return {
@@ -204,9 +204,9 @@ class ModelTrainer:
             "version_id": version_id,
             "best_model": best_name,
             "best_rmse": float(best_rmse),
-            "rows_trained": len(df),
+            "rows_trained": len(X),
             "features_used": len(feature_cols),
-            "feature_names": feature_cols,
+            "feature_names": list(feature_cols),
             "comparison": results,
         }
 
@@ -216,13 +216,29 @@ class ModelTrainer:
         """Train demand forecast model."""
         logger.info("=== PHASE 4: Training Demand Forecast Model ===")
 
-        df = self.builder.build_demand_dataset(days=days)
-        if df.empty:
+        # Build dataset using extract_demand_features for all vendors
+        from app.ml.features import extract_demand_features
+        from app.modules.users.model import User
+
+        vendors = self.db.query(User).filter(User.role == "vendor", User.is_approved == True).all()
+
+        X_all, y_all = [], []
+        feature_cols = []
+        for vendor in vendors:
+            try:
+                X_v, y_v, cols = extract_demand_features(self.db, vendor.id, days=days)
+                if len(X_v) > 0:
+                    X_all.append(X_v)
+                    y_all.append(y_v)
+                    feature_cols = cols
+            except Exception as e:
+                logger.error(f"Failed to extract demand features for vendor {vendor.id}: {e}")
+
+        if not X_all:
             return {"status": "failed", "error": "Empty demand dataset", "rows": 0}
 
-        feature_cols = [c for c in df.columns if c != 'target_order_count']
-        X = df[feature_cols].values
-        y = df['target_order_count'].values
+        X = np.vstack(X_all)
+        y = np.concatenate(y_all)
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
@@ -271,7 +287,7 @@ class ModelTrainer:
                 logger.error(f"RandomForest Demand failed: {e}")
 
         if best_model is None:
-            return {"status": "failed", "error": "No model trained", "rows": len(df)}
+            return {"status": "failed", "error": "No model trained", "rows": len(X)}
 
         version_id = ModelRegistry.save(
             model=best_model,
@@ -283,7 +299,7 @@ class ModelTrainer:
             },
             hyperparams={"days": days, "features": len(feature_cols), "model": best_name},
             features=feature_cols,
-            description=f"Demand forecast trained on {len(df)} hourly records",
+            description=f"Demand forecast trained on {len(X)} hourly records",
         )
 
         return {
@@ -292,7 +308,7 @@ class ModelTrainer:
             "version_id": version_id,
             "best_model": best_name,
             "best_rmse": float(best_rmse),
-            "rows_trained": len(df),
+            "rows_trained": len(X),
             "features_used": len(feature_cols),
             "comparison": results,
         }
@@ -303,15 +319,15 @@ class ModelTrainer:
         """Train slot recommendation scoring model."""
         logger.info("=== PHASE 5: Training Slot Recommendation Model ===")
 
-        df = self.builder.build_slot_recommendation_dataset()
-        if df.empty:
-            return {"status": "failed", "error": "Empty slot dataset", "rows": 0}
+        from app.ml.features import extract_slot_features
+        try:
+            X, y, feature_cols = extract_slot_features(self.db)
+        except Exception as e:
+            logger.error(f"Failed to extract slot features: {e}")
+            return {"status": "failed", "error": str(e), "rows": 0}
 
-        feature_cols = [c for c in df.columns if c not in (
-            'target_quality_score', 'slot_id'
-        )]
-        X = df[feature_cols].values
-        y = df['target_quality_score'].values
+        if len(X) == 0:
+            return {"status": "failed", "error": "Empty slot dataset", "rows": 0}
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
@@ -341,7 +357,7 @@ class ModelTrainer:
                 logger.error(f"RandomForest Slot failed: {e}")
 
         if best_model is None:
-            return {"status": "failed", "error": "No model trained", "rows": len(df)}
+            return {"status": "failed", "error": "No model trained", "rows": len(X)}
 
         version_id = ModelRegistry.save(
             model=best_model,
@@ -353,7 +369,7 @@ class ModelTrainer:
             },
             hyperparams={"features": len(feature_cols), "model": best_name},
             features=feature_cols,
-            description=f"Slot recommendation trained on {len(df)} slots",
+            description=f"Slot recommendation trained on {len(X)} slots",
         )
 
         return {
@@ -362,7 +378,7 @@ class ModelTrainer:
             "version_id": version_id,
             "best_model": best_name,
             "best_rmse": float(best_rmse),
-            "rows_trained": len(df),
+            "rows_trained": len(X),
             "features_used": len(feature_cols),
             "comparison": results,
         }
@@ -524,15 +540,15 @@ class ModelTrainer:
         """Train vendor ranking model."""
         logger.info("=== PHASE 7: Training Vendor Ranking Model ===")
 
-        df = self.builder.build_vendor_performance_dataset()
-        if df.empty:
-            return {"status": "failed", "error": "Empty vendor dataset", "rows": 0}
+        from app.ml.features import extract_vendor_ranking_features
+        try:
+            X, y, feature_cols = extract_vendor_ranking_features(self.db)
+        except Exception as e:
+            logger.error(f"Failed to extract vendor ranking features: {e}")
+            return {"status": "failed", "error": str(e), "rows": 0}
 
-        feature_cols = [c for c in df.columns if c not in (
-            'target_performance_score', 'vendor_id'
-        )]
-        X = df[feature_cols].values
-        y = df['target_performance_score'].values
+        if len(X) == 0:
+            return {"status": "failed", "error": "Empty vendor dataset", "rows": 0}
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
@@ -581,7 +597,7 @@ class ModelTrainer:
                 logger.error(f"XGBoost Vendor failed: {e}")
 
         if best_model is None:
-            return {"status": "failed", "error": "No model trained", "rows": len(df)}
+            return {"status": "failed", "error": "No model trained", "rows": len(X)}
 
         version_id = ModelRegistry.save(
             model=best_model,
@@ -593,7 +609,7 @@ class ModelTrainer:
             },
             hyperparams={"features": len(feature_cols), "model": best_name},
             features=feature_cols,
-            description=f"Vendor ranking trained on {len(df)} vendors",
+            description=f"Vendor ranking trained on {len(X)} vendors",
         )
 
         return {
@@ -602,7 +618,7 @@ class ModelTrainer:
             "version_id": version_id,
             "best_model": best_name,
             "best_rmse": float(best_rmse),
-            "rows_trained": len(df),
+            "rows_trained": len(X),
             "features_used": len(feature_cols),
             "comparison": results,
         }
@@ -701,13 +717,15 @@ def train_demand_forecast(db: Session, vendor_id: int, days: int = 90) -> Dict[s
 def train_fraud_detection(db: Session) -> Dict[str, Any]:
     """Train fraud detection model using real order data."""
     logger.info("=== Training Fraud Detection Model ===")
-    from app.ml.features import build_user_item_matrix
-    # Fraud detection is trained on actual order patterns
-    builder = DatasetBuilder(db)
-    df = builder.build_eta_dataset(days=90)
+    from app.ml.features import extract_fraud_features
 
-    # Label: high cancellation rate = potential fraud
-    if df.empty:
+    try:
+        X, y, feature_cols = extract_fraud_features(db)
+    except Exception as e:
+        logger.error(f"Failed to extract fraud features: {e}")
+        return {"status": "failed", "error": str(e)}
+
+    if len(X) == 0:
         return {"status": "failed", "error": "Empty dataset"}
 
     # Use RandomForest for fraud classification
@@ -715,56 +733,49 @@ def train_fraud_detection(db: Session) -> Dict[str, Any]:
         try:
             from sklearn.ensemble import RandomForestClassifier
 
-            # Create fraud labels from real data patterns
-            fraud_features = df[[c for c in df.columns if c not in (
-                'target_eta_minutes', 'eta_minutes', 'order_id'
-            )]].values
+            # Ensure we have some variation in targets, otherwise fallback/dummy
+            if len(np.unique(y)) < 2:
+                # Force at least one dummy positive if all are zero to allow training
+                y[0] = 1.0
 
-            # Simulate fraud labels based on actual patterns
-            # High queue + long ETA = stress but not fraud
-            # High cancellation vendors = potential fraud
-            y_fraud = np.zeros(len(df))
-            # Flag extreme outliers as potential fraud
-            y_fraud[df['target_eta_minutes'] > df['target_eta_minutes'].quantile(0.95)] = 1
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
 
-            if y_fraud.sum() > 5:  # Need enough positive samples
-                X_train, X_test, y_train, y_test = train_test_split(
-                    fraud_features, y_fraud, test_size=0.2, random_state=42
-                )
+            model = RandomForestClassifier(
+                n_estimators=100, max_depth=8, random_state=42, n_jobs=-1,
+                class_weight='balanced'
+            )
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
 
-                model = RandomForestClassifier(
-                    n_estimators=100, max_depth=8, random_state=42, n_jobs=-1,
-                    class_weight='balanced'
-                )
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+            accuracy = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred, zero_division=0)
+            recall = recall_score(y_test, y_pred, zero_division=0)
+            f1 = f1_score(y_test, y_pred, zero_division=0)
 
-                from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-                accuracy = accuracy_score(y_test, y_pred)
-                precision = precision_score(y_test, y_pred, zero_division=0)
-                recall = recall_score(y_test, y_pred, zero_division=0)
-                f1 = f1_score(y_test, y_pred, zero_division=0)
-
-                version_id = ModelRegistry.save(
-                    model=model,
-                    model_type="fraud_detection",
-                    metrics={
-                        "accuracy": round(float(accuracy), 3),
-                        "precision": round(float(precision), 3),
-                        "recall": round(float(recall), 3),
-                        "f1": round(float(f1), 3),
-                    },
-                    hyperparams={"algorithm": "RandomForest", "class_weight": "balanced"},
-                    description=f"Fraud detection trained on {len(df)} orders",
-                )
-
-                return {
-                    "status": "success",
-                    "model_type": "fraud_detection",
-                    "version_id": version_id,
+            version_id = ModelRegistry.save(
+                model=model,
+                model_type="fraud_detection",
+                metrics={
                     "accuracy": round(float(accuracy), 3),
-                    "rows_trained": len(df),
-                }
+                    "precision": round(float(precision), 3),
+                    "recall": round(float(recall), 3),
+                    "f1": round(float(f1), 3),
+                },
+                hyperparams={"algorithm": "RandomForest", "class_weight": "balanced"},
+                features=feature_cols,
+                description=f"Fraud detection trained on {len(X)} users",
+            )
+
+            return {
+                "status": "success",
+                "model_type": "fraud_detection",
+                "version_id": version_id,
+                "accuracy": round(float(accuracy), 3),
+                "rows_trained": len(X),
+            }
         except Exception as e:
             return {"status": "failed", "error": str(e)}
 

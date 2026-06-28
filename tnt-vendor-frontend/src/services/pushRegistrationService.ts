@@ -2,9 +2,23 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 
 export async function registerFCMToken(): Promise<void> {
+  // Skip Firebase registration in dev — dummy credentials won't work
+  try {
+    const { default: firebase } = await import('@react-native-firebase/app');
+    // Check if Firebase has a real appId (not dummy)
+    const app = firebase.app();
+    if (!app.options.appId || app.options.appId === 'dummy-app-id') {
+      console.log('FCM: Skipping registration — no real Firebase project configured');
+      return;
+    }
+  } catch {
+    console.log('FCM: Firebase not configured — skipping');
+    return;
+  }
+
   try {
     // Dynamic import so the app doesn't crash if Firebase isn't set up yet
     const messaging = (await import('@react-native-firebase/messaging')).default;

@@ -69,6 +69,7 @@ export const NAV_ITEMS = [
   { path: '/vendors', label: 'Vendors', icon: 'Store', badge: 'pendingVendors' },
   { path: '/orders', label: 'Orders', icon: 'ShoppingBag' },
   { path: '/complaints', label: 'Complaints', icon: 'MessageSquareWarning', badge: 'openComplaints' },
+  { path: '/wastage', label: 'Wastage', icon: 'Trash2' },
   { path: '/rewards', label: 'Rewards', icon: 'Gift' },
   { path: '/stationery', label: 'Stationery', icon: 'Printer' },
   { path: '/ai', label: 'AI Intelligence', icon: 'Brain' },

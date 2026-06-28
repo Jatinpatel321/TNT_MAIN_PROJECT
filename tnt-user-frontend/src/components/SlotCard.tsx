@@ -71,6 +71,10 @@ export function SlotCard(props: {
       {slot.faculty_priority && (
         <Text style={styles.facultyBadge}>Faculty</Text>
       )}
+
+      {slot.express_pickup_eligible && (
+        <Text style={styles.expressBadge}>⚡ Express Pickup</Text>
+      )}
     </View>
   );
 
@@ -162,5 +166,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#6C63FF',
+  },
+  expressBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0891B2',
   },
 });

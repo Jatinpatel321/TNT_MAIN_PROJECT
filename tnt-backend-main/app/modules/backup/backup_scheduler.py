@@ -73,6 +73,68 @@ def _run_weekly_backup():
         logger.error("Scheduler: weekly backup failed: %s", exc)
 
 
+def _run_proactive_delays():
+    """Scheduled job: check and proactively alert users of order delays."""
+    try:
+        from app.database.session import SessionLocal
+        from app.modules.notifications.alert_tasks import check_proactive_delays_job
+        db = SessionLocal()
+        try:
+            check_proactive_delays_job(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: proactive delay checks failed: %s", exc)
+
+
+def _run_proactive_rush_hour_alerts():
+    """Scheduled job: check and send proactive rush hour alerts."""
+    try:
+        from app.database.session import SessionLocal
+        from app.modules.notifications.alert_tasks import send_proactive_rush_hour_alerts_job
+        db = SessionLocal()
+        try:
+            send_proactive_rush_hour_alerts_job(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: proactive rush hour alerts failed: %s", exc)
+
+
+def _run_auto_escalate_complaints():
+    """Scheduled job: run SLA complaint escalation."""
+    try:
+        from app.database.session import SessionLocal
+        from app.modules.complaints.escalation_service import auto_escalate_complaints_job
+        db = SessionLocal()
+        try:
+            auto_escalate_complaints_job(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: auto-escalate complaints failed: %s", exc)
+
+
+def _run_ml_retraining():
+    """Scheduled job to retrain ML models periodically."""
+    logger.info("Scheduler: starting ML model retraining")
+    try:
+        from app.database.session import SessionLocal
+        from app.ml.training_pipeline import ModelTrainer, train_fraud_detection
+        db = SessionLocal()
+        try:
+            trainer = ModelTrainer(db)
+            results = trainer.train_all()
+            logger.info("Scheduler: main ML models retraining complete: %s", results)
+            
+            fraud_res = train_fraud_detection(db)
+            logger.info("Scheduler: fraud detection ML model retraining complete: %s", fraud_res)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: ML model retraining failed: %s", exc)
+
+
 def start_scheduler() -> None:
     """Start the background scheduler with daily + weekly backup jobs."""
     sched = _get_scheduler()
@@ -102,8 +164,48 @@ def start_scheduler() -> None:
             misfire_grace_time=3600,
         )
 
+        # Proactive Delay Checks (every 10 minutes)
+        sched.add_job(
+            _run_proactive_delays,
+            trigger=CronTrigger(minute="*/10", timezone="UTC"),
+            id="proactive_delays",
+            name="Proactive Delay Alerts Check",
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+
+        # Proactive Rush Hour Alerts (every hour)
+        sched.add_job(
+            _run_proactive_rush_hour_alerts,
+            trigger=CronTrigger(minute="0", timezone="UTC"),
+            id="proactive_rush_hour",
+            name="Proactive Rush Hour Alerts Check",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
+
+        # Complaint Auto-escalation (every hour)
+        sched.add_job(
+            _run_auto_escalate_complaints,
+            trigger=CronTrigger(minute="0", timezone="UTC"),
+            id="complaint_escalation",
+            name="Complaint SLA Auto-Escalation Check",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
+
+        # ML model retraining (daily at 01:00 UTC)
+        sched.add_job(
+            _run_ml_retraining,
+            trigger=CronTrigger(hour=1, minute=0, timezone="UTC"),
+            id="ml_retraining",
+            name="Periodic ML Model Retraining",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         sched.start()
-        logger.info("Backup scheduler started (daily@02:00 UTC, weekly@Sunday 03:00 UTC)")
+        logger.info("Backup scheduler started (daily@02:00 UTC, weekly@Sunday 03:00 UTC, proactive tasks configured)")
     except Exception as exc:
         logger.error("Failed to start backup scheduler: %s", exc)
 
@@ -139,6 +241,12 @@ def get_scheduler_status() -> dict:
                     "name": "Weekly Database Backup",
                     "next_run_time": None,
                     "trigger": "cron(day_of_week=sun, hour=3, minute=0) UTC",
+                },
+                {
+                    "job_id": "ml_retraining",
+                    "name": "Periodic ML Model Retraining",
+                    "next_run_time": None,
+                    "trigger": "cron(hour=1, minute=0) UTC",
                 },
             ],
         }

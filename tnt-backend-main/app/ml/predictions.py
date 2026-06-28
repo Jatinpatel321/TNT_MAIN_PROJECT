@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import numpy as np
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.ml.registry import ModelRegistry
@@ -36,8 +37,29 @@ logger = logging.getLogger("tnt.ml.predictions")
 class MLPredictionService:
     """Service that loads ML models and makes predictions with explainability."""
 
+    _models_cache: dict[str, Any] = {}
+
     def __init__(self, db: Session):
         self.db = db
+
+    def predict(self, model_type: str) -> Optional[tuple[Any, dict[str, Any]]]:
+        """Lazy load and cache a model artifact.
+
+        Returns:
+            tuple[Any, dict[str, Any]]: The loaded model and its metadata, or None if missing.
+        """
+        if model_type not in self._models_cache:
+            try:
+                model_data = ModelRegistry.load(model_type)
+                if model_data is not None:
+                    self._models_cache[model_type] = model_data
+                    logger.info("Successfully loaded and cached ML model: %s", model_type)
+                else:
+                    self._models_cache[model_type] = None
+            except Exception as e:
+                logger.error("Failed to lazy load ML model '%s': %s", model_type, e)
+                self._models_cache[model_type] = None
+        return self._models_cache[model_type]
 
     # ── ETA Prediction ──────────────────────────────────────────────────
 
@@ -61,7 +83,7 @@ class MLPredictionService:
         ]])
 
         # Try to load ML model
-        model_data = ModelRegistry.load("eta_prediction")
+        model_data = self.predict("eta_prediction")
         if model_data is not None:
             model, metadata = model_data
             try:
@@ -83,6 +105,9 @@ class MLPredictionService:
                 }
             except Exception as e:
                 logger.error("ML ETA prediction failed: %s", e)
+                logger.warning("ML ETA prediction failed, falling back to heuristic.")
+        else:
+            logger.warning("ML model 'eta_prediction' artifact is missing/inactive, falling back to heuristic.")
 
         # Fallback to heuristic
         return self._heuristic_eta(vendor_id, slot, item_count)
@@ -129,7 +154,9 @@ class MLPredictionService:
 
     def forecast_demand(self, vendor_id: int, days_ahead: int = 7) -> dict[str, Any]:
         """Forecast demand for a vendor using ML model."""
-        model_data = ModelRegistry.load(f"demand_forecast_vendor{vendor_id}")
+        model_data = self.predict(f"demand_forecast_vendor{vendor_id}")
+        if model_data is None:
+            model_data = self.predict("demand_forecast")
         now = utcnow_naive()
         forecasts = []
 
@@ -157,6 +184,10 @@ class MLPredictionService:
 
         # If no model or failed, use daily average
         if not forecasts:
+            logger.warning(
+                "ML demand forecast model artifact is missing or failed for vendor %s, falling back to heuristic.",
+                vendor_id,
+            )
             thirty_days_ago = now - timedelta(days=30)
             daily_avg = self.db.query(Order.id).filter(
                 Order.vendor_id == vendor_id, Order.created_at >= thirty_days_ago
@@ -174,7 +205,7 @@ class MLPredictionService:
         return {
             "vendor_id": vendor_id,
             "forecasts": forecasts,
-            "method": "ml" if model_data else "heuristic",
+            "method": "ml" if model_data and len(forecasts) > 0 else "heuristic",
             "total_predicted": sum(f["predicted_orders"] for f in forecasts),
         }
 
@@ -182,7 +213,9 @@ class MLPredictionService:
 
     def recommend_slot(self, user_id: int) -> dict[str, Any]:
         """Recommend best slot based on ML model and user preferences."""
-        model_data = ModelRegistry.load("slot_recommendation")
+        model_data = self.predict("slot_recommendation")
+        if model_data is None:
+            logger.warning("ML slot recommendation model artifact is missing, falling back to heuristic.")
         slots = self.db.query(Slot).filter(
             Slot.status.notin_(["full", "blocked"]),
             Slot.start_time >= utcnow_naive(),
@@ -418,7 +451,9 @@ class MLPredictionService:
 
     def rank_vendors(self) -> list[dict[str, Any]]:
         """Rank vendors using ML model."""
-        model_data = ModelRegistry.load("vendor_ranking")
+        model_data = self.predict("vendor_ranking")
+        if model_data is None:
+            logger.warning("ML vendor ranking model artifact is missing, falling back to heuristic.")
         vendors = self.db.query(User).filter(
             User.role == UserRole.VENDOR, User.is_approved == True
         ).all()
@@ -491,8 +526,9 @@ class MLPredictionService:
 
     def detect_fraud(self, user_id: int, order_id: int) -> dict[str, Any]:
         """Check if an order/user is potentially fraudulent."""
-        model_data = ModelRegistry.load("fraud_detection")
+        model_data = self.predict("fraud_detection")
         if model_data is None:
+            logger.warning("ML fraud detection model artifact is missing, falling back to heuristic.")
             return self._heuristic_fraud_check(user_id, order_id)
 
         model, metadata = model_data

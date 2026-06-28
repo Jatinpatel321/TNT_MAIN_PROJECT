@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 
 export const profileApi = {
   getProfile: () => axios.get(`${API_BASE_URL}/v1/vendors/profile/`),

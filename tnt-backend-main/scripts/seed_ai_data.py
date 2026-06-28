@@ -31,13 +31,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.deps import get_db
 from app.modules.users.model import User
-from app.modules.menu.model import MenuItem, Category
-from app.modules.vendors.model import VendorProfile
+from app.modules.menu.model import MenuItem
+
+class Category:
+    def __init__(self, name, description=None, is_active=True):
+        self.name = name
+        self.description = description
+        self.is_active = is_active
+from app.modules.vendors.model import Vendor, VendorStatus
+from app.modules.vendors.profile_models import VendorProfile
 from app.modules.orders.model import Order, OrderItem, OrderStatus
 from app.modules.slots.model import Slot
 from app.modules.group_cart.model import Group, GroupMember, GroupCartItem, GroupPaymentSplit, PaymentSplitType
 from app.modules.recommendations.models import UserBehaviour, UserPreferenceSnapshot
-from app.modules.feedback.model import VendorReview, MenuItemReview
+from app.modules.feedback.model import VendorReview
 
 fake = Faker()
 Faker.seed(42)
@@ -65,6 +72,7 @@ class AISeedDataGenerator:
         self._generate_vendors(num_vendors)
         self._generate_menu_items()
         self._generate_users(num_users)
+        self._generate_slots()
         
         # 2. Generate orders and behaviour
         self._generate_orders(num_orders)
@@ -84,7 +92,7 @@ class AISeedDataGenerator:
         # 5. Generate reviews
         self._generate_reviews()
         
-        print("✓ All seed data generated successfully!")
+        print("* All seed data generated successfully!")
         return {
             "users": len(self.users),
             "vendors": len(self.vendors),
@@ -107,11 +115,9 @@ class AISeedDataGenerator:
                 description=f"{cat_name.title()} category",
                 is_active=True
             )
-            self.db.add(cat)
             self.categories.append(cat)
         
-        self.db.commit()
-        print(f"  ✓ Generated {len(self.categories)} categories")
+        print(f"  * Generated {len(self.categories)} categories")
 
     def _generate_vendors(self, num_vendors):
         """Generate vendors."""
@@ -119,7 +125,7 @@ class AISeedDataGenerator:
         
         for i in range(num_vendors):
             vendor_user = User(
-                phone=fake.phone_number(),
+                phone=f"9{random.randint(100000000, 999999999)}",
                 name=fake.company(),
                 role="vendor",
                 is_approved=True,
@@ -129,21 +135,31 @@ class AISeedDataGenerator:
             self.db.add(vendor_user)
             self.db.flush()
             
+            vendor_entity = Vendor(
+                vendor_name=vendor_user.name,
+                category=random.choice(["food", "stationery"]),
+                owner_id=vendor_user.id,
+                password_hash=Vendor.hash_password("password123"),
+                status=VendorStatus.ACTIVE,
+                created_at=vendor_user.created_at
+            )
+            self.db.add(vendor_entity)
+            self.db.flush()
+            
             vendor_profile = VendorProfile(
-                user_id=vendor_user.id,
-                business_name=fake.company(),
-                business_type=random.choice(["food", "stationery", "both"]),
+                vendor_id=vendor_entity.vendor_id,
+                business_name=vendor_user.name,
+                category=vendor_entity.category,
                 description=fake.text(max_nb_chars=200),
-                address=fake.address(),
-                is_active=True,
+                phone=vendor_user.phone,
+                is_open=True,
                 rating=round(random.uniform(3.5, 5.0), 1),
-                total_orders=random.randint(50, 500)
             )
             self.db.add(vendor_profile)
             self.vendors.append(vendor_user)
         
         self.db.commit()
-        print(f"  ✓ Generated {len(self.vendors)} vendors")
+        print(f"  * Generated {len(self.vendors)} vendors")
 
     def _generate_menu_items(self):
         """Generate menu items for each vendor."""
@@ -181,14 +197,14 @@ class AISeedDataGenerator:
                         description=fake.text(max_nb_chars=100),
                         price=price,
                         is_available=random.choice([True, True, True, False]),  # 75% available
-                        preparation_time=random.randint(5, 30),
+                        prep_time_minutes=random.randint(5, 30),
                         image_url=f"https://example.com/{item_name.replace(' ', '_')}.jpg"
                     )
                     self.db.add(menu_item)
                     self.menu_items.append(menu_item)
         
         self.db.commit()
-        print(f"  ✓ Generated {len(self.menu_items)} menu items")
+        print(f"  * Generated {len(self.menu_items)} menu items")
 
     def _generate_users(self, num_users):
         """Generate regular users."""
@@ -196,9 +212,9 @@ class AISeedDataGenerator:
         
         for i in range(num_users):
             user = User(
-                phone=fake.phone_number(),
+                phone=f"9{random.randint(100000000, 999999999)}",
                 name=fake.name(),
-                role="user",
+                role="student",
                 is_approved=True,
                 is_active=True,
                 created_at=datetime.utcnow() - timedelta(days=random.randint(1, 180))
@@ -207,20 +223,40 @@ class AISeedDataGenerator:
             self.users.append(user)
         
         self.db.commit()
-        print(f"  ✓ Generated {len(self.users)} users")
+        print(f"  * Generated {len(self.users)} users")
+
+    def _generate_slots(self):
+        """Generate slots for each vendor."""
+        print("Generating slots...")
+        from app.modules.slots.model import Slot, SlotStatus
+
+        self.slots = []
+        for vendor in self.vendors:
+            # Create daily slots for last 90 days
+            for day_offset in range(91):
+                date = datetime.utcnow() - timedelta(days=day_offset)
+                for h in [10, 13, 18]:
+                    slot_start = date.replace(hour=h, minute=0, second=0, microsecond=0)
+                    slot_end = slot_start + timedelta(hours=2)
+                    slot = Slot(
+                        vendor_id=vendor.id,
+                        start_time=slot_start,
+                        end_time=slot_end,
+                        max_orders=50,
+                        current_orders=0,
+                        status=SlotStatus.AVAILABLE
+                    )
+                    self.db.add(slot)
+                    self.slots.append(slot)
+        
+        self.db.commit()
+        print(f"  * Generated {len(self.slots)} slots")
 
     def _generate_orders(self, num_orders):
-        """Generate orders with realistic patterns."""
+        """Generate historic orders."""
         print(f"Generating {num_orders} orders...")
         
-        statuses = [
-            OrderStatus.COMPLETED,
-            OrderStatus.COMPLETED,
-            OrderStatus.COMPLETED,  # 75% completed
-            OrderStatus.PICKED,
-            OrderStatus.PICKED,
-            OrderStatus.CANCELLED  # 20% cancelled
-        ]
+        statuses = [OrderStatus.PICKED, OrderStatus.COMPLETED, OrderStatus.CANCELLED]
         
         for _ in range(num_orders):
             user = random.choice(self.users)
@@ -235,14 +271,32 @@ class AISeedDataGenerator:
             order_date = datetime.utcnow() - timedelta(days=random.randint(0, 90))
             status = random.choice(statuses)
             
+            vendor_slots = [s for s in self.slots if s.vendor_id == vendor.id]
+            if vendor_slots:
+                # Find slot closest to order_date
+                slot = min(vendor_slots, key=lambda s: abs((s.start_time - order_date).total_seconds()))
+                slot_id = slot.id
+            else:
+                from app.modules.slots.model import SlotStatus
+                fallback_slot = Slot(
+                    vendor_id=vendor.id,
+                    start_time=order_date,
+                    end_time=order_date + timedelta(hours=1),
+                    max_orders=50,
+                    status=SlotStatus.AVAILABLE
+                )
+                self.db.add(fallback_slot)
+                self.db.flush()
+                slot_id = fallback_slot.id
+
             order = Order(
                 user_id=user.id,
                 vendor_id=vendor.id,
+                slot_id=slot_id,
                 status=status,
                 total_amount=0,  # Will be calculated
                 eta_minutes=random.randint(10, 30),
                 created_at=order_date,
-                updated_at=order_date + timedelta(minutes=random.randint(5, 60))
             )
             self.db.add(order)
             self.db.flush()
@@ -267,7 +321,7 @@ class AISeedDataGenerator:
             self.orders.append(order)
         
         self.db.commit()
-        print(f"  ✓ Generated {len(self.orders)} orders")
+        print(f"  * Generated {len(self.orders)} orders")
 
     def _generate_behaviour_history(self):
         """Generate user behaviour history."""
@@ -292,17 +346,14 @@ class AISeedDataGenerator:
                     event_type=event_type,
                     vendor_id=vendor_id,
                     menu_item_id=menu_item_id,
-                    event_data=json.dumps({
-                        "timestamp": fake.unix_time(),
-                        "duration": random.randint(5, 300)
-                    }),
+                    duration_seconds=random.randint(5, 300),
                     created_at=datetime.utcnow() - timedelta(days=random.randint(0, 90))
                 )
                 self.db.add(behaviour)
                 behaviour_count += 1
         
         self.db.commit()
-        print(f"  ✓ Generated {behaviour_count} behaviour events")
+        print(f"  * Generated {behaviour_count} behaviour events")
 
     def _generate_preference_snapshots(self):
         """Generate user preference snapshots."""
@@ -325,7 +376,9 @@ class AISeedDataGenerator:
             for order in user_orders:
                 vendor_counts[order.vendor_id] = vendor_counts.get(order.vendor_id, 0) + 1
                 
-                for item in order.order_items:
+                from app.modules.orders.model import OrderItem
+                order_items = self.db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+                for item in order_items:
                     menu_item = self.db.query(MenuItem).filter(MenuItem.id == item.menu_item_id).first()
                     if menu_item:
                         category_counts[menu_item.category] = category_counts.get(menu_item.category, 0) + 1
@@ -360,13 +413,13 @@ class AISeedDataGenerator:
                     "preferred_hour": preferred_hour,
                     "hour_distribution": hour_counts
                 }),
-                updated_at=datetime.utcnow()
+                computed_at=datetime.utcnow()
             )
             self.db.add(snapshot)
             snapshot_count += 1
         
         self.db.commit()
-        print(f"  ✓ Generated {snapshot_count} preference snapshots")
+        print(f"  * Generated {snapshot_count} preference snapshots")
 
     def _generate_eta_history(self):
         """Generate ETA prediction history."""
@@ -377,16 +430,14 @@ class AISeedDataGenerator:
         eta_count = 0
         for order in self.orders:
             if order.status in [OrderStatus.COMPLETED, OrderStatus.PICKED]:
-                # Actual prep time (stored in eta_minutes)
                 actual_eta = order.eta_minutes
-                
-                # Simulate prediction accuracy (±20% variance)
                 predicted_eta = int(actual_eta * random.uniform(0.8, 1.2))
                 order.eta_minutes = predicted_eta
+                order.actual_completion_minutes = actual_eta
                 eta_count += 1
         
         self.db.commit()
-        print(f"  ✓ Generated ETA data for {eta_count} orders")
+        print(f"  * Generated ETA data for {eta_count} orders")
 
     def _generate_vendor_speed_history(self):
         """Generate vendor speed metrics."""
@@ -399,7 +450,7 @@ class AISeedDataGenerator:
             if len(vendor_orders) >= 5:
                 speed_count += 1
         
-        print(f"  ✓ {speed_count} vendors have sufficient order history for speed metrics")
+        print(f"  * {speed_count} vendors have sufficient order history for speed metrics")
 
     def _generate_prediction_history(self):
         """Generate prediction history."""
@@ -413,7 +464,7 @@ class AISeedDataGenerator:
             if len(user_orders) >= 3:
                 prediction_count += 1
         
-        print(f"  ✓ {prediction_count} users have sufficient history for predictions")
+        print(f"  * {prediction_count} users have sufficient history for predictions")
 
     def _generate_groups(self):
         """Generate group carts."""
@@ -449,7 +500,7 @@ class AISeedDataGenerator:
             self.groups.append(group)
         
         self.db.commit()
-        print(f"  ✓ Generated {len(self.groups)} groups")
+        print(f"  * Generated {len(self.groups)} groups")
 
     def _generate_group_orders(self):
         """Generate group orders."""
@@ -482,7 +533,7 @@ class AISeedDataGenerator:
                     order_count += 1
         
         self.db.commit()
-        print(f"  ✓ Generated {order_count} group cart items")
+        print(f"  * Generated {order_count} group cart items")
 
     def _generate_split_payments(self):
         """Generate split payment records."""
@@ -525,10 +576,10 @@ class AISeedDataGenerator:
                 payment_count += 1
         
         self.db.commit()
-        print(f"  ✓ Generated {payment_count} split payment records")
+        print(f"  * Generated {payment_count} split payment records")
 
     def _generate_reviews(self):
-        """Generate reviews for vendors and menu items."""
+        """Generate reviews for vendors."""
         print("Generating reviews...")
         
         review_count = 0
@@ -540,35 +591,25 @@ class AISeedDataGenerator:
                 user_id=user.id,
                 vendor_id=vendor.id,
                 rating=random.randint(3, 5),
-                comment=fake.text(max_nb_chars=200),
-                created_at=datetime.utcnow() - timedelta(days=random.randint(0, 30))
-            )
-            self.db.add(review)
-            review_count += 1
-        
-        # Menu item reviews
-        for user in self.users[:40]:
-            item = random.choice(self.menu_items)
-            review = MenuItemReview(
-                user_id=user.id,
-                menu_item_id=item.id,
-                rating=random.randint(3, 5),
-                comment=fake.text(max_nb_chars=150),
+                review_text=fake.text(max_nb_chars=200),
                 created_at=datetime.utcnow() - timedelta(days=random.randint(0, 30))
             )
             self.db.add(review)
             review_count += 1
         
         self.db.commit()
-        print(f"  ✓ Generated {review_count} reviews")
+        print(f"  * Generated {review_count} reviews")
 
 
-def main():
-    """Main function to run seed data generation."""
-    from app.core.deps import SessionLocal
+def seed_ai_data(db=None):
+    """Generate synthetic training data for AI services."""
+    from app.database.session import SessionLocal
     
-    db = SessionLocal()
-    
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+        
     try:
         generator = AISeedDataGenerator(db)
         stats = generator.generate_all(
@@ -576,6 +617,31 @@ def main():
             num_vendors=10,
             num_orders=200
         )
+        
+        # Automatically train models on seeded data
+        print("Automatically training ML models on seeded data...")
+        from app.ml.training_pipeline import ModelTrainer, train_fraud_detection
+        trainer = ModelTrainer(db)
+        
+        # Train all main models
+        trainer.train_all()
+        # Train fraud model
+        train_fraud_detection(db)
+        print("ML models successfully trained and registered.")
+        
+        return stats
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        if should_close:
+            db.close()
+
+
+def main():
+    """Main function to run seed data generation."""
+    try:
+        stats = seed_ai_data()
         
         print("\n" + "="*60)
         print("SEED DATA GENERATION COMPLETE")
@@ -589,10 +655,7 @@ def main():
         
     except Exception as e:
         print(f"Error: {e}")
-        db.rollback()
         raise
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":

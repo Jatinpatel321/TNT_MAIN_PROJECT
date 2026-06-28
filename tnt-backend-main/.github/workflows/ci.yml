@@ -38,7 +38,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest ruff pre-commit
+          pip install pytest ruff pre-commit pytest-cov
 
       - name: Ruff import check
         run: ruff check . --select I
@@ -80,4 +80,4 @@ jobs:
           done
 
       - name: Pytest
-        run: pytest -q
+        run: pytest --cov=app --cov-fail-under=80 -q

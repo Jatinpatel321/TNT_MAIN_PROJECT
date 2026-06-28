@@ -660,3 +660,116 @@ class KPIService:
         }
 
         return res_payload
+
+    def get_food_waste_analytics(self) -> Dict[str, Any]:
+        """Aggregate university-wide food waste reduction metrics."""
+        from datetime import timedelta
+        from sqlalchemy import func
+        from app.core.time_utils import utcnow_naive
+        from app.modules.orders.model import Order, OrderStatus, OrderItem
+        from app.modules.menu.model import MenuItem
+        from app.modules.users.model import User
+
+        end_date = utcnow_naive()
+        start_date = end_date - timedelta(days=90)
+
+        # 1. Total wasted revenue and cancelled order count
+        cancelled_stats = self.db.query(
+            func.count(Order.id).label("count"),
+            func.sum(Order.total_amount).label("wasted_revenue"),
+        ).filter(
+            Order.status == OrderStatus.CANCELLED,
+            Order.created_at >= start_date,
+        ).first()
+
+        total_orders = self.db.query(func.count(Order.id)).filter(
+            Order.created_at >= start_date,
+        ).scalar() or 1
+
+        cancelled_count = cancelled_stats.count or 0
+        wasted_revenue = float(cancelled_stats.wasted_revenue or 0)
+        cancellation_rate = round(cancelled_count / total_orders * 100, 1)
+
+        # 2. Top wasted menu items (by number of cancellations)
+        wasted_items_query = self.db.query(
+            MenuItem.name,
+            func.count(OrderItem.id).label("cancelled_count"),
+            func.sum(OrderItem.quantity * MenuItem.price).label("wasted_value")
+        ).join(
+            OrderItem, OrderItem.menu_item_id == MenuItem.id
+        ).join(
+            Order, Order.id == OrderItem.order_id
+        ).filter(
+            Order.status == OrderStatus.CANCELLED,
+            Order.created_at >= start_date,
+        ).group_by(MenuItem.name).order_by(
+            func.count(OrderItem.id).desc()
+        ).limit(5).all()
+
+        wasted_items = [
+            {
+                "name": item.name,
+                "cancelled_count": item.cancelled_count,
+                "wasted_value": float(item.wasted_value or 0)
+            }
+            for item in wasted_items_query
+        ]
+
+        # 3. Wastage breakdown by vendor
+        vendor_waste_query = self.db.query(
+            User.username.label("vendor_name"),
+            func.count(Order.id).label("cancelled_count"),
+            func.sum(Order.total_amount).label("wasted_revenue")
+        ).join(
+            Order, Order.vendor_id == User.id
+        ).filter(
+            Order.status == OrderStatus.CANCELLED,
+            Order.created_at >= start_date,
+        ).group_by(User.username).order_by(
+            func.sum(Order.total_amount).desc()
+        ).all()
+
+        vendor_waste = [
+            {
+                "vendor_name": v.vendor_name,
+                "cancelled_count": v.cancelled_count,
+                "wasted_revenue": float(v.wasted_revenue or 0)
+            }
+            for v in vendor_waste_query
+        ]
+
+        # 4. Monthly/daily trends of wastage (last 30 days for chart)
+        trend_start = end_date - timedelta(days=30)
+        daily_trend_query = self.db.query(
+            func.date(Order.created_at).label("date"),
+            func.sum(Order.total_amount).label("wasted_revenue"),
+            func.count(Order.id).label("cancelled_count")
+        ).filter(
+            Order.status == OrderStatus.CANCELLED,
+            Order.created_at >= trend_start,
+        ).group_by(
+            func.date(Order.created_at)
+        ).order_by(
+            func.date(Order.created_at)
+        ).all()
+
+        daily_trend = [
+            {
+                "date": str(t.date),
+                "wasted_revenue": float(t.wasted_revenue or 0),
+                "cancelled_count": t.cancelled_count
+            }
+            for t in daily_trend_query
+        ]
+
+        return {
+            "period": "last_90_days",
+            "total_orders": total_orders,
+            "cancelled_orders": cancelled_count,
+            "cancellation_rate": cancellation_rate,
+            "wasted_revenue": wasted_revenue,
+            "daily_waste_average": round(wasted_revenue / 90.0, 2),
+            "wasted_items": wasted_items,
+            "vendor_waste": vendor_waste,
+            "daily_trend": daily_trend
+        }

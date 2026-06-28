@@ -1,0 +1,37 @@
+buildscript {
+
+    ext {
+        buildToolsVersion = "35.0.0"
+        minSdkVersion = 23
+        compileSdkVersion = 34
+        targetSdkVersion = 34
+        kotlinVersion = "1.8.22"
+    }
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.6.1")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22")
+    }
+
+}
+
+subprojects { subproject ->
+    subproject.afterEvaluate {
+        def isShimProject = subproject.name == "baseReactShim"
+        def isReactAndroid = subproject.name == "ReactAndroid"
+        def isAndroidModule = subproject.plugins.hasPlugin("com.android.library") || subproject.plugins.hasPlugin("com.android.application")
+        def hasImplementation = subproject.configurations.findByName("implementation") != null
+        if (!isShimProject && !isReactAndroid && isAndroidModule && hasImplementation) {
+            subproject.dependencies.add("implementation", project(":baseReactShim"))
+        }
+    }
+}
+
+def expoCameraMavenPath = new File(["node", "--print", "require.resolve('expo-camera/package.json')"].execute(null, rootDir).text.trim(), "../android/maven")
+allprojects { repositories { maven { url(expoCameraMavenPath) } } }

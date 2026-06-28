@@ -508,6 +508,16 @@ async def get_kpis(
     return data
 
 
+@router.get("/analytics/wastage", summary="Get aggregated institutional food waste analytics")
+async def get_wastage_analytics(
+    db: Session = Depends(get_db),
+    user=Depends(require_role("admin")),
+):
+    from app.modules.admin.kpi_service import KPIService
+    service = KPIService(db)
+    return service.get_food_waste_analytics()
+
+
 # 👥 USER MANAGEMENT
 @router.get("/users", response_model=AdminUserListResponse)
 def list_all_users(

@@ -57,10 +57,17 @@ export type CheckoutResponse = {
   express_pickup_eligible: boolean;
 };
 
-export async function checkout(slotId: number, paymentMethod?: string): Promise<CheckoutResponse> {
+export async function checkout(
+  slotId: number,
+  paymentMethod?: string,
+  voucherCode?: string,
+  pointsToRedeem?: number
+): Promise<CheckoutResponse> {
   const res = await apiClient.post('/checkout', {
     slot_id: slotId,
     payment_method: paymentMethod ?? 'UPI',
+    voucher_code: voucherCode || undefined,
+    points_to_redeem: pointsToRedeem || undefined,
   });
   return res.data as CheckoutResponse;
 }

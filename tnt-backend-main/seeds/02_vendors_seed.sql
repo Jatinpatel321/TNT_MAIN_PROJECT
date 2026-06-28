@@ -1,3 +1,4 @@
+-- Passwords: vendor_password='vendor123', staff_password='staff123'
 BEGIN;
 
 -- Truncate vendor related tables
@@ -10,16 +11,16 @@ TRUNCATE TABLE vendors RESTART IDENTITY CASCADE;
 -- Insert Vendors (IDs 1 to 10)
 -- owner_id points to users.id (66 to 75)
 INSERT INTO vendors (vendor_id, vendor_name, vendor_type, owner_id, password_hash, status, created_at) VALUES
-(1, 'Campus Cafe', 'food', 66, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '88 days'),
-(2, 'Food Junction', 'food', 67, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '88 days'),
-(3, 'Snack Corner', 'food', 68, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '87 days'),
-(4, 'Coffee Hub', 'food', 69, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '87 days'),
-(5, 'Student Kitchen', 'food', 70, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '86 days'),
-(6, 'Express Bites', 'food', 71, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '86 days'),
-(7, 'Print Express', 'stationery', 72, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '85 days'),
-(8, 'Smart Print', 'stationery', 73, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '85 days'),
-(9, 'Campus Xerox', 'stationery', 74, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '84 days'),
-(10, 'Academic Prints', 'stationery', 75, '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', 'active', NOW() - INTERVAL '84 days');
+(1, 'Campus Cafe', 'food', 66, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '88 days'),
+(2, 'Food Junction', 'food', 67, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '88 days'),
+(3, 'Snack Corner', 'food', 68, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '87 days'),
+(4, 'Coffee Hub', 'food', 69, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '87 days'),
+(5, 'Student Kitchen', 'food', 70, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '86 days'),
+(6, 'Express Bites', 'food', 71, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '86 days'),
+(7, 'Print Express', 'stationery', 72, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '85 days'),
+(8, 'Smart Print', 'stationery', 73, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '85 days'),
+(9, 'Campus Xerox', 'stationery', 74, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '84 days'),
+(10, 'Academic Prints', 'stationery', 75, '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', 'active', NOW() - INTERVAL '84 days');
 
 -- Insert Vendor Profiles
 INSERT INTO vendor_profiles (id, vendor_id, business_name, category, description, phone, email, location, latitude, longitude, logo_url, cover_image, business_hours, pickup_instructions, holidays, is_open, max_pickup_distance_km, prep_time_minutes, created_at, updated_at) VALUES
@@ -36,26 +37,26 @@ INSERT INTO vendor_profiles (id, vendor_id, business_name, category, description
 
 -- Insert Vendor Staff (1 manager, 1 helper for each of 10 vendors = 20 total)
 INSERT INTO vendor_staff (id, vendor_id, name, role, phone, permissions, password_hash, is_active, created_at) VALUES
-(1, 1, 'Rajesh Kumar', 'manager', '+919800000001', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(2, 1, 'Karan Dev', 'staff', '+919800000002', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(3, 2, 'Sohan Lal', 'manager', '+919800000003', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(4, 2, 'Ramesh Ram', 'staff', '+919800000004', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(5, 3, 'Vijay Singh', 'manager', '+919800000005', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(6, 3, 'Ankit Kumar', 'staff', '+919800000006', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(7, 4, 'Tarun Roy', 'manager', '+919800000007', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(8, 4, 'Manpreet Singh', 'staff', '+919800000008', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(9, 5, 'Ravi Verma', 'manager', '+919800000009', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(10, 5, 'Ajay Das', 'staff', '+919800000010', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(11, 6, 'Gopal Sen', 'manager', '+919800000011', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(12, 6, 'Kartik Sen', 'staff', '+919800000012', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(13, 7, 'Sanjay Gupta', 'manager', '+919800000013', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(14, 7, 'Naveen Gupta', 'staff', '+919800000014', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(15, 8, 'Mahesh Nair', 'manager', '+919800000015', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(16, 8, 'Pramod Nair', 'staff', '+919800000016', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(17, 9, 'Devendra Jha', 'manager', '+919800000017', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(18, 9, 'Bipin Jha', 'staff', '+919800000018', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(19, 10, 'Subhas Bose', 'manager', '+919800000019', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days'),
-(20, 10, 'Nehru Sen', 'staff', '+919800000020', '{"orders": ["view", "status_update"]}', '$2b$12$SEED_HASH_PLACEHOLDER_XXXXXXXXXXXXXXXXXXXXXXXXXXX', true, NOW() - INTERVAL '70 days');
+(1, 1, 'Rajesh Kumar', 'manager', '+919800000001', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(2, 1, 'Karan Dev', 'staff', '+919800000002', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(3, 2, 'Sohan Lal', 'manager', '+919800000003', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(4, 2, 'Ramesh Ram', 'staff', '+919800000004', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(5, 3, 'Vijay Singh', 'manager', '+919800000005', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(6, 3, 'Ankit Kumar', 'staff', '+919800000006', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(7, 4, 'Tarun Roy', 'manager', '+919800000007', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(8, 4, 'Manpreet Singh', 'staff', '+919800000008', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(9, 5, 'Ravi Verma', 'manager', '+919800000009', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(10, 5, 'Ajay Das', 'staff', '+919800000010', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(11, 6, 'Gopal Sen', 'manager', '+919800000011', '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(12, 6, 'Kartik Sen', 'staff', '+919800000012', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(13, 7, 'Sanjay Gupta', 'manager', '+919800000013', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(14, 7, 'Naveen Gupta', 'staff', '+919800000014', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(15, 8, 'Mahesh Nair', 'manager', '+919800000015', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(16, 8, 'Pramod Nair', 'staff', '+919800000016', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(17, 9, 'Devendra Jha', 'manager', '+919800000017', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(18, 9, 'Bipin Jha', 'staff', '+919800000018', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(19, 10, 'Subhas Bose', 'manager', '+919800000019', '{"orders": ["view", "edit", "status_update"], "services": ["edit"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days'),
+(20, 10, 'Nehru Sen', 'staff', '+919800000020', '{"orders": ["view", "status_update"]}', '$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS', true, NOW() - INTERVAL '70 days');
 
 -- Insert Vendor Staff Permissions (2 permissions per manager/staff = 40 total)
 INSERT INTO vendor_staff_permissions (id, staff_id, permission, is_granted, created_at) VALUES
