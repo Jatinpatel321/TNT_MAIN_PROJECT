@@ -1,178 +1,97 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Notification } from '../../services/notificationApi';
+// ─── Premium Notification Detail Screen ─────────────────────────
+// View notification details with premium design system
 
-type RootStackParamList = {
-  NotificationDetail: { notification: Notification };
-};
+import React, { useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
+import { colors, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import Button from '../../design-system/components/Button';
 
-type NotificationDetailScreenRouteProp = RouteProp<RootStackParamList, 'NotificationDetail'>;
-type NotificationDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'NotificationDetail'>;
-
-interface Props {
-  route: NotificationDetailScreenRouteProp;
-  navigation: NotificationDetailScreenNavigationProp;
-}
-
-export default function NotificationDetailScreen({ route, navigation }: Props) {
+export default function NotificationDetailScreen({ route, navigation }: any) {
   const { notification } = route.params;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'order_ready': return '✅';
-      case 'order_accepted': return '📋';
-      case 'order_preparing': return '👨‍🍳';
-      case 'delay_alert': return '⚠️';
-      case 'order_cancelled': return '❌';
-      case 'pickup_reminder': return '🔔';
-      case 'promo': return '🎉';
-      default: return '📢';
-    }
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
+  const getIcon = (type: string) => {
+    const icons: Record<string, string> = {
+      order_ready: '✅', order_accepted: '📋', order_preparing: '👨‍🍳',
+      delay_alert: '⚠️', order_cancelled: '❌', pickup_reminder: '🔔', promo: '🎉',
+    };
+    return icons[type] || '📢';
   };
 
-  const getNotificationColor = (type: string) => {
-    switch (type) {
-      case 'order_ready': return '#10B981';
-      case 'delay_alert': return '#F59E0B';
-      case 'order_cancelled': return '#EF4444';
-      default: return '#3B82F6';
-    }
+  const getColor = (type: string) => {
+    const map: Record<string, string> = {
+      order_ready: colors.success, delay_alert: colors.warning, order_cancelled: colors.error,
+    };
+    return map[type] || colors.info;
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(notification.notification_type) }]}>
-        <Text style={styles.icon}>{getNotificationIcon(notification.notification_type)}</Text>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.header}>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
+        <View style={[styles.iconCircle, { backgroundColor: getColor(notification.notification_type) }]}>
+          <Text style={styles.icon}>{getIcon(notification.notification_type)}</Text>
+        </View>
+        <Text style={styles.headerTitle}>{notification.title}</Text>
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{notification.title}</Text>
-        <Text style={styles.timestamp}>
-          {new Date(notification.created_at).toLocaleString()}
-        </Text>
-
-        <View style={styles.messageContainer}>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <GlassCard padding={20} borderRadius={20} style={{ marginHorizontal: spacing.lg, marginTop: spacing.md }}>
           <Text style={styles.message}>{notification.message}</Text>
-        </View>
+        </GlassCard>
 
-        <View style={styles.infoContainer}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Type:</Text>
-            <Text style={styles.infoValue}>{notification.notification_type}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Status:</Text>
-            <Text style={[styles.infoValue, { color: notification.is_read ? '#6B7280' : '#10B981' }]}>
-              {notification.is_read ? 'Read' : 'Unread'}
-            </Text>
-          </View>
-          {notification.reference_id && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Reference ID:</Text>
-              <Text style={styles.infoValue}>#{notification.reference_id}</Text>
-            </View>
-          )}
-        </View>
+        <GlassCard padding={16} borderRadius={18} style={{ marginHorizontal: spacing.lg, marginTop: spacing.sm }}>
+          <DetailRow label="Type" value={notification.notification_type} />
+          <DetailRow label="Status" value={notification.is_read ? 'Read' : 'Unread'} valueColor={notification.is_read ? colors.textMuted : colors.primary} />
+          {notification.reference_id && <DetailRow label="Reference" value={`#${notification.reference_id}`} />}
+          <DetailRow label="Time" value={new Date(notification.created_at).toLocaleString()} />
+        </GlassCard>
 
         {!notification.is_read && (
-          <TouchableOpacity style={styles.markReadButton}>
-            <Text style={styles.markReadButtonText}>Mark as Read</Text>
-          </TouchableOpacity>
+          <Button title="Mark as Read" onPress={() => navigation.goBack()} variant="primary" size="lg" fullWidth style={{ marginHorizontal: spacing.lg, marginTop: spacing.md }} />
         )}
-      </View>
+        <View style={{ height: spacing.huge }} />
+      </Animated.View>
     </ScrollView>
   );
 }
 
+function DetailRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <View style={detailStyles.row}>
+      <Text style={detailStyles.label}>{label}</Text>
+      <Text style={[detailStyles.value, valueColor ? { color: valueColor } : undefined]}>{value}</Text>
+    </View>
+  );
+}
+
+const detailStyles = StyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  label: { fontSize: 14, color: colors.textMuted, fontWeight: '500' },
+  value: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+});
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
+  container: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 60,
-    marginBottom: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
   },
-  icon: {
-    fontSize: 40,
-  },
-  content: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  timestamp: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  messageContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  message: {
-    fontSize: 16,
-    color: '#374151',
-    lineHeight: 24,
-  },
-  infoContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#111827',
-    fontWeight: '600',
-  },
-  markReadButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  markReadButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  iconCircle: { width: 72, height: 72, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  icon: { fontSize: 36 },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: colors.textInverse, textAlign: 'center' },
+  message: { fontSize: 16, color: colors.textPrimary, lineHeight: 24 },
 });

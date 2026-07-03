@@ -1,4 +1,4 @@
-package com.tntapp
+package com.tnt.vendor
 
 import android.app.Application
 import com.facebook.react.PackageList

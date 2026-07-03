@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// ─── Premium Slot Dashboard ──────────────────────────────────────
+// Premium slot management with design system (#635BFF, GlassCard)
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,49 +11,38 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
+  Animated,
 } from 'react-native';
-import { useAuth } from '../../context/AuthContext';
 import { slotApi } from '../../services/slotApi';
-
-interface Slot {
-  id: number;
-  start_time: string;
-  end_time: string;
-  max_orders: number;
-  current_orders: number;
-  status: string;
-  load_label: string;
-  available_capacity: number;
-  faculty_priority: boolean;
-  queue_size: number;
-  estimated_wait: number;
-  is_ai_recommended: boolean;
-}
+import { colors, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatusPill from '../../design-system/components/StatusPill';
+import StatCard from '../../design-system/components/StatCard';
+import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
+import Button from '../../design-system/components/Button';
 
 export default function SlotDashboardScreen({ navigation }: any) {
-  const { user } = useAuth();
-  const [slots, setSlots] = useState<Slot[]>([]);
+  const [slots, setSlots] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    fetchSlots();
+  }, []);
 
   const fetchSlots = async (isRefresh = false) => {
     try {
-      if (!isRefresh) {
-        setLoading(true);
-      }
-      setError(null);
-
+      if (!isRefresh) setLoading(true);
       const [slotsRes, analyticsRes] = await Promise.all([
         slotApi.getSlots(),
         slotApi.getAnalytics(),
       ]);
-
-      setSlots(slotsRes.data);
+      setSlots(slotsRes.data || []);
       setAnalytics(analyticsRes.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load slots');
       console.error('Slots fetch error:', err);
     } finally {
       setLoading(false);
@@ -58,456 +50,138 @@ export default function SlotDashboardScreen({ navigation }: any) {
     }
   };
 
-  useEffect(() => {
-    fetchSlots();
-  }, []);
+  const onRefresh = useCallback(() => { setRefreshing(true); fetchSlots(true); }, []);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchSlots(true);
-  }, []);
-
-  const handleLockSlot = async (slotId: number) => {
-    try {
-      await slotApi.lockSlot(slotId);
-      Alert.alert('Success', 'Slot locked successfully');
-      fetchSlots();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to lock slot');
-    }
+  const handleLockSlot = async (id: number) => {
+    try { await slotApi.lockSlot(id); fetchSlots(); } catch (err: any) { Alert.alert('Error', err.message); }
   };
 
-  const handleUnlockSlot = async (slotId: number) => {
-    try {
-      await slotApi.unlockSlot(slotId);
-      Alert.alert('Success', 'Slot unlocked successfully');
-      fetchSlots();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to unlock slot');
-    }
+  const handleUnlockSlot = async (id: number) => {
+    try { await slotApi.unlockSlot(id); fetchSlots(); } catch (err: any) { Alert.alert('Error', err.message); }
   };
 
-  const handleDeleteSlot = (slotId: number) => {
-    Alert.alert(
-      'Delete Slot',
-      'Are you sure you want to delete this slot?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await slotApi.deleteSlot(slotId);
-              Alert.alert('Success', 'Slot deleted successfully');
-              fetchSlots();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete slot');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteSlot = (id: number) => {
+    Alert.alert('Delete Slot', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { try { await slotApi.deleteSlot(id); fetchSlots(); } catch (err: any) { Alert.alert('Error', err.message); } } },
+    ]);
   };
 
-  const getStatusColor = (status: string): string => {
-    switch (status.toLowerCase()) {
-      case 'available':
-        return '#10B981';
-      case 'blocked':
-        return '#EF4444';
-      case 'full':
-        return '#F59E0B';
-      default:
-        return '#6B7280';
-    }
-  };
-
-  const getLoadLabelColor = (label: string): string => {
-    switch (label.toLowerCase()) {
-      case 'low':
-        return '#10B981';
-      case 'medium':
-        return '#F59E0B';
-      case 'high':
-        return '#EF4444';
-      default:
-        return '#6B7280';
-    }
+  const formatTime = (t: string) => {
+    try { return new Date(t).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }); } catch { return t; }
   };
 
   if (loading) {
     return (
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Slot Management</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>Loading slots...</Text>
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (error && !slots.length) {
-    return (
-      <ScrollView
-        style={styles.container}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Slot Management</Text>
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchSlots()}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading slots...</Text>
+      </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
       <View style={styles.header}>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
         <Text style={styles.headerTitle}>Slot Management</Text>
+        <Text style={styles.headerSubtitle}>{slots.length} active slots</Text>
       </View>
 
-      {/* Analytics Cards */}
-      {analytics && (
-        <View style={styles.analyticsGrid}>
-          <View style={styles.analyticsCard}>
-            <Text style={styles.analyticsValue}>{analytics.total_slots}</Text>
-            <Text style={styles.analyticsLabel}>Total Slots</Text>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        {/* Analytics */}
+        {analytics && (
+          <View style={styles.statsRow}>
+            <StatCard value={analytics.total_slots || 0} label="Total" icon="📋" color={colors.primary} size="sm" style={{ flex: 1 }} />
+            <StatCard value={analytics.active_slots || 0} label="Active" icon="✅" color={colors.success} size="sm" style={{ flex: 1 }} />
+            <StatCard value={analytics.blocked_slots || 0} label="Blocked" icon="🔒" color={colors.error} size="sm" style={{ flex: 1 }} />
+            <StatCard value={analytics.utilization_rate ? Math.round(analytics.utilization_rate * 100) : 0} label="Util. %" icon="📊" color={colors.secondary} size="sm" style={{ flex: 1 }} />
           </View>
-          <View style={styles.analyticsCard}>
-            <Text style={styles.analyticsValue}>{analytics.active_slots}</Text>
-            <Text style={styles.analyticsLabel}>Active</Text>
-          </View>
-          <View style={styles.analyticsCard}>
-            <Text style={styles.analyticsValue}>{analytics.blocked_slots}</Text>
-            <Text style={styles.analyticsLabel}>Blocked</Text>
-          </View>
-          <View style={styles.analyticsCard}>
-            <Text style={styles.analyticsValue}>{Math.round(analytics.utilization_rate * 100)}%</Text>
-            <Text style={styles.analyticsLabel}>Utilization</Text>
-          </View>
+        )}
+
+        {/* Actions */}
+        <View style={styles.actionsRow}>
+          <Button title="+ Create Slots" onPress={() => navigation.navigate('SlotConfiguration')} variant="primary" size="md" style={{ flex: 1 }} />
+          <Button title="⚙️ Capacity" onPress={() => navigation.navigate('CapacitySettings')} variant="secondary" size="md" style={{ flex: 1 }} />
         </View>
-      )}
 
-      {/* Action Buttons */}
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('SlotConfiguration')}
-        >
-          <Text style={styles.actionButtonText}>➕ Create Slots</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.actionButtonSecondary]}
-          onPress={() => navigation.navigate('CapacitySettings')}
-        >
-          <Text style={styles.actionButtonText}>⚙️ Capacity Rules</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Slots List */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Active Slots ({slots.length})</Text>
-        {slots.map((slot) => (
-          <View key={slot.id} style={styles.slotCard}>
-            <View style={styles.slotHeader}>
-              <View style={styles.slotTimeContainer}>
-                <Text style={styles.slotTime}>
-                  {new Date(slot.start_time).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
-                <Text style={styles.slotTimeArrow}>→</Text>
-                <Text style={styles.slotTime}>
-                  {new Date(slot.end_time).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
+        {/* Slot List */}
+        {slots.length === 0 ? (
+          <PremiumEmptyState icon="📋" title="No slots" description="Create your first time slot" onAction={() => navigation.navigate('SlotConfiguration')} actionLabel="Create Slot" />
+        ) : (
+          slots.map(slot => (
+            <GlassCard key={slot.id} padding={16} borderRadius={18} style={{ marginHorizontal: spacing.lg, marginBottom: spacing.sm }}>
+              <View style={styles.slotHeader}>
+                <View style={styles.timeRow}>
+                  <Text style={styles.timeText}>{formatTime(slot.start_time)}</Text>
+                  <Text style={styles.timeArrow}>→</Text>
+                  <Text style={styles.timeText}>{formatTime(slot.end_time)}</Text>
+                </View>
+                <StatusPill label={slot.status || 'available'} variant={slot.status === 'available' ? 'success' : slot.status === 'blocked' ? 'error' : 'warning'} size="sm" />
               </View>
-              <View style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(slot.status) }
-              ]}>
-                <Text style={styles.statusText}>{slot.status}</Text>
-              </View>
-            </View>
-
-            <View style={styles.slotDetails}>
-              <View style={styles.slotDetailRow}>
-                <Text style={styles.slotDetailLabel}>Capacity:</Text>
-                <Text style={styles.slotDetailValue}>
-                  {slot.current_orders}/{slot.max_orders}
-                </Text>
-              </View>
-              <View style={styles.slotDetailRow}>
-                <Text style={styles.slotDetailLabel}>Available:</Text>
-                <Text style={styles.slotDetailValue}>{slot.available_capacity}</Text>
-              </View>
-              <View style={styles.slotDetailRow}>
-                <Text style={styles.slotDetailLabel}>Load:</Text>
-                <Text style={[
-                  styles.slotDetailValue,
-                  { color: getLoadLabelColor(slot.load_label) }
-                ]}>
-                  {slot.load_label}
-                </Text>
+              <View style={styles.slotDetails}>
+                <SlotDetail label="Capacity" value={`${slot.current_orders || 0}/${slot.max_orders || 0}`} />
+                <SlotDetail label="Available" value={slot.available_capacity ?? 0} color={colors.success} />
+                <SlotDetail label="Load" value={slot.load_label || 'N/A'} color={slot.load_label === 'high' ? colors.error : slot.load_label === 'medium' ? colors.warning : colors.success} />
+                <SlotDetail label="Queue" value={slot.queue_size || 0} />
+                <SlotDetail label="Wait" value={`${slot.estimated_wait || 0}min`} />
               </View>
               {slot.faculty_priority && (
-                <View style={styles.facultyBadge}>
-                  <Text style={styles.facultyText}>👨‍🏫 Faculty Priority</Text>
-                </View>
+                <View style={styles.facultyBadge}><Text style={styles.facultyText}>👨‍🏫 Faculty Priority</Text></View>
               )}
-            </View>
-
-            <View style={styles.slotActions}>
-              {slot.is_locked ? (
-                <TouchableOpacity
-                  style={[styles.slotButton, styles.unlockButton]}
-                  onPress={() => handleUnlockSlot(slot.id)}
-                >
-                  <Text style={styles.slotButtonText}>🔓 Unlock</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.slotButton, styles.lockButton]}
-                  onPress={() => handleLockSlot(slot.id)}
-                >
-                  <Text style={styles.slotButtonText}>🔒 Lock</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[styles.slotButton, styles.deleteButton]}
-                onPress={() => handleDeleteSlot(slot.id)}
-              >
-                <Text style={styles.slotButtonText}>🗑️ Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </View>
+              <View style={styles.slotActions}>
+                {slot.is_locked ? (
+                  <Button title="🔓 Unlock" onPress={() => handleUnlockSlot(slot.id)} variant="success" size="sm" style={{ flex: 1 }} />
+                ) : (
+                  <Button title="🔒 Lock" onPress={() => handleLockSlot(slot.id)} variant="warning" size="sm" style={{ flex: 1 }} />
+                )}
+                <Button title="🗑️ Delete" onPress={() => handleDeleteSlot(slot.id)} variant="danger" size="sm" style={{ flex: 1 }} />
+              </View>
+            </GlassCard>
+          ))
+        )}
+        <View style={{ height: spacing.huge }} />
+      </Animated.View>
     </ScrollView>
   );
 }
 
+function SlotDetail({ label, value, color }: { label: string; value: string | number; color?: string }) {
+  return (
+    <View style={detailStyles.row}>
+      <Text style={detailStyles.label}>{label}</Text>
+      <Text style={[detailStyles.value, color ? { color } : undefined]}>{value}</Text>
+    </View>
+  );
+}
+
+const detailStyles = StyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  label: { fontSize: 13, color: colors.textMuted },
+  value: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+});
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#10B981',
+    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    marginTop: 100,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 12,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    marginTop: 100,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  analyticsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 16,
-    gap: 12,
-  },
-  analyticsCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  analyticsValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#10B981',
-    marginBottom: 4,
-  },
-  analyticsLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  section: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  actionButton: {
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  actionButtonSecondary: {
-    backgroundColor: '#3B82F6',
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  slotCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  slotHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  slotTimeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  slotTime: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  slotTimeArrow: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  slotDetails: {
-    marginBottom: 12,
-  },
-  slotDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  slotDetailLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  slotDetailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  facultyBadge: {
-    backgroundColor: '#FEF3C7',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  facultyText: {
-    fontSize: 12,
-    color: '#92400E',
-    fontWeight: '600',
-  },
-  slotActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  slotButton: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  lockButton: {
-    backgroundColor: '#F59E0B',
-  },
-  unlockButton: {
-    backgroundColor: '#10B981',
-  },
-  deleteButton: {
-    backgroundColor: '#EF4444',
-  },
-  slotButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  statsRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, marginTop: -16, marginBottom: spacing.md, gap: spacing.sm },
+  actionsRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  slotHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timeText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  timeArrow: { fontSize: 14, color: colors.textMuted },
+  slotDetails: { marginBottom: 12 },
+  facultyBadge: { backgroundColor: colors.secondaryPale, padding: 8, borderRadius: 10, marginBottom: 10 },
+  facultyText: { fontSize: 12, color: colors.secondary, fontWeight: '600' },
+  slotActions: { flexDirection: 'row', gap: 8 },
 });

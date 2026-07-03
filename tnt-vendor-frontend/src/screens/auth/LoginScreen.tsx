@@ -19,9 +19,10 @@ const { width } = Dimensions.get('window');
 const LOGO_SIZE = width * 0.28;
 
 export default function LoginScreen({ navigation }: any) {
-  const [vendorId, setVendorId] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginMode, setLoginMode] = useState<'owner' | 'staff'>('owner');
   const { login } = useAuth();
 
   // Animations
@@ -68,17 +69,27 @@ export default function LoginScreen({ navigation }: any) {
   }, []);
 
   const handleLogin = async () => {
-    if (!vendorId || !password) {
-      Alert.alert('Error', 'Please enter vendor ID and password');
+    if (!identifier.trim() || !password) {
+      Alert.alert(
+        'Error',
+        loginMode === 'staff'
+          ? 'Please enter staff phone and password'
+          : 'Please enter vendor ID and password',
+      );
+      return;
+    }
+
+    if (loginMode === 'owner' && Number.isNaN(Number(identifier))) {
+      Alert.alert('Error', 'Vendor ID must be numeric');
       return;
     }
 
     setLoading(true);
     try {
-      await login(parseInt(vendorId), password);
+      await login(identifier.trim(), password, loginMode);
       navigation.replace('Main');
-    } catch (error) {
-      Alert.alert('Login Failed', 'Invalid credentials');
+    } catch (error: any) {
+      Alert.alert('Login Failed', error?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -139,18 +150,39 @@ export default function LoginScreen({ navigation }: any) {
           <Text style={styles.formTitle}>Welcome Back</Text>
           <Text style={styles.formSubtitle}>Sign in to your vendor account</Text>
 
+          <View style={styles.modeToggleRow}>
+            <TouchableOpacity
+              style={[styles.modeToggle, loginMode === 'owner' && styles.modeToggleActive]}
+              onPress={() => setLoginMode('owner')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.modeToggleText, loginMode === 'owner' && styles.modeToggleTextActive]}>
+                Vendor Owner
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeToggle, loginMode === 'staff' && styles.modeToggleActive]}
+              onPress={() => setLoginMode('staff')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.modeToggleText, loginMode === 'staff' && styles.modeToggleTextActive]}>
+                Staff Member
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Vendor ID Field */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Vendor ID</Text>
+            <Text style={styles.label}>{loginMode === 'staff' ? 'Staff Phone' : 'Vendor ID'}</Text>
             <View style={styles.inputWrapper}>
               <Text style={styles.inputIcon}>🏪</Text>
               <TextInput
                 style={styles.input}
-                value={vendorId}
-                onChangeText={setVendorId}
-                placeholder="Enter your vendor ID"
+                value={identifier}
+                onChangeText={setIdentifier}
+                placeholder={loginMode === 'staff' ? 'Enter your staff phone' : 'Enter your vendor ID'}
                 placeholderTextColor={Colors.textMuted}
-                keyboardType="numeric"
+                keyboardType={loginMode === 'staff' ? 'phone-pad' : 'numeric'}
                 autoCapitalize="none"
               />
             </View>
@@ -301,6 +333,32 @@ const styles = StyleSheet.create({
     fontSize: Typography.bodySmall,
     color: Colors.textMuted,
     marginBottom: 24,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  modeToggle: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.bgSecondary,
+    alignItems: 'center',
+  },
+  modeToggleActive: {
+    backgroundColor: Colors.primary + '22',
+    borderColor: Colors.primary,
+  },
+  modeToggleText: {
+    color: Colors.textMuted,
+    fontSize: Typography.bodySmall,
+    fontWeight: Typography.bold,
+  },
+  modeToggleTextActive: {
+    color: Colors.textInverse,
   },
 
   // Fields

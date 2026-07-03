@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+// ─── Premium Staff Permissions Screen ────────────────────────────
+// Manage staff permissions with premium design system
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,15 +10,12 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { staffApi } from '../../services/staffApi';
-
-interface StaffMember {
-  id: number;
-  name: string;
-  role: 'owner' | 'manager' | 'staff';
-  permissions: string[];
-}
+import { colors, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import Button from '../../design-system/components/Button';
 
 interface Permission {
   module: string;
@@ -24,355 +24,138 @@ interface Permission {
 }
 
 export default function StaffPermissionsScreen({ route, navigation }: any) {
-  const { staff } = route.params as { staff: StaffMember };
+  const { staff } = route.params;
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(false);
-  const [loadingPermissions, setLoadingPermissions] = useState(true);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [loadingPerms, setLoadingPerms] = useState(true);
+  const [selected, setSelected] = useState<string[]>([...(staff.permissions || [])]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchPermissions();
-    setSelectedPermissions([...staff.permissions]);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    (async () => {
+      try {
+        const res = await staffApi.getPermissions();
+        setPermissions(res.data.permissions || []);
+      } catch { }
+      finally { setLoadingPerms(false); }
+    })();
   }, []);
 
-  const fetchPermissions = async () => {
-    try {
-      setLoadingPermissions(true);
-      const response = await staffApi.getPermissions();
-      setPermissions(response.data.permissions);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to load permissions');
-    } finally {
-      setLoadingPermissions(false);
-    }
+  const toggle = (perm: string) => {
+    setSelected(prev => prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]);
   };
 
-  const togglePermission = (permission: string) => {
-    setSelectedPermissions({
-      ...selectedPermissions,
-      permissions: selectedPermissions.includes(permission)
-        ? selectedPermissions.filter(p => p !== permission)
-        : [...selectedPermissions, permission],
-    });
-  };
-
-  const handleSavePermissions = async () => {
+  const handleSave = async () => {
     try {
       setLoading(true);
-      await staffApi.updateStaff(staff.id, {
-        permissions: selectedPermissions,
-      });
-
-      Alert.alert('Success', 'Permissions updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update permissions');
-    } finally {
-      setLoading(false);
-    }
+      await staffApi.updateStaff(staff.id, { permissions: selected });
+      Alert.alert('Success', 'Permissions updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    } catch (err: any) { Alert.alert('Error', err.message); }
+    finally { setLoading(false); }
   };
 
-  const selectAll = () => {
-    const allPermissions = permissions.flatMap(p => p.actions);
-    setSelectedPermissions(allPermissions);
-  };
-
-  const selectNone = () => {
-    setSelectedPermissions([]);
-  };
-
-  const selectRoleDefaults = () => {
-    switch (staff.role) {
-      case 'owner':
-        selectAll();
-        break;
-      case 'manager':
-        setSelectedPermissions(['orders:read', 'orders:write', 'menu:read', 'menu:write', 'analytics:read', 'inventory:read']);
-        break;
-      case 'staff':
-        setSelectedPermissions(['orders:read', 'menu:read']);
-        break;
-    }
+  const selectAll = () => { setSelected(permissions.flatMap(p => p.actions)); };
+  const selectNone = () => { setSelected([]); };
+  const selectDefaults = () => {
+    const defaults: Record<string, string[]> = {
+      owner: permissions.flatMap(p => p.actions),
+      manager: ['orders:read', 'orders:write', 'menu:read', 'menu:write', 'analytics:read', 'inventory:read'],
+      staff: ['orders:read', 'menu:read'],
+    };
+    setSelected(defaults[staff.role] || []);
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
         <Text style={styles.headerTitle}>Permissions</Text>
-        <Text style={styles.headerSubtitle}>{staff.name}</Text>
+        <Text style={styles.headerSubtitle}>{staff.name} · {staff.role}</Text>
       </View>
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoIcon}>ℹ️</Text>
-        <Text style={styles.infoText}>
-          Configure permissions for {staff.name}. Select the modules they can access.
-        </Text>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.section}>
+      <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
+        {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickActionButton} onPress={selectAll}>
-            <Text style={styles.quickActionText}>✅ Select All</Text>
+          <TouchableOpacity style={styles.quickBtn} onPress={selectAll}>
+            <Text style={styles.quickText}>✅ All</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton} onPress={selectNone}>
-            <Text style={styles.quickActionText}>❌ Clear All</Text>
+          <TouchableOpacity style={styles.quickBtn} onPress={selectNone}>
+            <Text style={styles.quickText}>❌ None</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton} onPress={selectRoleDefaults}>
-            <Text style={styles.quickActionText}>🔄 Role Defaults</Text>
+          <TouchableOpacity style={styles.quickBtn} onPress={selectDefaults}>
+            <Text style={styles.quickText}>🔄 Default</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Permissions List */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Available Permissions ({selectedPermissions.length} selected)
-        </Text>
-        {loadingPermissions ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#10B981" />
-            <Text style={styles.loadingText}>Loading permissions...</Text>
-          </View>
+        <Text style={styles.selectedCount}>{selected.length} permissions selected</Text>
+
+        {/* Permissions List */}
+        {loadingPerms ? (
+          <View style={styles.loadingWrap}><ActivityIndicator size="large" color={colors.primary} /></View>
         ) : (
-          permissions.map((permission) => (
-            <View key={permission.module} style={styles.permissionCard}>
-              <TouchableOpacity
-                style={styles.permissionHeader}
-                onPress={() => togglePermission(permission.module)}
-              >
-                <View style={styles.permissionTitleContainer}>
-                  <View style={[
-                    styles.checkbox,
-                    selectedPermissions.includes(permission.module) && styles.checkboxChecked
-                  ]}>
-                    {selectedPermissions.includes(permission.module) && (
-                      <Text style={styles.checkmark}>✓</Text>
-                    )}
+          permissions.map(p => (
+            <TouchableOpacity key={p.module} onPress={() => toggle(p.module)}>
+              <GlassCard padding={14} borderRadius={16} style={{ marginHorizontal: spacing.lg, marginBottom: 6 }}>
+                <View style={styles.permHeader}>
+                  <View style={styles.permInfo}>
+                    <Text style={styles.permModule}>{p.module.toUpperCase()}</Text>
+                    <Text style={styles.permDesc}>{p.description}</Text>
                   </View>
-                  <View style={styles.permissionTitleInfo}>
-                    <Text style={styles.permissionModule}>
-                      {permission.module.toUpperCase()}
-                    </Text>
-                    <Text style={styles.permissionDescription}>
-                      {permission.description}
-                    </Text>
+                  <View style={[styles.checkbox, selected.includes(p.module) && styles.checkboxChecked]}>
+                    {selected.includes(p.module) && <Text style={styles.checkmark}>✓</Text>}
                   </View>
                 </View>
-              </TouchableOpacity>
-
-              <View style={styles.actionsGrid}>
-                {permission.actions.map((action) => {
-                  const isSelected = selectedPermissions.includes(action);
-                  return (
-                    <TouchableOpacity
-                      key={action}
-                      style={[
-                        styles.actionChip,
-                        isSelected && styles.actionChipSelected
-                      ]}
-                      onPress={() => togglePermission(action)}
-                    >
-                      <Text style={[
-                        styles.actionChipText,
-                        isSelected && styles.actionChipTextSelected
-                      ]}>
-                        {action}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+                <View style={styles.actionChips}>
+                  {p.actions.map(a => {
+                    const isSel = selected.includes(a);
+                    return (
+                      <TouchableOpacity key={a} style={[styles.chip, isSel && styles.chipActive]} onPress={() => toggle(a)}>
+                        <Text style={[styles.chipText, isSel && styles.chipTextActive]}>{a}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
           ))
         )}
-      </View>
 
-      {/* Save Button */}
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-          onPress={handleSavePermissions}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Permissions</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+        <View style={styles.saveSection}>
+          <Button title="Save Permissions" onPress={handleSave} loading={loading} variant="primary" size="lg" fullWidth />
+        </View>
+        <View style={{ height: spacing.huge }} />
+      </Animated.View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#10B981',
+    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 4,
-  },
-  infoBox: {
-    backgroundColor: '#DBEAFE',
-    borderRadius: 12,
-    padding: 16,
-    margin: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1E40AF',
-    lineHeight: 20,
-  },
-  section: {
-    padding: 16,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  quickActionButton: {
-    flex: 1,
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  permissionCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  permissionHeader: {
-    marginBottom: 12,
-  },
-  permissionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
-  },
-  checkmark: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  permissionTitleInfo: {
-    flex: 1,
-  },
-  permissionModule: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  permissionDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 18,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  actionChip: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  actionChipSelected: {
-    backgroundColor: '#D1FAE5',
-    borderColor: '#10B981',
-  },
-  actionChipText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  actionChipTextSelected: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 12,
-  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  quickActions: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
+  quickBtn: { flex: 1, backgroundColor: colors.bgCard, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  quickText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  selectedCount: { fontSize: 13, color: colors.textMuted, fontWeight: '500', paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  loadingWrap: { padding: 40, alignItems: 'center' },
+  permHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  permInfo: { flex: 1 },
+  permModule: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  permDesc: { fontSize: 12, color: colors.textMuted },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkmark: { color: colors.textInverse, fontSize: 14, fontWeight: '700' },
+  actionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  chip: { backgroundColor: colors.bgSecondary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  chipActive: { backgroundColor: colors.primaryPale, borderColor: colors.primary },
+  chipText: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  chipTextActive: { color: colors.primary, fontWeight: '600' },
+  saveSection: { paddingHorizontal: spacing.lg, marginTop: spacing.xxl },
 });

@@ -92,8 +92,18 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments — NEVER COMMIT
 .env
+.env.*
+.env.local
+.env.production
+.env.development
+.env.staging
+tnt-backend-main/.env
+tnt-backend-main/.env.*
+tnt-vendor-frontend/.env
+tnt-vendor-frontend/.env.*
+
 .venv
 env/
 venv/
@@ -148,3 +158,9 @@ uploads/
 
 # ML models (tracked separately via git LFS or explicit add)
 # *.pkl
+
+# Secrets
+*.key
+*.pem
+*.cert
+*.secret

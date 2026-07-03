@@ -1,11 +1,26 @@
 """Vendor auth schemas — login, token refresh, profile management."""
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+# ── Vendor Profile (defined first so VendorLoginResponse can reference it) ──
+
+
+class VendorProfileResponse(BaseModel):
+    """Vendor profile returned in login response."""
+    vendor_id: int
+    vendor_name: str
+    category: Optional[str] = None
+    owner_id: int
+    owner_name: Optional[str] = None
+    owner_phone: Optional[str] = None
+    status: str
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -19,6 +34,9 @@ class VendorLoginRequest(BaseModel):
     staff_phone: Optional[str] = Field(
         None, description="Staff phone — use for staff login instead of vendor_id"
     )
+    phone: Optional[str] = Field(
+        None, description="Legacy staff phone field — supported for backward compatibility"
+    )
 
 
 class VendorLoginResponse(BaseModel):
@@ -27,7 +45,7 @@ class VendorLoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    vendor: "VendorProfileResponse"
+    vendor: VendorProfileResponse
 
 
 class VendorTokenRefreshRequest(BaseModel):
@@ -38,22 +56,6 @@ class VendorTokenRefreshResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-
-
-# ── Vendor Profile ───────────────────────────────────────────────────────────
-
-
-class VendorProfileResponse(BaseModel):
-    vendor_id: int
-    vendor_name: str
-    category: Optional[str] = None
-    owner_id: int
-    owner_name: Optional[str] = None
-    owner_phone: Optional[str] = None
-    status: str
-    created_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class VendorProfileUpdate(BaseModel):

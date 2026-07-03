@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, NetInfo, Animated } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 
 export default function OfflineMessage() {
   const [isOffline, setIsOffline] = useState(false);
-  const [slideAnim] = useState(new Animated.Value(-100));
+  const slideAnim = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state: any) => {

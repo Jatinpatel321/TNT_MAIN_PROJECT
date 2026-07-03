@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
-import { launchCamera, launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
+import * as ExpoImagePicker from 'expo-image-picker';
 
 interface ImagePickerProps {
   onImageSelected: (uri: string) => void;
@@ -8,36 +8,44 @@ interface ImagePickerProps {
 }
 
 export default function ImagePicker({ onImageSelected, title = 'Select Image' }: ImagePickerProps) {
-  const handleCamera = () => {
-    const options = {
-      mediaType: 'photo' as const,
+  const handleCamera = async () => {
+    const { status } = await ExpoImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera permission is required to take photos');
+      return;
+    }
+
+    const result = await ExpoImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
       quality: 0.8,
       maxWidth: 1024,
       maxHeight: 1024,
-      includeBase64: false,
-    };
-
-    launchCamera(options, (response: ImagePickerResponse) => {
-      if (response.assets && response.assets[0]) {
-        onImageSelected(response.assets[0].uri || '');
-      }
+      allowsEditing: false,
     });
+
+    if (!result.canceled && result.assets[0]) {
+      onImageSelected(result.assets[0].uri);
+    }
   };
 
-  const handleGallery = () => {
-    const options = {
-      mediaType: 'photo' as const,
+  const handleGallery = async () => {
+    const { status } = await ExpoImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Gallery permission is required to select photos');
+      return;
+    }
+
+    const result = await ExpoImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
       quality: 0.8,
       maxWidth: 1024,
       maxHeight: 1024,
-      includeBase64: false,
-    };
-
-    launchImageLibrary(options, (response: ImagePickerResponse) => {
-      if (response.assets && response.assets[0]) {
-        onImageSelected(response.assets[0].uri || '');
-      }
+      allowsEditing: false,
     });
+
+    if (!result.canceled && result.assets[0]) {
+      onImageSelected(result.assets[0].uri);
+    }
   };
 
   const showOptions = () => {

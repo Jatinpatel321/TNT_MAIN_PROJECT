@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+// ─── Premium Edit Staff Screen ────────────────────────────────────
+// Edit staff member with premium design system (#635BFF, GlassCard)
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,19 +11,13 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { staffApi } from '../../services/staffApi';
-
-interface StaffMember {
-  id: number;
-  user_id: number;
-  name: string;
-  phone: string;
-  email?: string;
-  role: 'owner' | 'manager' | 'staff';
-  permissions: string[];
-  is_active: boolean;
-}
+import { colors, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatusPill from '../../design-system/components/StatusPill';
+import Button from '../../design-system/components/Button';
 
 interface Permission {
   module: string;
@@ -38,11 +35,13 @@ export default function EditStaffScreen({ route, navigation }: any) {
     phone: staff.phone,
     email: staff.email || '',
     role: staff.role,
-    permissions: [...staff.permissions],
-    is_active: staff.is_active,
+    permissions: [...(staff.permissions || [])],
+    is_active: staff.is_active !== false,
   });
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     fetchPermissions();
   }, []);
 
@@ -50,7 +49,7 @@ export default function EditStaffScreen({ route, navigation }: any) {
     try {
       setLoadingPermissions(true);
       const response = await staffApi.getPermissions();
-      setPermissions(response.data.permissions);
+      setPermissions(response.data.permissions || []);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to load permissions');
     } finally {
@@ -60,24 +59,20 @@ export default function EditStaffScreen({ route, navigation }: any) {
 
   const handleUpdateStaff = async () => {
     if (!formData.name || !formData.phone) {
-      Alert.alert('Error', 'Please fill required fields (Name, Phone)');
+      Alert.alert('Error', 'Name and Phone are required');
       return;
     }
-
     try {
       setLoading(true);
       await staffApi.updateStaff(staff.id, {
         name: formData.name,
         phone: formData.phone,
         email: formData.email || undefined,
-        role: formData.role as 'owner' | 'manager' | 'staff',
+        role: formData.role as any,
         permissions: formData.permissions,
         is_active: formData.is_active,
       });
-
-      Alert.alert('Success', 'Staff member updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      Alert.alert('Success', 'Staff member updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to update staff');
     } finally {
@@ -85,376 +80,142 @@ export default function EditStaffScreen({ route, navigation }: any) {
     }
   };
 
-  const togglePermission = (permission: string) => {
-    setFormData({
-      ...formData,
-      permissions: formData.permissions.includes(permission)
-        ? formData.permissions.filter(p => p !== permission)
-        : [...formData.permissions, permission],
-    });
+  const togglePermission = (perm: string) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: prev.permissions.includes(perm)
+        ? prev.permissions.filter(p => p !== perm)
+        : [...prev.permissions, perm],
+    }));
   };
 
-  const selectRole = (role: 'owner' | 'manager' | 'staff') => {
-    setFormData({ ...formData, role });
+  const handleRoleSelect = (role: string) => {
+    const roleDefaults: Record<string, string[]> = {
+      owner: permissions.flatMap(p => p.actions),
+      manager: ['orders:read', 'orders:write', 'menu:read', 'menu:write', 'analytics:read', 'inventory:read'],
+      staff: ['orders:read', 'menu:read'],
+    };
+    setFormData(prev => ({ ...prev, role, permissions: roleDefaults[role] || [] }));
   };
 
-  const getRolePermissions = (role: string): string[] => {
-    switch (role) {
-      case 'owner':
-        return permissions.flatMap(p => p.actions);
-      case 'manager':
-        return ['orders:read', 'orders:write', 'menu:read', 'menu:write', 'analytics:read', 'inventory:read'];
-      case 'staff':
-        return ['orders:read', 'menu:read'];
-      default:
-        return [];
-    }
-  };
-
-  const handleRoleSelect = (role: 'owner' | 'manager' | 'staff') => {
-    selectRole(role);
-    const defaultPermissions = getRolePermissions(role);
-    setFormData({
-      ...formData,
-      role,
-      permissions: defaultPermissions,
-    });
-  };
-
-  const toggleActiveStatus = () => {
-    setFormData({ ...formData, is_active: !formData.is_active });
-  };
+  const roles = [
+    { key: 'owner', label: 'Owner', icon: '👑' },
+    { key: 'manager', label: 'Manager', icon: '👔' },
+    { key: 'staff', label: 'Staff', icon: '👤' },
+  ];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Edit Staff Member</Text>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
+        <Text style={styles.headerTitle}>Edit Staff</Text>
+        <Text style={styles.headerSubtitle}>{staff.name}</Text>
       </View>
 
-      <View style={styles.form}>
-        {/* Name */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Full Name *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
-            placeholder="John Doe"
-            placeholderTextColor="#9CA3AF"
-          />
-        </View>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <View style={styles.formSection}>
+          {/* Basic Info */}
+          <GlassCard padding={18} borderRadius={20}>
+            <FormField label="Full Name *" value={formData.name} onChange={t => setFormData(p => ({ ...p, name: t }))} placeholder="John Doe" />
+            <FormField label="Phone *" value={formData.phone} onChange={t => setFormData(p => ({ ...p, phone: t }))} placeholder="+91XXXXXXXXXX" keyboard="phone-pad" />
+            <FormField label="Email" value={formData.email} onChange={t => setFormData(p => ({ ...p, email: t }))} placeholder="john@example.com" keyboard="email-address" />
+          </GlassCard>
 
-        {/* Phone */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Phone Number *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.phone}
-            onChangeText={(text) => setFormData({ ...formData, phone: text })}
-            placeholder="+919999999999"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="phone-pad"
-          />
-        </View>
-
-        {/* Email */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Email (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.email}
-            onChangeText={(text) => setFormData({ ...formData, email: text })}
-            placeholder="john@example.com"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        {/* Role Selection */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Role *</Text>
-          <View style={styles.roleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                formData.role === 'owner' && styles.roleButtonActive
-              ]}
-              onPress={() => handleRoleSelect('owner')}
-            >
-              <Text style={[
-                styles.roleButtonText,
-                formData.role === 'owner' && styles.roleButtonTextActive
-              ]}>
-                👑 Owner
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                formData.role === 'manager' && styles.roleButtonActive
-              ]}
-              onPress={() => handleRoleSelect('manager')}
-            >
-              <Text style={[
-                styles.roleButtonText,
-                formData.role === 'manager' && styles.roleButtonTextActive
-              ]}>
-                👔 Manager
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                formData.role === 'staff' && styles.roleButtonActive
-              ]}
-              onPress={() => handleRoleSelect('staff')}
-            >
-              <Text style={[
-                styles.roleButtonText,
-                formData.role === 'staff' && styles.roleButtonTextActive
-              ]}>
-                👤 Staff
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Active Status */}
-        <View style={styles.formGroup}>
-          <TouchableOpacity
-            style={[styles.statusToggle, formData.is_active && styles.statusToggleActive]}
-            onPress={toggleActiveStatus}
-          >
-            <Text style={styles.statusToggleText}>
-              {formData.is_active ? '✅ Active' : '❌ Inactive'}
-            </Text>
+          {/* Status Toggle */}
+          <TouchableOpacity style={styles.statusToggle} onPress={() => setFormData(p => ({ ...p, is_active: !p.is_active }))}>
+            <StatusPill label={formData.is_active ? 'Active' : 'Inactive'} variant={formData.is_active ? 'success' : 'neutral'} size="sm" />
+            <Text style={styles.statusText}>Tap to toggle status</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Permissions */}
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Permissions</Text>
-          {loadingPermissions ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#10B981" />
-              <Text style={styles.loadingText}>Loading permissions...</Text>
-            </View>
-          ) : (
-            <View style={styles.permissionsContainer}>
-              {permissions.map((permission) => (
+          {/* Role */}
+          <Text style={styles.sectionTitle}><Text style={styles.sectionAccent}>│</Text> Role</Text>
+          <GlassCard padding={14} borderRadius={18}>
+            <View style={styles.roleRow}>
+              {roles.map(r => (
                 <TouchableOpacity
-                  key={permission.module}
-                  style={styles.permissionCard}
-                  onPress={() => togglePermission(permission.module)}
+                  key={r.key}
+                  style={[styles.roleBtn, formData.role === r.key && styles.roleBtnActive]}
+                  onPress={() => handleRoleSelect(r.key)}
                 >
-                  <View style={styles.permissionHeader}>
-                    <Text style={styles.permissionModule}>
-                      {permission.module.toUpperCase()}
-                    </Text>
-                    <View style={[
-                      styles.checkbox,
-                      formData.permissions.includes(permission.module) && styles.checkboxChecked
-                    ]}>
-                      {formData.permissions.includes(permission.module) && (
-                        <Text style={styles.checkmark}>✓</Text>
-                      )}
-                    </View>
-                  </View>
-                  <Text style={styles.permissionDescription}>
-                    {permission.description}
-                  </Text>
-                  <View style={styles.actionsContainer}>
-                    {permission.actions.map((action) => (
-                      <View key={action} style={styles.actionBadge}>
-                        <Text style={styles.actionText}>{action}</Text>
-                      </View>
-                    ))}
-                  </View>
+                  <Text style={styles.roleIcon}>{r.icon}</Text>
+                  <Text style={[styles.roleLabel, formData.role === r.key && styles.roleLabelActive]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-          )}
-        </View>
+          </GlassCard>
 
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleUpdateStaff}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
+          {/* Permissions */}
+          <Text style={styles.sectionTitle}><Text style={styles.sectionAccent}>│</Text> Permissions ({formData.permissions.length})</Text>
+          {loadingPermissions ? (
+            <View style={styles.permLoading}><ActivityIndicator size="small" color={colors.primary} /></View>
           ) : (
-            <Text style={styles.submitButtonText}>Update Staff Member</Text>
+            permissions.map(p => (
+              <TouchableOpacity key={p.module} onPress={() => togglePermission(p.module)}>
+                <GlassCard padding={14} borderRadius={16} style={{ marginBottom: 6 }}>
+                  <View style={styles.permHeader}>
+                    <Text style={styles.permModule}>{p.module.toUpperCase()}</Text>
+                    <View style={[styles.checkbox, formData.permissions.includes(p.module) && styles.checkboxChecked]}>
+                      {formData.permissions.includes(p.module) && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                  </View>
+                  <Text style={styles.permDesc}>{p.description}</Text>
+                </GlassCard>
+              </TouchableOpacity>
+            ))
           )}
-        </TouchableOpacity>
-      </View>
+
+          <View style={styles.submitSection}>
+            <Button title="Update Staff" onPress={handleUpdateStaff} loading={loading} variant="primary" size="lg" fullWidth />
+          </View>
+        </View>
+        <View style={{ height: spacing.huge }} />
+      </Animated.View>
     </ScrollView>
   );
 }
 
+function FormField({ label, value, onChange, placeholder, keyboard }: { label: string; value: string; onChange: (t: string) => void; placeholder: string; keyboard?: any }) {
+  return (
+    <View style={fieldStyles.group}>
+      <Text style={fieldStyles.label}>{label}</Text>
+      <TextInput style={fieldStyles.input} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboard} autoCapitalize="none" />
+    </View>
+  );
+}
+
+const fieldStyles = StyleSheet.create({
+  group: { marginBottom: 14 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
+  input: { backgroundColor: colors.bgSecondary, borderRadius: 12, padding: 14, fontSize: 16, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
+});
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#10B981',
+    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  form: {
-    padding: 16,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    color: '#111827',
-  },
-  roleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  roleButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'white',
-    alignItems: 'center',
-  },
-  roleButtonActive: {
-    borderColor: '#10B981',
-    backgroundColor: '#F0FDF4',
-  },
-  roleButtonText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  roleButtonTextActive: {
-    color: '#10B981',
-  },
-  statusToggle: {
-    backgroundColor: '#F3F4F6',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-  },
-  statusToggleActive: {
-    backgroundColor: '#D1FAE5',
-    borderColor: '#10B981',
-  },
-  statusToggleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  permissionsContainer: {
-    gap: 12,
-  },
-  permissionCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  permissionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  permissionModule: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
-  },
-  checkmark: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  permissionDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  actionBadge: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  actionText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  submitButton: {
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 8,
-  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  formSection: { padding: spacing.lg },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md, marginTop: spacing.md },
+  sectionAccent: { color: colors.primary },
+  statusToggle: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: spacing.lg, paddingBottom: 0 },
+  statusText: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  roleRow: { flexDirection: 'row', gap: 8 },
+  roleBtn: { flex: 1, alignItems: 'center', padding: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.bgCard },
+  roleBtnActive: { borderColor: colors.primary, backgroundColor: colors.primaryPale },
+  roleIcon: { fontSize: 20, marginBottom: 4 },
+  roleLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  roleLabelActive: { color: colors.primary },
+  permLoading: { padding: 20, alignItems: 'center' },
+  permHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  permModule: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  permDesc: { fontSize: 12, color: colors.textMuted },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkmark: { color: colors.textInverse, fontSize: 14, fontWeight: '700' },
+  submitSection: { marginTop: spacing.xxl },
 });

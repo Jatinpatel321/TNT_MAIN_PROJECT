@@ -13,28 +13,22 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
 from app.core.security import get_current_user, require_role
-from app.ml.predictions import MLPredictionService
 from app.ml.registry import ModelRegistry
-from app.ml.training_pipeline import (
-    RetrainingService,
-    run_full_training_pipeline,
-    train_eta_models,
-    train_demand_forecast,
-    train_fraud_detection,
-    train_vendor_ranking,
-    train_slot_recommendation,
-)
-from app.ml.explain import get_feature_importance
 from app.database.session import SessionLocal
 
 router = APIRouter(prefix="/ml", tags=["ML Analytics Dashboard"])
 
 
-def _get_ml_service(db: Session) -> MLPredictionService:
+def _get_ml_service(db: Session) -> Any:
+    """Lazy-import MLPredictionService so numpy/scikit-learn deps
+    are not imported at module load time (Python 3.15 compat)."""
+    from app.ml.predictions import MLPredictionService  # lazy
     return MLPredictionService(db)
 
 
-def _get_retraining_service() -> RetrainingService:
+def _get_retraining_service() -> Any:
+    """Lazy-import RetrainingService so ML deps are not loaded at import time."""
+    from app.ml.training_pipeline import RetrainingService  # lazy
     return RetrainingService(SessionLocal)
 
 
@@ -79,6 +73,7 @@ def train_all_models(
     user=Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """Run full training pipeline for all model types."""
+    from app.ml.training_pipeline import run_full_training_pipeline  # lazy
     return run_full_training_pipeline(db, days=days)
 
 
@@ -89,6 +84,7 @@ def train_eta(
     user=Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """Train/retrain the ETA prediction model (XGBoost vs LightGBM vs RandomForest comparison)."""
+    from app.ml.training_pipeline import train_eta_models  # lazy
     return train_eta_models(db, days=days)
 
 
@@ -100,6 +96,7 @@ def train_demand(
     user=Depends(get_current_user),
 ) -> dict[str, Any]:
     """Train/retrain demand forecast model for a specific vendor."""
+    from app.ml.training_pipeline import train_demand_forecast  # lazy
     return train_demand_forecast(db, vendor_id, days=days)
 
 
@@ -109,6 +106,7 @@ def train_fraud(
     user=Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """Train/retrain the fraud detection model."""
+    from app.ml.training_pipeline import train_fraud_detection  # lazy
     return train_fraud_detection(db)
 
 
@@ -118,6 +116,7 @@ def train_vendor_ranking_endpoint(
     user=Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """Train/retrain the vendor ranking model."""
+    from app.ml.training_pipeline import train_vendor_ranking  # lazy
     return train_vendor_ranking(db)
 
 
@@ -127,6 +126,7 @@ def train_slot_rec(
     user=Depends(require_role("admin")),
 ) -> dict[str, Any]:
     """Train/retrain the slot recommendation model."""
+    from app.ml.training_pipeline import train_slot_recommendation  # lazy
     return train_slot_recommendation(db)
 
 
@@ -232,6 +232,7 @@ def get_model_explainability(
     model_data = ModelRegistry.load(model_type)
     if model_data is None:
         raise HTTPException(status_code=404, detail=f"No model found for type '{model_type}'")
+    from app.ml.explain import get_feature_importance  # lazy
     model, metadata = model_data
     feature_names = metadata.get("features", [])
     importance = get_feature_importance(model, feature_names)

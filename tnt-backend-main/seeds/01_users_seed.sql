@@ -91,8 +91,8 @@ INSERT INTO users (id, phone, name, full_name, role, vendor_type, university_id,
 -- Insert Admin/Super Admin Users (IDs 76 to 78)
 -- Roles: admin (76, 77), super_admin (78)
 INSERT INTO users (id, phone, name, full_name, role, vendor_type, university_id, department, semester, device_token, push_enabled, is_active, is_approved, preferences, totp_secret, totp_enabled, created_at) VALUES
-(76, '+919900000001', 'Admin User 1', 'Admin User 1', 'admin', 'food', 'TNT-ADM-001', 'IT', null, 'adm_token_1', true, true, true, '{}', 'TOTPSECRETACTUAL1', true, NOW() - INTERVAL '89 days'),
-(77, '+919900000002', 'Admin User 2', 'Admin User 2', 'admin', 'food', 'TNT-ADM-002', 'CSE', null, 'adm_token_2', true, true, true, '{}', 'TOTPSECRETACTUAL2', true, NOW() - INTERVAL '88 days'),
-(78, '+919900000003', 'Super Admin', 'Super Admin', 'super_admin', 'food', 'TNT-SAD-001', 'AIML', null, 'sad_token_1', true, true, true, '{}', 'TOTPSECRETSUPER', true, NOW() - INTERVAL '89 days');
+(76, '+919900000001', 'Admin User 1', 'Admin User 1', 'admin', 'food', 'TNT-ADM-001', 'IT', null, 'adm_token_1', true, true, true, '{}', null, false, NOW() - INTERVAL '89 days'),
+(77, '+919900000002', 'Admin User 2', 'Admin User 2', 'admin', 'food', 'TNT-ADM-002', 'CSE', null, 'adm_token_2', true, true, true, '{}', null, false, NOW() - INTERVAL '88 days'),
+(78, '+919900000003', 'Super Admin', 'Super Admin', 'super_admin', 'food', 'TNT-SAD-001', 'AIML', null, 'sad_token_1', true, true, true, '{}', null, false, NOW() - INTERVAL '89 days');
 
 COMMIT;

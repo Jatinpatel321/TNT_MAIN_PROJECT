@@ -195,16 +195,4 @@ export async function verifyRazorpayPayment(
   );
   return res.data;
 }
-</write_to_file>
-<task_progress>
-- [x] Explore existing group cart and payment implementation
-- [x] Create payment service backend
-- [x] Create payment split APIs
-- [x] Create frontend service
-- [ ] Build split payment screen
-- [ ] Create contribution summary component
-- [ ] Create outstanding payments component
-- [ ] Integrate with Razorpay
-- [ ] Create documentation
-</task_progress>
-</write_to_file>
+

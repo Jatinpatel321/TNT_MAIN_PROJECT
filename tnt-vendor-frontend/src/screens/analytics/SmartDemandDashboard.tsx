@@ -1,6 +1,10 @@
-import React, {useCallback, useEffect, useState} from 'react';
+// ─── Premium Smart Demand Dashboard ─────────────────────────────
+// AI-powered demand, stock & rush prediction with premium design
+
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  Animated,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -9,6 +13,11 @@ import {
   View,
 } from 'react-native';
 import {vendorApi, type DemandDashboard} from '../../services/vendorApi';
+import {colors, spacing} from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatCard from '../../design-system/components/StatCard';
+import StatusPill from '../../design-system/components/StatusPill';
+import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
 
 type Section = 'demand' | 'stock' | 'rush';
 
@@ -18,6 +27,12 @@ export default function SmartDemandDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}).start();
+    loadDashboard();
+  }, []);
 
   const loadDashboard = useCallback(async (isRefresh = false) => {
     try {
@@ -33,182 +48,199 @@ export default function SmartDemandDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadDashboard(true);
-  };
-
-  const overview = data?.demand_overview;
-  const stock = data?.stock_prediction;
-  const rush = data?.rush_prediction;
+  const onRefresh = () => { setRefreshing(true); loadDashboard(true); };
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#10B981" />
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading smart demand data...</Text>
       </View>
     );
   }
 
+  const overview = data?.demand_overview;
+  const stock = data?.stock_prediction;
+  const rush = data?.rush_prediction;
+
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
       <View style={styles.header}>
-        <Text style={styles.title}>Smart Demand</Text>
-        <Text style={styles.subtitle}>Forecast demand, stock risk, and rush windows</Text>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
+        <Text style={styles.headerTitle}>Smart Demand</Text>
+        <Text style={styles.headerSubtitle}>AI-powered demand, stock & rush forecasts</Text>
       </View>
 
       {error && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => loadDashboard()}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <GlassCard padding={14} borderRadius={16} style={{marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: colors.errorPale}}>
+          <Text style={{color: colors.error, fontSize: 14}}>{error}</Text>
+          <TouchableOpacity onPress={() => loadDashboard()}><Text style={{color: colors.error, fontWeight: '700', marginTop: 8}}>Retry</Text></TouchableOpacity>
+        </GlassCard>
       )}
 
-      <View style={styles.segmentedControl}>
-        {(['demand', 'stock', 'rush'] as Section[]).map(section => (
-          <TouchableOpacity
-            key={section}
-            style={[styles.segment, activeSection === section && styles.activeSegment]}
-            onPress={() => setActiveSection(section)}>
-            <Text style={[styles.segmentText, activeSection === section && styles.activeSegmentText]}>
-              {section.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {activeSection === 'demand' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Demand Forecast</Text>
-          <View style={styles.metricGrid}>
-            <Metric label="Orders today" value={overview?.orders_today ?? 0} />
-            <Metric label="Predicted today" value={overview?.predicted_today ?? 0} />
-            <Metric label="Remaining" value={overview?.predicted_remaining ?? 0} />
-            <Metric label="Tomorrow" value={overview?.tomorrow_prediction ?? 0} />
-          </View>
-          <Text style={styles.insightText}>Weekly trend: {overview?.weekly_trend ?? 'stable'} ({overview?.weekly_change_pct ?? 0}%)</Text>
-          <Text style={styles.insightText}>Vs yesterday: {overview?.vs_yesterday_pct ?? 0}%</Text>
-          <Text style={styles.insightText}>Daily average: {overview?.daily_average ?? 0} orders</Text>
-        </View>
-      )}
-
-      {activeSection === 'stock' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Stock Prediction</Text>
-          <View style={styles.metricGrid}>
-            <Metric label="Total items" value={stock?.summary?.total_items ?? 0} />
-            <Metric label="Critical" value={stock?.summary?.critical ?? 0} tone="danger" />
-            <Metric label="Low" value={stock?.summary?.low ?? 0} tone="warning" />
-            <Metric label="OK" value={stock?.summary?.ok ?? 0} tone="success" />
-          </View>
-          {(stock?.items ?? []).slice(0, 10).map((item: any) => (
-            <View key={item.item_id} style={styles.listRow}>
-              <View style={styles.rowMain}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowSub}>Stock {item.current_stock} / demand {item.daily_demand_rate}/day</Text>
-              </View>
-              <View style={[styles.pill, getUrgencyStyle(item.urgency)]}>
-                <Text style={styles.pillText}>{item.urgency}</Text>
-              </View>
-            </View>
+      <Animated.View style={{opacity: fadeAnim}}>
+        {/* Segmented Control */}
+        <View style={styles.segmentedWrap}>
+          {(['demand', 'stock', 'rush'] as Section[]).map(s => (
+            <TouchableOpacity key={s} style={[styles.segment, activeSection === s && styles.segmentActive]} onPress={() => setActiveSection(s)}>
+              <Text style={[styles.segmentText, activeSection === s && styles.segmentTextActive]}>{s.toUpperCase()}</Text>
+            </TouchableOpacity>
           ))}
         </View>
-      )}
 
-      {activeSection === 'rush' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Rush Prediction</Text>
-          <View style={styles.metricGrid}>
-            <Metric label="Rush hours" value={rush?.rush_hours_count ?? 0} />
-            <Metric label="Next rush" value={rush?.next_rush_hour != null ? `${rush.next_rush_hour}:00` : 'None'} />
-            <Metric label="Busiest" value={rush?.busiest_hour != null ? `${rush.busiest_hour}:00` : 'N/A'} />
-          </View>
-          <Text style={styles.insightText}>{rush?.staff_recommendation}</Text>
-          {(rush?.predictions ?? []).map((hour: any) => (
-            <View key={hour.hour} style={styles.rushRow}>
-              <Text style={styles.rushLabel}>{hour.label}</Text>
-              <View style={styles.rushBarTrack}>
-                <View style={[styles.rushBar, {width: `${Math.min(100, hour.percentage)}%`, backgroundColor: hour.is_rush ? '#F59E0B' : '#10B981'}]} />
+        {/* Demand Section */}
+        {activeSection === 'demand' && (
+          <View style={styles.sectionPad}>
+            <GlassCard padding={16} borderRadius={18}>
+              <Text style={styles.cardTitle}>Demand Forecast</Text>
+              <View style={styles.metricGrid}>
+                <StatCard value={overview?.orders_today ?? 0} label="Orders Today" icon="📦" color={colors.primary} size="sm" style={{flex: 1}} />
+                <StatCard value={overview?.predicted_today ?? 0} label="Predicted" icon="🔮" color={colors.secondary} size="sm" style={{flex: 1}} />
+                <StatCard value={overview?.predicted_remaining ?? 0} label="Remaining" icon="⏳" color={colors.warning} size="sm" style={{flex: 1}} />
+                <StatCard value={overview?.tomorrow_prediction ?? 0} label="Tomorrow" icon="📅" color={colors.info} size="sm" style={{flex: 1}} />
               </View>
-              <Text style={styles.rushCount}>{hour.predicted_orders}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+              {overview && (
+                <View style={styles.insightList}>
+                  <InsightRow label="Weekly trend" value={`${overview.weekly_trend || 'stable'} (${overview.weekly_change_pct ?? 0}%)`} />
+                  <InsightRow label="Vs yesterday" value={`${overview.vs_yesterday_pct ?? 0}%`} />
+                  <InsightRow label="Daily avg" value={`${overview.daily_average ?? 0} orders`} />
+                </View>
+              )}
+            </GlassCard>
 
-      {(data?.recommendations ?? []).length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Recommendations</Text>
-          {data?.recommendations.slice(0, 5).map((rec: any, index: number) => (
-            <Text key={index} style={styles.insightText}>{rec.message}</Text>
-          ))}
-        </View>
-      )}
+            {data?.recommendations?.length > 0 && (
+              <GlassCard padding={16} borderRadius={18} style={{marginTop: spacing.sm}}>
+                <Text style={styles.cardTitle}>AI Recommendations</Text>
+                {data.recommendations.slice(0, 5).map((rec: any, i: number) => (
+                  <View key={i} style={styles.recRow}>
+                    <Text style={styles.recBullet}>•</Text>
+                    <Text style={styles.recText}>{rec.message}</Text>
+                  </View>
+                ))}
+              </GlassCard>
+            )}
+          </View>
+        )}
+
+        {/* Stock Section */}
+        {activeSection === 'stock' && (
+          <View style={styles.sectionPad}>
+            <GlassCard padding={16} borderRadius={18}>
+              <Text style={styles.cardTitle}>Stock Prediction</Text>
+              <View style={styles.metricGrid}>
+                <StatCard value={stock?.summary?.total_items ?? 0} label="Total Items" icon="📦" color={colors.primary} size="sm" style={{flex: 1}} />
+                <StatCard value={stock?.summary?.critical ?? 0} label="Critical" icon="🔴" color={colors.error} size="sm" style={{flex: 1}} />
+                <StatCard value={stock?.summary?.low ?? 0} label="Low" icon="🟡" color={colors.warning} size="sm" style={{flex: 1}} />
+                <StatCard value={stock?.summary?.ok ?? 0} label="OK" icon="🟢" color={colors.success} size="sm" style={{flex: 1}} />
+              </View>
+            </GlassCard>
+            {(stock?.items ?? []).slice(0, 10).map((item: any) => {
+              const urgencyColor = item.urgency === 'critical' ? colors.error : item.urgency === 'low' ? colors.warning : colors.success;
+              return (
+                <GlassCard key={item.item_id} padding={14} borderRadius={16} style={{marginTop: spacing.sm}}>
+                  <View style={styles.stockRow}>
+                    <View style={{flex: 1}}>
+                      <Text style={styles.stockName}>{item.name}</Text>
+                      <Text style={styles.stockMeta}>Stock {item.current_stock} / demand {item.daily_demand_rate}/day</Text>
+                    </View>
+                    <StatusPill label={item.urgency} variant={item.urgency === 'critical' ? 'error' : item.urgency === 'low' ? 'warning' : 'success'} size="sm" />
+                  </View>
+                </GlassCard>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Rush Section */}
+        {activeSection === 'rush' && (
+          <View style={styles.sectionPad}>
+            <GlassCard padding={16} borderRadius={18}>
+              <Text style={styles.cardTitle}>Rush Prediction</Text>
+              <View style={styles.metricGrid}>
+                <StatCard value={rush?.rush_hours_count ?? 0} label="Rush Hours" icon="⚡" color={colors.warning} size="sm" style={{flex: 1}} />
+                <StatCard value={rush?.next_rush_hour ?? 0} label="Next Rush Hour" icon="⏰" color={colors.info} size="sm" style={{flex: 1}} />
+                <StatCard value={rush?.busiest_hour ?? 0} label="Busiest Hour" icon="🏆" color={colors.error} size="sm" style={{flex: 1}} />
+              </View>
+              {rush?.staff_recommendation && (
+                <View style={styles.insightBox}>
+                  <Text style={styles.insightIcon}>💡</Text>
+                  <Text style={styles.insightBoxText}>{rush.staff_recommendation}</Text>
+                </View>
+              )}
+            </GlassCard>
+
+            {(rush?.predictions ?? []).map((hour: any) => {
+              const isRush = hour.is_rush;
+              return (
+                <GlassCard key={hour.hour} padding={12} borderRadius={14} style={{marginTop: 6}}>
+                  <View style={styles.rushRow}>
+                    <Text style={styles.rushLabel}>{hour.label}</Text>
+                    <View style={styles.rushBarTrack}>
+                      <View style={[styles.rushBar, {width: `${Math.min(100, hour.percentage)}%`, backgroundColor: isRush ? colors.warning : colors.success}]} />
+                    </View>
+                    <Text style={styles.rushCount}>{hour.predicted_orders}</Text>
+                  </View>
+                </GlassCard>
+              );
+            })}
+            <View style={{height: spacing.huge}} />
+          </View>
+        )}
+      </Animated.View>
     </ScrollView>
   );
 }
 
-function getUrgencyStyle(urgency: string) {
-  if (urgency === 'critical') return styles.critical;
-  if (urgency === 'low') return styles.low;
-  return styles.ok;
-}
-
-function Metric({label, value, tone}: {label: string; value: string | number; tone?: 'danger' | 'warning' | 'success'}) {
+function InsightRow({label, value}: {label: string; value: string}) {
   return (
-    <View style={styles.metricCard}>
-      <Text style={[styles.metricValue, tone === 'danger' && styles.dangerText, tone === 'warning' && styles.warningText, tone === 'success' && styles.successText]}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
+    <View style={insightStyles.row}>
+      <Text style={insightStyles.label}>{label}</Text>
+      <Text style={insightStyles.value}>{value}</Text>
     </View>
   );
 }
+const insightStyles = StyleSheet.create({
+  row: {flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.borderLight},
+  label: {fontSize: 13, color: colors.textMuted},
+  value: {fontSize: 14, fontWeight: '600', color: colors.textPrimary},
+});
 
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#F9FAFB'},
-  centered: {flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12},
-  loadingText: {fontSize: 14, color: '#6B7280'},
-  header: {backgroundColor: '#10B981', padding: 20, paddingTop: 56},
-  title: {fontSize: 24, fontWeight: '700', color: 'white'},
-  subtitle: {fontSize: 14, color: 'rgba(255,255,255,0.82)', marginTop: 4},
-  errorBox: {margin: 16, padding: 12, borderRadius: 8, backgroundColor: '#FEE2E2'},
-  errorText: {fontSize: 14, color: '#991B1B'},
-  retryText: {fontSize: 14, fontWeight: '700', color: '#991B1B', marginTop: 8},
-  segmentedControl: {flexDirection: 'row', gap: 8, padding: 16},
-  segment: {flex: 1, alignItems: 'center', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, paddingVertical: 10, backgroundColor: 'white'},
-  activeSegment: {backgroundColor: '#111827', borderColor: '#111827'},
-  segmentText: {fontSize: 12, fontWeight: '700', color: '#6B7280'},
-  activeSegmentText: {color: 'white'},
-  card: {backgroundColor: 'white', margin: 16, marginTop: 0, padding: 16, borderRadius: 8, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 3, elevation: 2},
-  cardTitle: {fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 12},
-  metricGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12},
-  metricCard: {width: '48%', minHeight: 76, borderRadius: 8, backgroundColor: '#F3F4F6', padding: 12, justifyContent: 'center'},
-  metricValue: {fontSize: 22, fontWeight: '800', color: '#111827'},
-  metricLabel: {fontSize: 12, color: '#6B7280', marginTop: 4},
-  dangerText: {color: '#DC2626'},
-  warningText: {color: '#D97706'},
-  successText: {color: '#059669'},
-  insightText: {fontSize: 14, color: '#374151', lineHeight: 20, marginBottom: 6},
-  listRow: {flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6'},
-  rowMain: {flex: 1},
-  rowTitle: {fontSize: 14, fontWeight: '700', color: '#111827'},
-  rowSub: {fontSize: 12, color: '#6B7280', marginTop: 2},
-  pill: {borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5},
-  critical: {backgroundColor: '#FEE2E2'},
-  low: {backgroundColor: '#FEF3C7'},
-  ok: {backgroundColor: '#D1FAE5'},
-  pillText: {fontSize: 11, fontWeight: '800', color: '#111827', textTransform: 'uppercase'},
-  rushRow: {flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10},
-  rushLabel: {width: 86, fontSize: 12, color: '#374151'},
-  rushBarTrack: {flex: 1, height: 10, borderRadius: 999, backgroundColor: '#E5E7EB', overflow: 'hidden'},
+  container: {flex: 1, backgroundColor: colors.bg},
+  centered: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  loadingText: {marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600'},
+  header: {
+    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
+  },
+  headerDeco1: {position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)'},
+  headerDeco2: {position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)'},
+  headerTitle: {fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3},
+  headerSubtitle: {fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500'},
+  segmentedWrap: {flexDirection: 'row', gap: 8, paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm},
+  segment: {flex: 1, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, paddingVertical: 10, backgroundColor: colors.bgCard},
+  segmentActive: {backgroundColor: colors.textPrimary, borderColor: colors.textPrimary},
+  segmentText: {fontSize: 12, fontWeight: '700', color: colors.textMuted},
+  segmentTextActive: {color: colors.textInverse},
+  sectionPad: {paddingHorizontal: spacing.lg},
+  cardTitle: {fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm},
+  metricGrid: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm},
+  insightList: {marginTop: spacing.xs},
+  insightBox: {flexDirection: 'row', backgroundColor: colors.infoPale, borderRadius: 12, padding: 12, gap: 8, marginTop: spacing.sm},
+  insightIcon: {fontSize: 16},
+  insightBoxText: {flex: 1, fontSize: 13, color: colors.info, lineHeight: 18},
+  recRow: {flexDirection: 'row', marginBottom: 6, gap: 6},
+  recBullet: {color: colors.primary, fontSize: 14, fontWeight: '700'},
+  recText: {flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18},
+  stockRow: {flexDirection: 'row', alignItems: 'center', gap: 12},
+  stockName: {fontSize: 15, fontWeight: '600', color: colors.textPrimary},
+  stockMeta: {fontSize: 12, color: colors.textMuted, marginTop: 2},
+  rushRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  rushLabel: {width: 80, fontSize: 12, color: colors.textSecondary},
+  rushBarTrack: {flex: 1, height: 10, borderRadius: 999, backgroundColor: colors.bgSecondary, overflow: 'hidden'},
   rushBar: {height: 10, borderRadius: 999},
-  rushCount: {width: 28, textAlign: 'right', fontSize: 12, fontWeight: '700', color: '#111827'},
+  rushCount: {width: 28, textAlign: 'right', fontSize: 12, fontWeight: '700', color: colors.textPrimary},
 });

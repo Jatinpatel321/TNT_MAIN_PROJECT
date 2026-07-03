@@ -1,414 +1,155 @@
-import React, { useState, useEffect } from 'react';
+// ─── Premium Faculty Priority Settings ──────────────────────────
+// Configure faculty priority hours with premium design system
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TextInput,
-  TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { slotApi } from '../../services/slotApi';
-
-interface SlotRule {
-  id: number;
-  rule_type: string;
-  rule_config: {
-    auto_block_enabled?: boolean;
-    block_threshold?: number;
-    peak_hours?: { start: string; end: string; multiplier: number };
-    faculty_priority_hours?: { start: number; end: number };
-  };
-  is_enabled: boolean;
-  priority: number;
-}
+import { colors, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatusPill from '../../design-system/components/StatusPill';
+import Button from '../../design-system/components/Button';
 
 export default function FacultyPrioritySettingsScreen({ navigation }: any) {
-  const [rules, setRules] = useState<SlotRule[]>([]);
+  const [rules, setRules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    rule_type: 'faculty_priority',
-    start_hour: '9',
-    end_hour: '17',
-    priority: '5',
-  });
+  const [form, setForm] = useState({ start_hour: '9', end_hour: '17', priority: '5' });
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     fetchRules();
   }, []);
 
   const fetchRules = async () => {
-    try {
-      setLoading(true);
-      const response = await slotApi.getRules();
-      setRules(response.data);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to load rules');
-    } finally {
-      setLoading(false);
-    }
+    try { setLoading(true); const res = await slotApi.getRules(); setRules((res.data || []).filter((r: any) => r.rule_type === 'faculty_priority')); }
+    catch (err: any) { Alert.alert('Error', err.message); }
+    finally { setLoading(false); }
   };
 
-  const handleCreateRule = async () => {
-    if (!formData.start_hour || !formData.end_hour) {
-      Alert.alert('Error', 'Please fill required fields');
-      return;
-    }
-
+  const handleCreate = async () => {
     try {
-      setLoading(true);
+      setSaving(true);
       await slotApi.createRule({
         rule_type: 'faculty_priority',
-        rule_config: {
-          faculty_priority_hours: {
-            start: parseInt(formData.start_hour),
-            end: parseInt(formData.end_hour),
-          },
-        },
-        is_enabled: true,
-        priority: parseInt(formData.priority),
+        rule_config: { faculty_priority_hours: { start: parseInt(form.start_hour), end: parseInt(form.end_hour) } },
+        is_enabled: true, priority: parseInt(form.priority),
       });
-
-      Alert.alert('Success', 'Faculty priority rule created successfully');
-      setShowForm(false);
-      fetchRules();
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to create rule');
-    } finally {
-      setLoading(false);
-    }
+      setShowForm(false); fetchRules(); Alert.alert('Success', 'Faculty priority rule created');
+    } catch (err: any) { Alert.alert('Error', err.message); }
+    finally { setSaving(false); }
   };
 
-  const handleDeleteRule = (ruleId: number) => {
-    Alert.alert(
-      'Delete Rule',
-      'Are you sure you want to delete this rule?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await slotApi.deleteRule(ruleId);
-              Alert.alert('Success', 'Rule deleted successfully');
-              fetchRules();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete rule');
-            }
-          },
-        },
-      ]
-    );
+  const handleDelete = (id: number) => {
+    Alert.alert('Delete Rule', 'Sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { try { await slotApi.deleteRule(id); fetchRules(); } catch (err: any) { Alert.alert('Error', err.message); } } },
+    ]);
   };
-
-  const facultyRules = rules.filter(r => r.rule_type === 'faculty_priority');
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Faculty Priority Settings</Text>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
+        <Text style={styles.headerTitle}>Faculty Priority</Text>
+        <Text style={styles.headerSubtitle}>{rules.length} active rules</Text>
       </View>
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoIcon}>ℹ️</Text>
-        <Text style={styles.infoText}>
-          Faculty priority slots are reserved for faculty members during specified hours. 
-          Only faculty and admin users can book these slots.
-        </Text>
-      </View>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoIcon}>ℹ️</Text>
+          <Text style={styles.infoText}>Faculty priority slots reserve capacity for faculty members during specified hours. Only faculty and admin users can book these slots.</Text>
+        </View>
 
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowForm(!showForm)}
-        >
-          <Text style={styles.addButtonText}>
-            {showForm ? '❌ Cancel' : '➕ Add Faculty Priority Rule'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.actionsWrap}>
+          <Button title={showForm ? '✕ Cancel' : '+ Add Rule'} onPress={() => setShowForm(!showForm)} variant={showForm ? 'outline' : 'primary'} size="md" fullWidth />
+        </View>
 
         {showForm && (
-          <View style={styles.form}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Start Hour (0-23)</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.start_hour}
-                onChangeText={(text) => setFormData({ ...formData, start_hour: text })}
-                placeholder="9"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>End Hour (0-23)</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.end_hour}
-                onChangeText={(text) => setFormData({ ...formData, end_hour: text })}
-                placeholder="17"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Priority (1-10)</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.priority}
-                onChangeText={(text) => setFormData({ ...formData, priority: text })}
-                placeholder="5"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-              onPress={handleCreateRule}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.submitButtonText}>Create Rule</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <GlassCard padding={18} borderRadius={20} style={{ marginHorizontal: spacing.lg, marginBottom: spacing.md }}>
+            <FormField label="Start Hour (0-23)" value={form.start_hour} onChange={t => setForm(p => ({ ...p, start_hour: t }))} placeholder="9" keyboard="numeric" />
+            <FormField label="End Hour (0-23)" value={form.end_hour} onChange={t => setForm(p => ({ ...p, end_hour: t }))} placeholder="17" keyboard="numeric" />
+            <FormField label="Priority (1-10)" value={form.priority} onChange={t => setForm(p => ({ ...p, priority: t }))} placeholder="5" keyboard="numeric" />
+            <Button title="Create Rule" onPress={handleCreate} loading={saving} variant="primary" size="md" fullWidth style={{ marginTop: 12 }} />
+          </GlassCard>
         )}
-      </View>
 
-      {/* Rules List */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Faculty Priority Rules ({facultyRules.length})</Text>
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#10B981" />
-          </View>
+          <View style={styles.loadingWrap}><ActivityIndicator size="large" color={colors.primary} /></View>
         ) : (
-          facultyRules.map((rule) => (
-            <View key={rule.id} style={styles.ruleCard}>
+          rules.map(rule => (
+            <GlassCard key={rule.id} padding={16} borderRadius={18} style={{ marginHorizontal: spacing.lg, marginBottom: spacing.sm }}>
               <View style={styles.ruleHeader}>
-                <View style={styles.facultyIconContainer}>
-                  <Text style={styles.facultyIcon}>👨‍🏫</Text>
-                  <Text style={styles.ruleType}>Faculty Priority</Text>
-                </View>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: rule.is_enabled ? '#10B981' : '#EF4444' }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {rule.is_enabled ? 'Enabled' : 'Disabled'}
-                  </Text>
-                </View>
+                <View style={styles.titleRow}><Text style={styles.facultyIcon}>👨‍🏫</Text><Text style={styles.ruleType}>Faculty Priority</Text></View>
+                <StatusPill label={rule.is_enabled ? 'Enabled' : 'Disabled'} variant={rule.is_enabled ? 'success' : 'neutral'} size="sm" />
               </View>
-
-              <View style={styles.ruleDetails}>
-                {rule.rule_config.faculty_priority_hours && (
-                  <Text style={styles.ruleDetail}>
-                    Hours: {rule.rule_config.faculty_priority_hours.start}:00 - {rule.rule_config.faculty_priority_hours.end}:00
-                  </Text>
-                )}
-                <Text style={styles.ruleDetail}>Priority: {rule.priority}</Text>
-              </View>
-
-              <View style={styles.noteBox}>
-                <Text style={styles.noteText}>
-                  During these hours, only faculty members can book slots
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDeleteRule(rule.id)}
-              >
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
+              {rule.rule_config?.faculty_priority_hours && (
+                <RuleDetail label="Hours" value={`${rule.rule_config.faculty_priority_hours.start}:00 - ${rule.rule_config.faculty_priority_hours.end}:00`} />
+              )}
+              <RuleDetail label="Priority" value={rule.priority} />
+              <View style={styles.noteBox}><Text style={styles.noteText}>Faculty-only booking during these hours</Text></View>
+              <Button title="Delete" onPress={() => handleDelete(rule.id)} variant="danger" size="sm" fullWidth />
+            </GlassCard>
           ))
         )}
-      </View>
+        <View style={{ height: spacing.huge }} />
+      </Animated.View>
     </ScrollView>
   );
 }
 
+function RuleDetail({ label, value }: { label: string; value: string | number }) {
+  return <View style={detailStyles.row}><Text style={detailStyles.label}>{label}</Text><Text style={detailStyles.value}>{value}</Text></View>;
+}
+const detailStyles = StyleSheet.create({
+  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  label: { fontSize: 13, color: colors.textMuted },
+  value: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+});
+
+function FormField({ label, value, onChange, placeholder, keyboard }: { label: string; value: string; onChange: (t: string) => void; placeholder: string; keyboard?: any }) {
+  return (
+    <View style={fieldStyles.group}>
+      <Text style={fieldStyles.label}>{label}</Text>
+      <TextInput style={fieldStyles.input} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboard} />
+    </View>
+  );
+}
+const fieldStyles = StyleSheet.create({
+  group: { marginBottom: 12 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
+  input: { backgroundColor: colors.bgSecondary, borderRadius: 12, padding: 12, fontSize: 16, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
+});
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#10B981',
+    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  infoBox: {
-    backgroundColor: '#DBEAFE',
-    borderRadius: 12,
-    padding: 16,
-    margin: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1E40AF',
-    lineHeight: 20,
-  },
-  section: {
-    padding: 16,
-  },
-  addButton: {
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  form: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    color: '#111827',
-  },
-  submitButton: {
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  ruleCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  ruleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  facultyIconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  facultyIcon: {
-    fontSize: 20,
-  },
-  ruleType: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    textTransform: 'capitalize',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  ruleDetails: {
-    marginBottom: 12,
-  },
-  ruleDetail: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  noteBox: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  noteText: {
-    fontSize: 13,
-    color: '#92400E',
-    lineHeight: 18,
-  },
-  deleteButton: {
-    backgroundColor: '#EF4444',
-    padding: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  infoCard: { flexDirection: 'row', backgroundColor: colors.infoPale, margin: spacing.lg, borderRadius: 16, padding: 16, gap: 12 },
+  infoIcon: { fontSize: 20 },
+  infoText: { flex: 1, fontSize: 13, color: colors.info, lineHeight: 18 },
+  actionsWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  loadingWrap: { padding: 40, alignItems: 'center' },
+  ruleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  facultyIcon: { fontSize: 20 },
+  ruleType: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  noteBox: { backgroundColor: colors.warningPale, borderRadius: 10, padding: 10, marginVertical: 10 },
+  noteText: { fontSize: 12, color: colors.warningDark, fontWeight: '500' },
 });

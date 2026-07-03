@@ -348,7 +348,7 @@ export default function PerformanceIntelligenceDashboard() {
               </View>
               <View style={[styles.gradeItem, {backgroundColor: '#EF4444'}]}>
                 <Text style={styles.gradeLabel}>Poor</Text>
-                <Text style={styles.gradeThreshold}><50</Text>
+                <Text style={styles.gradeThreshold}>{'<50'}</Text>
               </View>
             </View>
           </View>

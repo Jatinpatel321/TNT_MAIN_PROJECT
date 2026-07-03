@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8001';
+import { API_BASE_URL } from '../config/api';
 
 export interface UploadResponse {
   url: string;

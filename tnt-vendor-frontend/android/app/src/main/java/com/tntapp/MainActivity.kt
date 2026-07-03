@@ -1,4 +1,4 @@
-package com.tntapp
+package com.tnt.vendor
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

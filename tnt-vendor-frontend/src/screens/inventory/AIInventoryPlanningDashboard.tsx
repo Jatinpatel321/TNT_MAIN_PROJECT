@@ -1,18 +1,24 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {
-  ActivityIndicator,
-  Dimensions,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {LineChart, BarChart} from 'react-native-chart-kit';
-import {vendorApi} from '../../services/vendorApi';
+// ─── AI Inventory Planning ────────────────────────────────────────
+// Premium light-theme inventory intelligence with AI predictions
 
-const screenWidth = Dimensions.get('window').width;
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Animated,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { vendorApi } from '../../services/vendorApi';
+import { colors, shadows, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatCard from '../../design-system/components/StatCard';
+import ForecastCard from '../../design-system/components/ForecastCard';
+import AICard from '../../design-system/components/AICard';
+import Badge from '../../design-system/components/Badge';
 
 type TabType = 'overview' | 'restock' | 'waste' | 'purchase';
 
@@ -22,6 +28,11 @@ export default function AIInventoryPlanningDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<any>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
 
   const loadPlan = useCallback(async (isRefresh = false) => {
     try {
@@ -37,61 +48,50 @@ export default function AIInventoryPlanningDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    loadPlan();
-  }, [loadPlan]);
+  useEffect(() => { loadPlan(); }, [loadPlan]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadPlan(true);
-  };
+  const tabs: { key: TabType; label: string; icon: string }[] = [
+    { key: 'overview', label: 'Overview', icon: '📊' },
+    { key: 'restock', label: 'Restock', icon: '🔄' },
+    { key: 'waste', label: 'Waste', icon: '♻️' },
+    { key: 'purchase', label: 'Purchase', icon: '🛒' },
+  ];
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return '#EF4444';
-      case 'high': return '#F97316';
-      case 'medium': return '#F59E0B';
-      case 'low': return '#10B981';
-      default: return '#6B7280';
-    }
-  };
-
-  const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case 'high': return '#EF4444';
-      case 'medium': return '#F59E0B';
-      case 'low': return '#10B981';
-      default: return '#6B7280';
-    }
-  };
+  const summary = plan?.summary || {};
+  const insights = plan?.insights || [];
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#10B981" />
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Generating AI inventory plan...</Text>
       </View>
     );
   }
 
-  const summary = plan?.summary || {};
-  const itemsFinishing = plan?.items_likely_to_finish || [];
-  const itemsRestock = plan?.items_to_restock || [];
-  const demand = plan?.expected_demand || {};
-  const wastage = plan?.expected_wastage || {};
-  const restockSuggestions = plan?.restock_suggestions || [];
-  const wasteSuggestions = plan?.waste_reduction_suggestions || [];
-  const purchasePlan = plan?.smart_purchase_plan || [];
-  const insights = plan?.insights || [];
-
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>AI Inventory Planning</Text>
-        <Text style={styles.subtitle}>Smart predictions for optimal stock management</Text>
+        <View style={styles.headerDeco1} />
+        <View style={styles.headerDeco2} />
+        <Text style={styles.headerTitle}>Inventory AI</Text>
+        <Text style={styles.headerSubtitle}>Smart predictions for optimal stock management</Text>
       </View>
+
+      {/* Tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabRow} contentContainerStyle={styles.tabContentPad}>
+        {tabs.map(tab => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <Text style={styles.tabIcon}>{tab.icon}</Text>
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {error && (
         <View style={styles.errorBox}>
@@ -102,357 +102,235 @@ export default function AIInventoryPlanningDashboard() {
         </View>
       )}
 
-      {/* Summary Cards */}
-      <View style={styles.summaryGrid}>
-        <SummaryCard
-          label="Total Items"
-          value={summary.total_items || 0}
-          icon="📦"
-          color="#3B82F6"
-        />
-        <SummaryCard
-          label="Low Stock"
-          value={summary.low_stock || 0}
-          icon="⚠️"
-          color={getPriorityColor((summary.low_stock || 0) > 0 ? 'high' : 'low')}
-        />
-        <SummaryCard
-          label="Out of Stock"
-          value={summary.out_of_stock || 0}
-          icon="🚫"
-          color={getPriorityColor((summary.out_of_stock || 0) > 0 ? 'critical' : 'low')}
-        />
-        <SummaryCard
-          label="Waste Risk"
-          value={summary.items_with_waste_risk || 0}
-          icon="♻️"
-          color={getRiskColor((summary.items_with_waste_risk || 0) > 0 ? 'high' : 'low')}
-        />
-        <SummaryCard
-          label="To Restock"
-          value={summary.items_to_restock || 0}
-          icon="🔄"
-          color={getPriorityColor((summary.items_to_restock || 0) > 0 ? 'medium' : 'low')}
-        />
-        <SummaryCard
-          label="At Risk"
-          value={summary.items_likely_to_finish || 0}
-          icon="⏰"
-          color={getPriorityColor((summary.items_likely_to_finish || 0) > 0 ? 'critical' : 'low')}
-        />
-      </View>
-
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        {(['overview', 'restock', 'waste', 'purchase'] as TabType[]).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.activeTab]}
-            onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (
-        <View style={styles.section}>
-          {/* Items Likely to Finish */}
-          {itemsFinishing.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>⏰ Items Likely to Finish</Text>
-              {itemsFinishing.slice(0, 5).map((item: any, index: number) => (
-                <View key={index} style={styles.itemRow}>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.item_name}</Text>
-                    <Text style={styles.itemDetail}>
-                      Stock: {item.current_stock} | Demand: {item.daily_demand}/day
-                    </Text>
-                  </View>
-                  <View style={styles.itemStatus}>
-                    <View style={[styles.severityBadge, {backgroundColor: getPriorityColor(item.severity)}]}>
-                      <Text style={styles.severityText}>{item.severity.toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.itemDays}>{item.days_until_out}d left</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Expected Demand */}
-          {demand.items && demand.items.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>📊 Expected Demand</Text>
-              <View style={styles.demandHeader}>
-                <Text style={styles.demandTotal}>
-                  Daily: {demand.total_daily_demand} | Weekly: {demand.total_weekly_demand}
-                </Text>
-              </View>
-              {demand.items.slice(0, 5).map((item: any, index: number) => (
-                <View key={index} style={styles.itemRow}>
-                  <Text style={styles.itemName}>{item.item_name}</Text>
-                  <Text style={styles.itemDetail}>
-                    Daily: {item.daily} | Weekly: {item.weekly}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Waste Risk */}
-          {wastage.items && wastage.items.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>♻️ Waste Risk</Text>
-              {wastage.items.slice(0, 3).map((item: any, index: number) => (
-                <View key={index} style={styles.itemRow}>
-                  <Text style={styles.itemName}>{item.item_name}</Text>
-                  <View style={styles.itemStatus}>
-                    <Text style={[styles.wasteValue, {color: getRiskColor(item.waste_risk)}]}>
-                      {item.predicted_wastage} units
-                    </Text>
-                    <View style={[styles.riskBadge, {backgroundColor: getRiskColor(item.waste_risk)}]}>
-                      <Text style={styles.riskText}>{item.waste_risk.toUpperCase()}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Insights */}
-          {insights.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>💡 AI Insights</Text>
-              {insights.map((insight: string, index: number) => (
-                <View key={index} style={styles.insightRow}>
-                  <Text style={styles.insightBullet}>•</Text>
-                  <Text style={styles.insightText}>{insight}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadPlan(true); }} tintColor={colors.primary} />}
+        style={styles.scrollContent}
+      >
+        {/* Summary Cards */}
+        <View style={styles.statsRow}>
+          <StatCard value={summary.total_items || 0} label="Total Items" icon="📦" color={colors.primary} size="sm" style={{ flex: 1 }} />
+          <StatCard value={summary.low_stock || 0} label="Low Stock" icon="⚠️" color={(summary.low_stock || 0) > 0 ? colors.warning : colors.success} size="sm" style={{ flex: 1 }} />
+          <StatCard value={summary.out_of_stock || 0} label="Out of Stock" icon="🚫" color={(summary.out_of_stock || 0) > 0 ? colors.error : colors.success} size="sm" style={{ flex: 1 }} />
         </View>
-      )}
+        <View style={styles.statsRow}>
+          <StatCard value={summary.items_with_waste_risk || 0} label="Waste Risk" icon="♻️" color={(summary.items_with_waste_risk || 0) > 0 ? colors.warning : colors.success} size="sm" style={{ flex: 1 }} />
+          <StatCard value={summary.items_to_restock || 0} label="To Restock" icon="🔄" color={(summary.items_to_restock || 0) > 0 ? colors.info : colors.success} size="sm" style={{ flex: 1 }} />
+          <StatCard value={summary.items_likely_to_finish || 0} label="At Risk" icon="⏰" color={(summary.items_likely_to_finish || 0) > 0 ? colors.error : colors.success} size="sm" style={{ flex: 1 }} />
+        </View>
 
-      {/* Restock Tab */}
-      {activeTab === 'restock' && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Restock Suggestions</Text>
-
-          {restockSuggestions.length > 0 ? (
-            restockSuggestions.map((suggestion: any, index: number) => (
-              <View key={index} style={styles.suggestionCard}>
-                <View style={styles.suggestionHeader}>
-                  <Text style={styles.suggestionName}>{suggestion.item_name}</Text>
-                  <View style={[styles.priorityBadge, {backgroundColor: getPriorityColor(suggestion.priority)}]}>
-                    <Text style={styles.priorityText}>{suggestion.priority.toUpperCase()}</Text>
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            {/* Items Likely to Finish */}
+            {(plan?.items_likely_to_finish || []).length > 0 && (
+              <GlassCard padding={16} borderRadius={20} style={{ marginBottom: spacing.md }}>
+                <Text style={styles.sectionTitle}>⏰ Items Likely to Finish</Text>
+                {plan.items_likely_to_finish.slice(0, 5).map((item: any, i: number) => (
+                  <View key={i} style={styles.itemRow}>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>{item.item_name}</Text>
+                      <Text style={styles.itemDetail}>Stock: {item.current_stock} | Demand: {item.daily_demand}/day</Text>
+                    </View>
+                    <View style={styles.itemRight}>
+                      <Badge
+                        label={item.severity}
+                        variant={item.severity === 'critical' ? 'error' : item.severity === 'high' ? 'warning' : 'info'}
+                        size="sm"
+                      />
+                      <Text style={[styles.daysLeft, { color: item.days_until_out <= 2 ? colors.error : colors.warning }]}>
+                        {item.days_until_out}d left
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.suggestionDetails}>
-                  <Text style={styles.suggestionDetail}>Current Stock: {suggestion.current_stock}</Text>
-                  <Text style={styles.suggestionDetail}>Suggested: {suggestion.suggested_quantity} units</Text>
-                  {suggestion.restock_by && (
-                    <Text style={styles.suggestionDetail}>Restock By: {suggestion.restock_by}</Text>
+                ))}
+              </GlassCard>
+            )}
+
+            {/* Insights */}
+            {insights.length > 0 && (
+              <GlassCard padding={16} borderRadius={20} style={{ marginBottom: spacing.md }}>
+                <Text style={styles.sectionTitle}>💡 AI Insights</Text>
+                {insights.map((insight: string, i: number) => (
+                  <View key={i} style={styles.insightRow}>
+                    <Text style={styles.bullet}>•</Text>
+                    <Text style={styles.insightText}>{insight}</Text>
+                  </View>
+                ))}
+              </GlassCard>
+            )}
+
+            {/* Demand */}
+            {plan?.expected_demand?.items && (
+              <ForecastCard
+                title="Expected Demand"
+                icon="📊"
+                color={colors.primary}
+                data={(plan.expected_demand.items || []).slice(0, 5).map((d: any) => ({
+                  label: d.item_name,
+                  value: d.daily || 0,
+                  unit: '/day',
+                }))}
+                style={{ marginBottom: spacing.md }}
+              />
+            )}
+          </Animated.View>
+        )}
+
+        {/* Restock Tab */}
+        {activeTab === 'restock' && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <Text style={styles.sectionTitle}>Restock Suggestions</Text>
+            {(plan?.restock_suggestions || []).length > 0 ? (
+              plan.restock_suggestions.map((s: any, i: number) => (
+                <GlassCard key={i} padding={16} borderRadius={18} style={{ marginBottom: spacing.sm }}>
+                  <View style={styles.suggestionHeader}>
+                    <Text style={styles.suggestionName}>{s.item_name}</Text>
+                    <Badge label={s.priority} variant={s.priority === 'critical' ? 'error' : s.priority === 'high' ? 'warning' : 'info'} size="sm" />
+                  </View>
+                  <View style={styles.suggestionDetails}>
+                    <Text style={styles.suggestionDetail}>Current Stock: {s.current_stock}</Text>
+                    <Text style={styles.suggestionDetail}>Suggested: {s.suggested_quantity} units</Text>
+                    {s.restock_by && <Text style={styles.suggestionDetail}>Restock By: {s.restock_by}</Text>}
+                  </View>
+                  <Text style={styles.suggestionReason}>{s.reason}</Text>
+                </GlassCard>
+              ))
+            ) : (
+              <GlassCard padding={24} borderRadius={20}>
+                <Text style={styles.emptyText}>All items adequately stocked — no restock suggestions.</Text>
+              </GlassCard>
+            )}
+          </Animated.View>
+        )}
+
+        {/* Waste Tab */}
+        {activeTab === 'waste' && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <Text style={styles.sectionTitle}>Waste Reduction</Text>
+            {(plan?.waste_reduction_suggestions || []).length > 0 ? (
+              plan.waste_reduction_suggestions.map((s: any, i: number) => (
+                <AICard
+                  key={i}
+                  icon="♻️"
+                  title={s.type?.replace(/_/g, ' ').toUpperCase()}
+                  description={s.suggestion}
+                  severity={s.severity === 'high' ? 'warning' : s.severity === 'medium' ? 'info' : 'success'}
+                  confidence={0.85}
+                  style={{ marginBottom: spacing.sm }}
+                />
+              ))
+            ) : (
+              <GlassCard padding={24} borderRadius={20}>
+                <Text style={styles.emptyText}>No waste reduction suggestions available.</Text>
+              </GlassCard>
+            )}
+          </Animated.View>
+        )}
+
+        {/* Purchase Tab */}
+        {activeTab === 'purchase' && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            {plan?.total_estimated_cost > 0 && (
+              <GlassCard padding={20} borderRadius={20} style={{ marginBottom: spacing.md, alignItems: 'center' }}>
+                <Text style={styles.totalCostLabel}>Estimated Total Cost</Text>
+                <Text style={styles.totalCostValue}>₹{plan.total_estimated_cost}</Text>
+              </GlassCard>
+            )}
+            <Text style={styles.sectionTitle}>Smart Purchase Plan</Text>
+            {(plan?.smart_purchase_plan || []).length > 0 ? (
+              plan.smart_purchase_plan.map((item: any, i: number) => (
+                <GlassCard key={i} padding={16} borderRadius={18} style={{ marginBottom: spacing.sm }}>
+                  <View style={styles.suggestionHeader}>
+                    <Text style={styles.suggestionName}>{item.item_name}</Text>
+                    <Badge label={item.priority} variant={item.priority === 'critical' ? 'error' : item.priority === 'high' ? 'warning' : 'info'} size="sm" />
+                  </View>
+                  <View style={styles.purchaseDetails}>
+                    {[
+                      ['Current Stock', item.current_stock],
+                      ['Daily Demand', item.daily_demand],
+                      ['Optimal Qty', item.optimal_quantity],
+                      ['Days to Cover', `${item.days_to_cover}d`],
+                      ['Delivery Window', item.expected_delivery_window],
+                    ].map(([label, value], idx) => (
+                      <View key={idx} style={styles.purchaseRow}>
+                        <Text style={styles.purchaseLabel}>{label}</Text>
+                        <Text style={[styles.purchaseValue, label === 'Optimal Qty' && { color: colors.success, fontWeight: '700' }]}>{value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {item.suggested_vendor && (
+                    <Text style={styles.vendorText}>🏪 {item.suggested_vendor}</Text>
                   )}
-                </View>
-                <Text style={styles.suggestionReason}>{suggestion.reason}</Text>
-                <Text style={styles.suggestionAction}>{suggestion.action}</Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No restock suggestions - all items adequately stocked</Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Waste Tab */}
-      {activeTab === 'waste' && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Waste Reduction</Text>
-
-          {wasteSuggestions.map((suggestion: any, index: number) => (
-            <View key={index} style={[styles.suggestionCard, {borderLeftColor: getRiskColor(suggestion.severity)}]}>
-              <View style={styles.suggestionHeader}>
-                <Text style={styles.suggestionType}>{suggestion.type.replace('_', ' ').toUpperCase()}</Text>
-                <View style={[styles.severityBadge, {backgroundColor: getRiskColor(suggestion.severity)}]}>
-                  <Text style={styles.severityText}>{suggestion.severity.toUpperCase()}</Text>
-                </View>
-              </View>
-              <Text style={styles.suggestionText}>{suggestion.suggestion}</Text>
-              <Text style={styles.suggestionAction}>→ {suggestion.action}</Text>
-              {suggestion.estimated_savings && (
-                <Text style={styles.savingsText}>💰 {suggestion.estimated_savings}</Text>
-              )}
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Purchase Plan Tab */}
-      {activeTab === 'purchase' && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Smart Purchase Plan</Text>
-          
-          {plan?.total_estimated_cost > 0 && (
-            <View style={styles.totalCostCard}>
-              <Text style={styles.totalCostLabel}>Estimated Total Cost</Text>
-              <Text style={styles.totalCostValue}>${plan.total_estimated_cost}</Text>
-            </View>
-          )}
-
-          {purchasePlan.map((item: any, index: number) => (
-            <View key={index} style={styles.purchaseCard}>
-              <View style={styles.purchaseHeader}>
-                <Text style={styles.purchaseName}>{item.item_name}</Text>
-                <View style={[styles.priorityBadge, {backgroundColor: getPriorityColor(item.priority)}]}>
-                  <Text style={styles.priorityText}>{item.priority.toUpperCase()}</Text>
-                </View>
-              </View>
-              <View style={styles.purchaseDetails}>
-                <View style={styles.purchaseRow}>
-                  <Text style={styles.purchaseLabel}>Current Stock</Text>
-                  <Text style={styles.purchaseValue}>{item.current_stock}</Text>
-                </View>
-                <View style={styles.purchaseRow}>
-                  <Text style={styles.purchaseLabel}>Daily Demand</Text>
-                  <Text style={styles.purchaseValue}>{item.daily_demand}</Text>
-                </View>
-                <View style={styles.purchaseRow}>
-                  <Text style={styles.purchaseLabel}>Optimal Quantity</Text>
-                  <Text style={[styles.purchaseValue, styles.optimalValue]}>{item.optimal_quantity}</Text>
-                </View>
-                <View style={styles.purchaseRow}>
-                  <Text style={styles.purchaseLabel}>Days to Cover</Text>
-                  <Text style={styles.purchaseValue}>{item.days_to_cover}d</Text>
-                </View>
-                <View style={styles.purchaseRow}>
-                  <Text style={styles.purchaseLabel}>Delivery Window</Text>
-                  <Text style={styles.purchaseValue}>{item.expected_delivery_window}</Text>
-                </View>
-                {item.estimated_cost && (
-                  <View style={styles.purchaseRow}>
-                    <Text style={styles.purchaseLabel}>Estimated Cost</Text>
-                    <Text style={styles.purchaseValue}>${item.estimated_cost.total_cost}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.suggestedVendor}>🏪 {item.suggested_vendor}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </ScrollView>
-  );
-}
-
-// ── Helper Components ────────────────────────────────────────────────────
-
-function SummaryCard({label, value, icon, color}: any) {
-  return (
-    <View style={[styles.summaryCard, {borderLeftColor: color}]}>
-      <Text style={styles.summaryIcon}>{icon}</Text>
-      <Text style={[styles.summaryValue, {color}]}>{value}</Text>
-      <Text style={styles.summaryLabel}>{label}</Text>
+                </GlassCard>
+              ))
+            ) : (
+              <GlassCard padding={24} borderRadius={20}>
+                <Text style={styles.emptyText}>No purchase plan available.</Text>
+              </GlassCard>
+            )}
+          </Animated.View>
+        )}
+        <View style={{ height: spacing.huge }} />
+      </ScrollView>
     </View>
   );
 }
 
-// ── Chart Configuration ──────────────────────────────────────────────────
-
-const chartConfig = {
-  backgroundColor: '#1F2937',
-  backgroundGradientFrom: '#1F2937',
-  backgroundGradientTo: '#1F2937',
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-  style: {borderRadius: 16},
-};
-
-// ── Styles ───────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#111827'},
-  centered: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827'},
-  loadingText: {marginTop: 12, fontSize: 16, color: '#9CA3AF'},
-  header: {padding: 20, paddingTop: 40},
-  title: {fontSize: 28, fontWeight: 'bold', color: '#F9FAFB', marginBottom: 4},
-  subtitle: {fontSize: 14, color: '#9CA3AF'},
-  errorBox: {margin: 16, padding: 16, backgroundColor: '#7F1D1D', borderRadius: 8, borderWidth: 1, borderColor: '#EF4444'},
-  errorText: {color: '#FCA5A5', fontSize: 14, marginBottom: 8},
-  retryText: {color: '#F9FAFB', fontSize: 14, fontWeight: '600'},
-
-  summaryGrid: {flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: 16, marginBottom: 16, gap: 12},
-  summaryCard: {flex: 1, minWidth: '45%', backgroundColor: '#1F2937', borderRadius: 12, padding: 16, borderLeftWidth: 4},
-  summaryIcon: {fontSize: 24, marginBottom: 8},
-  summaryValue: {fontSize: 24, fontWeight: 'bold', marginBottom: 4},
-  summaryLabel: {fontSize: 12, color: '#9CA3AF'},
-
-  tabContainer: {flexDirection: 'row', marginHorizontal: 16, marginBottom: 16, backgroundColor: '#1F2937', borderRadius: 8, padding: 4},
-  tab: {flex: 1, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center'},
-  activeTab: {backgroundColor: '#10B981'},
-  tabText: {fontSize: 12, fontWeight: '600', color: '#9CA3AF'},
-  activeTabText: {color: '#FFFFFF'},
-
-  section: {marginBottom: 24},
-  sectionTitle: {fontSize: 20, fontWeight: '600', color: '#F9FAFB', marginHorizontal: 16, marginBottom: 12},
-
-  card: {marginHorizontal: 16, marginBottom: 16, backgroundColor: '#1F2937', borderRadius: 12, padding: 16},
-  cardTitle: {fontSize: 16, fontWeight: '600', color: '#F9FAFB', marginBottom: 12},
-
-  itemRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#374151'},
-  itemInfo: {flex: 1},
-  itemName: {fontSize: 14, fontWeight: '600', color: '#F9FAFB', marginBottom: 2},
-  itemDetail: {fontSize: 12, color: '#9CA3AF'},
-  itemStatus: {alignItems: 'flex-end'},
-  itemDays: {fontSize: 12, color: '#EF4444', marginTop: 4},
-
-  severityBadge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4},
-  severityText: {fontSize: 10, fontWeight: 'bold', color: '#FFFFFF'},
-  riskBadge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4},
-  riskText: {fontSize: 10, fontWeight: 'bold', color: '#FFFFFF'},
-
-  demandHeader: {marginBottom: 12},
-  demandTotal: {fontSize: 14, color: '#10B981', fontWeight: '600'},
-  wasteValue: {fontSize: 14, fontWeight: '600', marginBottom: 4},
-
-  insightRow: {flexDirection: 'row', marginBottom: 8},
-  insightBullet: {color: '#10B981', marginRight: 8, fontSize: 16},
-  insightText: {flex: 1, fontSize: 14, color: '#D1D5DB', lineHeight: 20},
-
-  suggestionCard: {marginHorizontal: 16, marginBottom: 16, backgroundColor: '#1F2937', borderRadius: 12, padding: 16, borderLeftWidth: 4, borderLeftColor: '#10B981'},
-  suggestionHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8},
-  suggestionName: {fontSize: 16, fontWeight: '600', color: '#F9FAFB', flex: 1},
-  suggestionType: {fontSize: 12, fontWeight: '600', color: '#9CA3AF'},
-  suggestionDetails: {marginBottom: 8},
-  suggestionDetail: {fontSize: 14, color: '#D1D5DB', marginBottom: 2},
-  suggestionReason: {fontSize: 12, color: '#F59E0B', marginBottom: 4},
-  suggestionAction: {fontSize: 12, color: '#10B981', fontWeight: '600', marginTop: 4},
-  suggestionText: {fontSize: 14, color: '#D1D5DB', marginBottom: 8, lineHeight: 20},
-
-  priorityBadge: {paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginLeft: 8},
-  priorityText: {fontSize: 10, fontWeight: 'bold', color: '#FFFFFF'},
-  savingsText: {fontSize: 12, color: '#10B981', marginTop: 8},
-
-  totalCostCard: {marginHorizontal: 16, marginBottom: 16, backgroundColor: '#1F2937', borderRadius: 12, padding: 20, alignItems: 'center'},
-  totalCostLabel: {fontSize: 14, color: '#9CA3AF', marginBottom: 4},
-  totalCostValue: {fontSize: 32, fontWeight: 'bold', color: '#10B981'},
-
-  purchaseCard: {marginHorizontal: 16, marginBottom: 16, backgroundColor: '#1F2937', borderRadius: 12, padding: 16},
-  purchaseHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12},
-  purchaseName: {fontSize: 16, fontWeight: '600', color: '#F9FAFB', flex: 1},
-  purchaseDetails: {marginBottom: 8},
-  purchaseRow: {flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#374151'},
-  purchaseLabel: {fontSize: 14, color: '#9CA3AF'},
-  purchaseValue: {fontSize: 14, fontWeight: '600', color: '#F9FAFB'},
-  optimalValue: {color: '#10B981'},
-  suggestedVendor: {fontSize: 12, color: '#3B82F6', marginTop: 8},
-
-  emptyCard: {marginHorizontal: 16, marginBottom: 16, backgroundColor: '#1F2937', borderRadius: 12, padding: 32, alignItems: 'center'},
-  emptyText: {fontSize: 14, color: '#9CA3AF'},
+  container: { flex: 1, backgroundColor: colors.bg },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
+  header: {
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  tabRow: { maxHeight: 52 },
+  tabContentPad: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.md },
+  scrollContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  tab: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 14, backgroundColor: colors.bgCard, marginRight: 8, gap: 6,
+    borderWidth: 1.5, borderColor: colors.border, ...shadows.sm,
+  },
+  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabIcon: { fontSize: 14 },
+  tabText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  tabTextActive: { color: colors.textInverse },
+  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 },
+  errorBox: { margin: spacing.md, padding: 16, backgroundColor: colors.errorPale, borderRadius: 14, borderWidth: 1, borderColor: colors.error + '30', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  errorText: { color: colors.error, fontSize: 14, flex: 1 },
+  retryText: { color: colors.primary, fontSize: 14, fontWeight: '700', marginLeft: 12 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  itemDetail: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  itemRight: { alignItems: 'flex-end', gap: 4 },
+  daysLeft: { fontSize: 12, fontWeight: '700' },
+  insightRow: { flexDirection: 'row', marginBottom: 6, gap: 6 },
+  bullet: { color: colors.primary, fontSize: 16 },
+  insightText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+  suggestionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  suggestionName: { fontSize: 16, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  suggestionDetails: { marginBottom: 8, gap: 4 },
+  suggestionDetail: { fontSize: 13, color: colors.textSecondary },
+  suggestionReason: { fontSize: 12, color: colors.warningDark, fontWeight: '500' },
+  totalCostLabel: { fontSize: 14, color: colors.textMuted, marginBottom: 4 },
+  totalCostValue: { fontSize: 32, fontWeight: '700', color: colors.success },
+  purchaseDetails: { gap: 2, marginBottom: 8 },
+  purchaseRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  purchaseLabel: { fontSize: 13, color: colors.textSecondary },
+  purchaseValue: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  vendorText: { fontSize: 12, color: colors.info, fontWeight: '600' },
+  emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center' },
 });

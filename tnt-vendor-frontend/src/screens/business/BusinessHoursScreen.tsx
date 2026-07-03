@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+// ─── Premium Business Hours Screen ─────────────────────────────
+// Set operating hours with premium design system
+
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,8 +10,13 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { businessSettingsApi } from '../../services/businessSettingsApi';
+import { colors, shadows, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatusPill from '../../design-system/components/StatusPill';
+import Button from '../../design-system/components/Button';
 
 const DAYS = [
   { key: 'monday', label: 'Monday', short: 'Mon' },
@@ -30,8 +38,10 @@ export default function BusinessHoursScreen({ navigation }: any) {
   const [hours, setHours] = useState<{ [key: string]: DayHours }>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     loadBusinessHours();
   }, []);
 
@@ -40,17 +50,10 @@ export default function BusinessHoursScreen({ navigation }: any) {
       setLoading(true);
       const response = await businessSettingsApi.getSettings();
       const businessHours = response.data.business_hours || {};
-      
-      // Initialize default hours if not set
       const defaultHours: { [key: string]: DayHours } = {};
       DAYS.forEach(day => {
-        defaultHours[day.key] = businessHours[day.key] || {
-          open: '09:00',
-          close: '18:00',
-          is_closed: false,
-        };
+        defaultHours[day.key] = businessHours[day.key] || { open: '09:00', close: '18:00', is_closed: false };
       });
-      
       setHours(defaultHours);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to load business hours');
@@ -59,26 +62,19 @@ export default function BusinessHoursScreen({ navigation }: any) {
     }
   };
 
-  const updateDayHours = (dayKey: string, field: keyof DayHours, value: string | boolean) => {
-    setHours({
-      ...hours,
-      [dayKey]: {
-        ...hours[dayKey],
-        [field]: value,
-      },
-    });
+  const toggleDayClosed = (dayKey: string) => {
+    setHours(prev => ({
+      ...prev,
+      [dayKey]: { ...prev[dayKey], is_closed: !prev[dayKey].is_closed },
+    }));
   };
 
   const copyToAllDays = (sourceDay: string) => {
     const sourceHours = hours[sourceDay];
     const newHours: { [key: string]: DayHours } = {};
-    
-    DAYS.forEach(day => {
-      newHours[day.key] = { ...sourceHours };
-    });
-    
+    DAYS.forEach(day => { newHours[day.key] = { ...sourceHours }; });
     setHours(newHours);
-    Alert.alert('Success', 'Hours copied to all days');
+    Alert.alert('Copied', 'Hours copied to all days');
   };
 
   const handleSave = async () => {
@@ -94,240 +90,138 @@ export default function BusinessHoursScreen({ navigation }: any) {
     }
   };
 
-  const toggleDayClosed = (dayKey: string) => {
-    updateDayHours(dayKey, 'is_closed', !hours[dayKey].is_closed);
+  const cycleTime = (key: string, field: 'open' | 'close', increment: boolean) => {
+    setHours(prev => {
+      const current = prev[key][field];
+      const [h, m] = current.split(':').map(Number);
+      let newH = (h + (increment ? 1 : -1) + 24) % 24;
+      const newTime = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      return { ...prev, [key]: { ...prev[key], [field]: newTime } };
+    });
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Business Hours</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>Loading business hours...</Text>
-        </View>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading business hours...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
+        <View style={styles.headerDeco1} />
+        <View style={styles.headerDeco2} />
         <Text style={styles.headerTitle}>Business Hours</Text>
         <Text style={styles.headerSubtitle}>Set your operating hours for each day</Text>
       </View>
 
-      <View style={styles.content}>
-        {DAYS.map((day, index) => (
-          <View key={day.key} style={styles.dayCard}>
-            <View style={styles.dayHeader}>
-              <View style={styles.dayInfo}>
-                <Text style={styles.dayLabel}>{day.label}</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.closedBadge,
-                    hours[day.key].is_closed && styles.closedBadgeActive,
-                  ]}
-                  onPress={() => toggleDayClosed(day.key)}
-                >
-                  <Text style={[
-                    styles.closedBadgeText,
-                    hours[day.key].is_closed && styles.closedBadgeTextActive,
-                  ]}>
-                    {hours[day.key].is_closed ? 'CLOSED' : 'OPEN'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              {index === 0 && (
-                <TouchableOpacity
-                  style={styles.copyButton}
-                  onPress={() => copyToAllDays(day.key)}
-                >
-                  <Text style={styles.copyButtonText}>📋 Copy to All</Text>
-                </TouchableOpacity>
-              )}
+      <Animated.View style={{ opacity: fadeAnim }}>
+        {DAYS.map((day, index) => {
+          const dayHours = hours[day.key] || { open: '09:00', close: '18:00', is_closed: false };
+          return (
+            <View key={day.key} style={styles.daySection}>
+              <GlassCard padding={16} borderRadius={18} intensity={dayHours.is_closed ? 'light' : 'medium'}>
+                <View style={styles.dayHeader}>
+                  <View style={styles.dayInfo}>
+                    <Text style={styles.dayLabel}>{day.label}</Text>
+                    <TouchableOpacity onPress={() => toggleDayClosed(day.key)}>
+                      <StatusPill
+                        label={dayHours.is_closed ? 'CLOSED' : 'OPEN'}
+                        variant={dayHours.is_closed ? 'error' : 'success'}
+                        size="sm"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {index === 0 && (
+                    <TouchableOpacity style={styles.copyBtn} onPress={() => copyToAllDays(day.key)}>
+                      <Text style={styles.copyBtnText}>Copy to All</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {!dayHours.is_closed && (
+                  <View style={styles.timeRow}>
+                    <View style={styles.timeBlock}>
+                      <Text style={styles.timeLabel}>Opens</Text>
+                      <View style={styles.timeDisplay}>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'open', false)} style={styles.timeArrow}>
+                          <Text style={styles.arrowText}>▲</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.timeValue}>{dayHours.open}</Text>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'open', true)} style={styles.timeArrow}>
+                          <Text style={styles.arrowText}>▼</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <Text style={styles.timeSeparator}>→</Text>
+                    <View style={styles.timeBlock}>
+                      <Text style={styles.timeLabel}>Closes</Text>
+                      <View style={styles.timeDisplay}>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'close', false)} style={styles.timeArrow}>
+                          <Text style={styles.arrowText}>▲</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.timeValue}>{dayHours.close}</Text>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'close', true)} style={styles.timeArrow}>
+                          <Text style={styles.arrowText}>▼</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </GlassCard>
             </View>
+          );
+        })}
 
-            {!hours[day.key].is_closed && (
-              <View style={styles.timeRow}>
-                <View style={styles.timeInputContainer}>
-                  <Text style={styles.timeLabel}>Opening Time</Text>
-                  <TouchableOpacity style={styles.timeButton}>
-                    <Text style={styles.timeText}>{hours[day.key].open}</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.timeSeparator}>→</Text>
-
-                <View style={styles.timeInputContainer}>
-                  <Text style={styles.timeLabel}>Closing Time</Text>
-                  <TouchableOpacity style={styles.timeButton}>
-                    <Text style={styles.timeText}>{hours[day.key].close}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        ))}
-
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Business Hours</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+        <View style={styles.saveSection}>
+          <Button
+            title="Save Business Hours"
+            onPress={handleSave}
+            loading={saving}
+            variant="primary"
+            size="lg"
+            fullWidth
+          />
+        </View>
+        <View style={{ height: spacing.huge }} />
+      </Animated.View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#10B981',
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    marginTop: 100,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 12,
-  },
-  content: {
-    padding: 16,
-  },
-  dayCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  dayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  dayInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  dayLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  closedBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#D1FAE5',
-    borderWidth: 1,
-    borderColor: '#10B981',
-  },
-  closedBadgeActive: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#EF4444',
-  },
-  closedBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-  closedBadgeTextActive: {
-    color: '#EF4444',
-  },
-  copyButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  copyButtonText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: '600',
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  timeInputContainer: {
-    flex: 1,
-  },
-  timeLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  timeButton: {
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  timeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  timeSeparator: {
-    fontSize: 20,
-    color: '#6B7280',
-    marginTop: 20,
-  },
-  saveButton: {
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
+  headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  daySection: { paddingHorizontal: spacing.lg, marginTop: spacing.sm },
+  dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  dayInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dayLabel: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  copyBtn: { backgroundColor: colors.primaryPale, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  copyBtnText: { fontSize: 12, fontWeight: '600', color: colors.primary },
+  timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginTop: 4 },
+  timeBlock: { flex: 1, alignItems: 'center' },
+  timeLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500', marginBottom: 6 },
+  timeDisplay: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timeArrow: { width: 28, height: 28, borderRadius: 8, backgroundColor: colors.bgSecondary, justifyContent: 'center', alignItems: 'center' },
+  arrowText: { fontSize: 10, color: colors.textSecondary },
+  timeValue: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, minWidth: 50, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  timeSeparator: { fontSize: 20, color: colors.textMuted, marginTop: 20 },
+  saveSection: { paddingHorizontal: spacing.lg, marginTop: spacing.xxl },
 });

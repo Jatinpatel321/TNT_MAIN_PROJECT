@@ -71,7 +71,7 @@ def jscFlavor = 'org.webkit:android-jsc:+'
 
 android {
     buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdkVersion 35
+    compileSdkVersion rootProject.ext.compileSdkVersion
 
     namespace "com.tntapp"
     defaultConfig {

@@ -1,9 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { registerFCMToken } from '../services/pushRegistrationService';
+// ─── Secure Auth Context ───────────────────────────────────────────
+// JWT stored in expo-secure-store (encrypted), with token expiry
+// validation and automatic logout on 401 via event bus.
 
-const API_BASE_URL = 'http://localhost:8001';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
+import { API_BASE_URL, STORAGE_KEYS } from '../config/api';
+import { onAuthEvent, AUTH_EVENTS } from '../services/apiClient';
+import { registerFCMToken } from '../services/pushRegistrationService';
 
 interface User {
   id: number;
@@ -13,71 +17,198 @@ interface User {
   role: string;
 }
 
+// Payload embedded in the JWT (depends on your backend)
+interface JwtPayload {
+  sub?: string;
+  exp?: number;
+  iat?: number;
+  role?: string;
+  vendor_id?: number;
+  [key: string]: unknown;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (vendorId: number, password: string) => Promise<void>;
+  login: (
+    identifier: string,
+    password: string,
+    accountType?: 'owner' | 'staff',
+  ) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
+  isTokenExpired: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// ── JWT helpers ────────────────────────────────────────────────────
+
+/** Safe base64 decode for React Native (no native atob in Hermes). */
+function base64Decode(input: string): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let output = '';
+  let buffer = 0;
+  let bits = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+    if (char === '=') break;
+    const idx = chars.indexOf(char);
+    if (idx === -1) continue;
+    buffer = (buffer << 6) | idx;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      output += String.fromCharCode((buffer >> bits) & 0xff);
+    }
+  }
+  return output;
+}
+
+/** Decode a JWT without verifying the signature (client-side only). */
+function decodeJwt(token: string): JwtPayload | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    // Base64url → standard base64 → decode
+    const decoded = base64Decode(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decoded) as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+/** Check if a JWT is expired (based on its `exp` claim). */
+function isJwtExpired(token: string): boolean {
+  const payload = decodeJwt(token);
+  if (!payload || !payload.exp) return false; // Can't verify — assume valid
+  const expMs = payload.exp * 1000; // JWT exp is in seconds
+  return Date.now() >= expMs;
+}
+
+// ── Provider ───────────────────────────────────────────────────────
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTokenExpired, setIsTokenExpired] = useState(false);
 
+  // Load stored auth on mount
   useEffect(() => {
     loadStoredAuth();
   }, []);
 
+  // Listen for forced logout from 401 interceptor
+  useEffect(() => {
+    const unsubscribe = onAuthEvent(AUTH_EVENTS.LOGOUT, () => {
+      performLogout();
+    });
+    return unsubscribe;
+  }, []);
+
   const loadStoredAuth = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('vendor_token');
-      const storedUser = await AsyncStorage.getItem('vendor_user');
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+      const storedToken = await SecureStore.getItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+      const storedUser = await SecureStore.getItemAsync(STORAGE_KEYS.USER_DATA);
+
+      if (!storedToken || !storedUser) {
+        setIsLoading(false);
+        return;
       }
+
+      // Check token expiry before accepting
+      if (isJwtExpired(storedToken)) {
+        console.warn('[Auth] Stored token is expired — clearing session');
+        await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+        await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA);
+        setIsTokenExpired(true);
+        setIsLoading(false);
+        return;
+      }
+
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
     } catch (error) {
-      console.error('Failed to load auth:', error);
+      console.error('[Auth] Failed to load stored auth:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = async (vendorId: number, password: string) => {
-    try {
-      const response = await axios.post(`${API_BASE_URL}/vendor/login`, {
-        vendor_id: vendorId,
-        password,
-      });
-      const { access_token, vendor } = response.data;
-      setToken(access_token);
-      setUser(vendor);
-      await AsyncStorage.setItem('vendor_token', access_token);
-      await AsyncStorage.setItem('vendor_user', JSON.stringify(vendor));
-      // Register FCM token after successful login
-      registerFCMToken();
-    } catch (error) {
-      throw new Error('Login failed');
+  const login = async (
+    identifier: string,
+    password: string,
+    accountType: 'owner' | 'staff' = 'owner',
+  ) => {
+    const loginPayload =
+      accountType === 'staff'
+        ? { staff_phone: identifier, password }
+        : { vendor_id: Number(identifier), password };
+
+    if (accountType === 'owner' && !Number.isFinite(loginPayload.vendor_id)) {
+      throw new Error('Vendor ID must be a number');
     }
+
+    let response;
+    try {
+      response = await axios.post(`${API_BASE_URL}/vendor/login`, loginPayload);
+    } catch (error: any) {
+      const backendMessage = error?.response?.data?.detail;
+      throw new Error(backendMessage || error?.message || 'Login failed');
+    }
+    const { access_token, vendor } = response.data;
+
+    if (!access_token || !vendor) {
+      throw new Error('Invalid server response — missing token or vendor data');
+    }
+
+    // Check token expiry at login time
+    if (isJwtExpired(access_token)) {
+      throw new Error('Server returned an expired token');
+    }
+
+    // Store securely
+    await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, access_token);
+    await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(vendor));
+
+    setToken(access_token);
+    setUser(vendor);
+    setIsTokenExpired(false);
+
+    // Register push notifications in background
+    registerFCMToken();
   };
 
-  const logout = async () => {
+  const performLogout = useCallback(async () => {
+    setUser(null);
+    setToken(null);
+    setIsTokenExpired(false);
     try {
-      setUser(null);
-      setToken(null);
-      await AsyncStorage.removeItem('vendor_token');
-      await AsyncStorage.removeItem('vendor_user');
-    } catch (error) {
-      console.error('Logout failed:', error);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.AUTH_TOKEN);
+      await SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA);
+    } catch {
+      // Ignore cleanup errors
     }
-  };
+  }, []);
+
+  const logout = useCallback(async () => {
+    await performLogout();
+  }, [performLogout]);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        isLoading,
+        isTokenExpired,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

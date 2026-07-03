@@ -73,7 +73,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdkVersion 35
 
-    namespace "com.tntapp"
+    namespace "com.tnt.vendor"
     defaultConfig {
         applicationId "com.tnt.vendor"
         minSdkVersion rootProject.ext.minSdkVersion

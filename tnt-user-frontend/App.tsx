@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import messaging from '@react-native-firebase/messaging';
 
 import { AuthProvider } from './src/hooks/useAuth';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -16,10 +15,22 @@ const theme = {
 
 export default function App() {
   useEffect(() => {
-    const unsubscribe = messaging().onTokenRefresh(() => {
-      registerFCMToken();
-    });
-    return unsubscribe;
+    // Firebase FCM is optional — silently skip if native module is missing
+    let unsubscribe: (() => void) | undefined;
+    (async () => {
+      try {
+        const messaging = (await import('@react-native-firebase/messaging')).default;
+        const unsub = messaging().onTokenRefresh(() => {
+          registerFCMToken();
+        });
+        unsubscribe = unsub;
+      } catch {
+        console.warn('Firebase not available natively — push notifications disabled');
+      }
+    })();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   return (

@@ -117,8 +117,8 @@ export const ROLE_COLORS = {
 };
 
 // ─── API ──────────────────────────────────────────────────────────────────────
-export const WS_BASE_URL = 'ws://localhost:8000';
-export const API_BASE_URL = 'http://localhost:8000';
+export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 export const POLL_INTERVAL_STATS = 30_000; // 30s
 export const POLL_INTERVAL_HEALTH = 10_000; // 10s
 export const POLL_INTERVAL_ORDERS = 5_000; // 5s

@@ -1,17 +1,10 @@
-/**
- * QR Scanner Screen — vendor-side pickup confirmation.
- *
- * Uses react-native-camera-kit for real barcode scanning.
- * Falls back to manual QR code entry for development.
- *
- * On successful scan:
- * 1. Calls POST /v1/orders/qr/confirm?qr_code=...
- * 2. Displays confirmation with order details.
- * 3. Plays a success sound.
- */
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+// ─── Premium QR Scanner Screen ──────────────────────────────────
+// Vendor-side pickup confirmation with premium design system
+
+import React, {useCallback, useRef, useState} from 'react';
 import {
   Alert,
+  Animated,
   StyleSheet,
   Text,
   TextInput,
@@ -21,348 +14,112 @@ import {
 } from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {vendorApi} from '../../services/vendorApi';
+import {colors, spacing} from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import Button from '../../design-system/components/Button';
 
 type Props = NativeStackScreenProps<any, 'QRScanner'>;
 
-export function QRScannerScreen({navigation, route}: Props) {
+export function QRScannerScreen({navigation}: Props) {
   const [scanning, setScanning] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [manualQrCode, setManualQrCode] = useState('');
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   const scanLockRef = useRef(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // ── Handle QR confirmation ───────────────────────────────────────────
-  const handleConfirmPickup = useCallback(
-    async (qrCode: string) => {
-      if (!qrCode.trim()) {
-        Alert.alert('Error', 'Please enter or scan a QR code');
-        return;
-      }
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}).start();
+  }, []);
 
-      // Prevent duplicate scans
-      if (scanLockRef.current) return;
-      scanLockRef.current = true;
-
-      try {
-        setConfirming(true);
-
-        // Attempt the confirmation via backend
-        const response = await vendorApi.confirmPickup(qrCode.trim());
-        const orderId = response.data?.order_id;
-
-        // Haptic + visual feedback
-        Vibration.vibrate(200);
-
-        Alert.alert(
-          '✅ Pickup Confirmed',
-          orderId
-            ? `Order #${orderId} has been marked as picked up.`
-            : 'Order has been marked as picked up successfully.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                scanLockRef.current = false;
-                navigation.goBack();
-              },
-            },
-          ],
-        );
-      } catch (error: any) {
-        const message =
-          error?.response?.data?.detail ||
-          error?.message ||
-          'Pickup confirmation failed. Please try again.';
-        Alert.alert('❌ Confirmation Failed', message);
-        scanLockRef.current = false;
-      } finally {
-        setConfirming(false);
-      }
-    },
-    [navigation],
-  );
-
-  // ── Camera scanner (react-native-camera-kit integration) ─────────────
-  const handleBarcodeRead = useCallback(
-    (event: {nativeEvent: {codeStringValue?: string}}) => {
-      const code = event.nativeEvent?.codeStringValue;
-      if (!code || code === lastScanned) return;
-
-      setLastScanned(code);
-      setManualQrCode(code);
-
-      // Automatically confirm on successful scan
-      Alert.alert(
-        'QR Code Scanned',
-        `Code: ${code.substring(0, 20)}...\n\nConfirm pickup?`,
-        [
-          {text: 'Cancel', style: 'cancel'},
-          {
-            text: 'Confirm Pickup',
-            onPress: () => handleConfirmPickup(code),
-          },
-        ],
-      );
-    },
-    [handleConfirmPickup, lastScanned],
-  );
+  const handleConfirmPickup = useCallback(async (qrCode: string) => {
+    if (!qrCode.trim()) { Alert.alert('Error', 'Enter or scan a QR code'); return; }
+    if (scanLockRef.current) return;
+    scanLockRef.current = true;
+    try {
+      setConfirming(true);
+      await vendorApi.confirmPickup(qrCode.trim());
+      Vibration.vibrate(200);
+      Alert.alert('✅ Pickup Confirmed', 'Order has been marked as picked up.', [
+        {text: 'OK', onPress: () => { scanLockRef.current = false; navigation.goBack(); }},
+      ]);
+    } catch (error: any) {
+      Alert.alert('❌ Failed', error?.response?.data?.detail || error?.message || 'Pickup confirmation failed');
+      scanLockRef.current = false;
+    } finally {
+      setConfirming(false);
+    }
+  }, [navigation]);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Scan QR Code</Text>
-        <Text style={styles.subtitle}>
-          Scan the student's QR code to confirm pickup
-        </Text>
+        <View style={styles.headerDeco1} /><View style={styles.headerDeco2} />
+        <Text style={styles.headerTitle}>Scan QR Code</Text>
+        <Text style={styles.headerSubtitle}>Scan student's QR code to confirm pickup</Text>
       </View>
 
-      {/* Camera Scanner View */}
-      <View style={styles.cameraContainer}>
-        {/*
-         * PRODUCTION CAMERA (uncomment when react-native-camera-kit is installed):
-         *
-         * <CameraScreen
-         *   scanBarcode={true}
-         *   onReadCode={handleBarcodeRead}
-         *   showFrame={true}
-         *   laserColor="#10B981"
-         *   frameColor="#10B981"
-         *   style={styles.camera}
-         * />
-         *
-         * If using expo-camera instead:
-         *
-         * <CameraView
-         *   style={styles.camera}
-         *   facing="back"
-         *   barcodeScannerSettings={{barcodeTypes: ['qr']}}
-         *   onBarcodeScanned={scanning ? handleBarcodeScan : undefined}
-         * >
-         *   <View style={styles.cameraOverlay}>
-         *     <View style={styles.scanFrame} />
-         *   </View>
-         * </CameraView>
-         */}
+      <Animated.View style={{flex: 1, opacity: fadeAnim}}>
+        {/* Camera placeholder */}
+        <GlassCard padding={0} borderRadius={20} style={{marginHorizontal: spacing.lg, marginTop: spacing.md, overflow: 'hidden'}}>
+          <View style={styles.cameraPlaceholder}>
+            <Text style={styles.cameraIcon}>📷</Text>
+            <Text style={styles.placeholderTitle}>Camera Scanner</Text>
+            <Text style={styles.placeholderHint}>Point camera at the student's QR code</Text>
+            {scanning && (
+              <View style={styles.scanningIndicator}>
+                <View style={styles.scanningDot} />
+                <Text style={styles.scanningText}>Scanning...</Text>
+              </View>
+            )}
+          </View>
+        </GlassCard>
 
-        {/* Fallback placeholder for development */}
-        <View style={styles.cameraPlaceholder}>
-          <Text style={styles.cameraIcon}>📷</Text>
-          <Text style={styles.cameraPlaceholderTitle}>
-            Camera Scanner
-          </Text>
-          <Text style={styles.cameraHint}>
-            Point camera at the student's QR code
-          </Text>
-
-          {/* Simulated scan button for development */}
-          <TouchableOpacity
-            style={styles.simulateButton}
-            onPress={() => {
-              Alert.alert(
-                'Simulate Scan',
-                'Enter QR code manually below, or generate one from an active order.',
-              );
-            }}>
-            <Text style={styles.simulateButtonText}>Simulate Scan</Text>
+        {/* Manual QR input */}
+        <View style={styles.manualSection}>
+          <Text style={styles.manualLabel}>Or enter QR code manually:</Text>
+          <TextInput
+            style={styles.manualInput}
+            placeholder="Paste QR code here..."
+            value={manualQrCode}
+            onChangeText={setManualQrCode}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Button title={confirming ? 'Confirming...' : 'Confirm Pickup'} onPress={() => handleConfirmPickup(manualQrCode)} loading={confirming} variant="success" size="lg" fullWidth />
+          <TouchableOpacity style={[styles.scanToggle, scanning && styles.scanToggleActive]} onPress={() => setScanning(prev => !prev)}>
+            <Text style={[styles.scanToggleText, scanning && styles.scanToggleTextActive]}>
+              {scanning ? '⏸ Pause Scanning' : '▶ Start Scanning'}
+            </Text>
           </TouchableOpacity>
-
-          {/* Scanning indicator */}
-          {scanning && (
-            <View style={styles.scanningIndicator}>
-              <View style={styles.scanningDot} />
-              <Text style={styles.scanningText}>Scanning...</Text>
-            </View>
-          )}
         </View>
-      </View>
-
-      {/* Manual QR Input */}
-      <View style={styles.manualSection}>
-        <Text style={styles.manualLabel}>Or enter QR code manually:</Text>
-        <TextInput
-          style={styles.manualInput}
-          placeholder="Paste QR code here..."
-          value={manualQrCode}
-          onChangeText={setManualQrCode}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoFocus={false}
-        />
-        <TouchableOpacity
-          style={[
-            styles.confirmButton,
-            confirming && styles.confirmButtonDisabled,
-          ]}
-          onPress={() => handleConfirmPickup(manualQrCode)}
-          disabled={confirming}>
-          <Text style={styles.confirmButtonText}>
-            {confirming ? 'Confirming...' : 'Confirm Pickup'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Scan activation toggle */}
-        <TouchableOpacity
-          style={[
-            styles.scanToggle,
-            scanning && styles.scanToggleActive,
-          ]}
-          onPress={() => setScanning(prev => !prev)}>
-          <Text
-            style={[
-              styles.scanToggleText,
-              scanning && styles.scanToggleTextActive,
-            ]}>
-            {scanning ? '⏸ Pause Scanning' : '▶ Start Scanning'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: {flex: 1, backgroundColor: colors.bg},
   header: {
-    padding: 20,
-    paddingTop: 16,
+    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  cameraContainer: {
-    margin: 20,
-    height: 280,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#1F2937',
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#374151',
-    borderStyle: 'dashed',
-    borderRadius: 16,
-  },
-  cameraIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  cameraPlaceholderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#D1D5DB',
-  },
-  cameraHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  cameraOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scanFrame: {
-    width: 200,
-    height: 200,
-    borderWidth: 2,
-    borderColor: '#10B981',
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-  },
-  simulateButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    backgroundColor: '#6366F1',
-    borderRadius: 8,
-  },
-  simulateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  scanningIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  scanningDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 6,
-  },
-  scanningText: {
-    fontSize: 12,
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  manualSection: {
-    padding: 20,
-    gap: 12,
-  },
-  manualLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  manualInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  confirmButton: {
-    backgroundColor: '#059669',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  confirmButtonDisabled: {
-    opacity: 0.6,
-  },
-  confirmButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  scanToggle: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  scanToggleActive: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FECACA',
-  },
-  scanToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  scanToggleTextActive: {
-    color: '#DC2626',
-  },
+  headerDeco1: {position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)'},
+  headerDeco2: {position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)'},
+  headerTitle: {fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3},
+  headerSubtitle: {fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500'},
+  cameraPlaceholder: {height: 220, backgroundColor: colors.textPrimary, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.borderDark, borderStyle: 'dashed', borderRadius: 20},
+  cameraIcon: {fontSize: 48, marginBottom: 8},
+  placeholderTitle: {fontSize: 16, fontWeight: '600', color: colors.textInverse},
+  placeholderHint: {fontSize: 12, color: colors.textMuted, marginTop: 4},
+  scanningIndicator: {flexDirection: 'row', alignItems: 'center', marginTop: 12},
+  scanningDot: {width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success, marginRight: 6},
+  scanningText: {fontSize: 12, color: colors.success, fontWeight: '600'},
+  manualSection: {padding: spacing.lg, gap: spacing.sm},
+  manualLabel: {fontSize: 14, fontWeight: '600', color: colors.textSecondary},
+  manualInput: {borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 16, backgroundColor: colors.bgCard, color: colors.textPrimary},
+  scanToggle: {backgroundColor: colors.bgSecondary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border},
+  scanToggleActive: {backgroundColor: colors.errorPale, borderColor: colors.error + '40'},
+  scanToggleText: {fontSize: 14, fontWeight: '600', color: colors.textSecondary},
+  scanToggleTextActive: {color: colors.error},
 });

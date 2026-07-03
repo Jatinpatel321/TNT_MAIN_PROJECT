@@ -1,6 +1,8 @@
 import {useEffect, useRef, useCallback, useState} from 'react';
 import {AppState, AppStateStatus} from 'react-native';
 
+import {WS_BASE_URL} from '../config/api';
+
 type WSEvent = {
   event: string;
   data: any;
@@ -11,10 +13,6 @@ type EventHandler = (event: WSEvent) => void;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_DELAY = 1000;
 const MAX_DELAY = 30000;
-const WS_BASE_URL = __DEV__
-  ? 'ws://localhost:8001'
-  : 'wss://api.tnt-campus.com';
-
 /**
  * Vendor WebSocket hook for real-time order updates.
  *

@@ -3,7 +3,12 @@ import type { MenuItem, Vendor, VendorSlot, VendorType } from '../types/models';
 
 export async function getVendors(type: VendorType): Promise<Vendor[]> {
   const res = await apiClient.get('/vendors', { params: { type } });
-  return res.data as Vendor[];
+  // Backend returns { total, limit, offset, items: Vendor[] }
+  const body = res.data as { items?: Vendor[]; total?: number };
+  if (Array.isArray(body)) {
+    return body as Vendor[];
+  }
+  return body?.items ?? [];
 }
 
 export async function getVendorMenu(vendorId: number): Promise<MenuItem[]> {

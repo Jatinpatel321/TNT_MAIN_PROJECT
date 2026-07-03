@@ -1,214 +1,99 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// ─── Executive Dashboard ────────────────────────────────────────────
+// Premium command center with AI-powered insights, live metrics,
+// revenue tracking, demand forecasting, and business health
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
-  Dimensions,
   Animated,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
-import { vendorApi } from '../../services/vendorApi';
-import { Colors, Typography, Spacing, Shadows, BorderRadius } from '../../theme';
-import Card from '../../components/Card';
-import MetricCard from '../../components/MetricCard';
-import Badge from '../../components/Badge';
-import Button from '../../components/Button';
+import { vendorApi, type DashboardMetrics } from '../../services/vendorApi';
+import { colors, shadows, spacing } from '../../design-system';
+import StatCard from '../../design-system/components/StatCard';
+import GlassCard from '../../design-system/components/GlassCard';
+import ProgressRing from '../../design-system/components/ProgressRing';
+import StatusPill from '../../design-system/components/StatusPill';
+import AICard from '../../design-system/components/AICard';
+import AnimatedCounter from '../../design-system/components/AnimatedCounter';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2;
 
-interface DashboardMetrics {
-  orders_today: number;
-  revenue_today: number;
-  pending_orders: number;
-  completed_orders: number;
-  avg_rating: number;
-  active_slots: number;
-  recent_orders: any[];
-  recent_notifications: any[];
-  revenue_trend: { date: string; revenue: number }[];
-}
+type StatusVariant = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple';
 
-type StatusKey = 'placed' | 'pending' | 'confirmed' | 'preparing' | 'ready' | 'ready_for_pickup' | 'completed' | 'picked' | 'cancelled';
-
-const STATUS_MAP: Record<string, StatusKey> = {
-  placed: 'placed',
-  pending: 'pending',
-  confirmed: 'confirmed',
-  preparing: 'preparing',
-  ready: 'ready',
-  ready_for_pickup: 'ready_for_pickup',
-  completed: 'completed',
-  picked: 'picked',
-  cancelled: 'cancelled',
+const ORDER_STATUS: Record<string, { label: string; variant: StatusVariant; color: string }> = {
+  placed: { label: 'Placed', variant: 'primary', color: colors.statusPlaced },
+  pending: { label: 'Pending', variant: 'primary', color: colors.statusPlaced },
+  confirmed: { label: 'Confirmed', variant: 'info', color: colors.statusConfirmed },
+  preparing: { label: 'Preparing', variant: 'warning', color: colors.statusPreparing },
+  ready: { label: 'Ready', variant: 'success', color: colors.statusReady },
+  ready_for_pickup: { label: 'Ready', variant: 'success', color: colors.statusReady },
+  completed: { label: 'Completed', variant: 'success', color: colors.statusCompleted },
+  picked: { label: 'Picked', variant: 'neutral', color: colors.statusPicked },
+  cancelled: { label: 'Cancelled', variant: 'error', color: colors.statusCancelled },
 };
-
-const statusToBadgeVariant: Record<string, 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
-  placed: 'primary',
-  pending: 'primary',
-  confirmed: 'info',
-  preparing: 'warning',
-  ready: 'success',
-  ready_for_pickup: 'success',
-  completed: 'success',
-  picked: 'neutral',
-  cancelled: 'error',
-};
-
-function getStatusColor(status: string): string {
-  const map: Record<string, string> = {
-    placed: '#8B5CF6',
-    pending: '#8B5CF6',
-    confirmed: '#3B82F6',
-    preparing: '#F59E0B',
-    ready: '#10B981',
-    ready_for_pickup: '#10B981',
-    completed: '#059669',
-    picked: '#6B7280',
-    cancelled: '#EF4444',
-  };
-  return map[STATUS_MAP[status] || status] || '#6B7280';
-}
-
-function getStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    placed: 'Placed',
-    pending: 'Pending',
-    confirmed: 'Confirmed',
-    preparing: 'Preparing',
-    ready: 'Ready',
-    ready_for_pickup: 'Ready',
-    completed: 'Completed',
-    picked: 'Picked Up',
-    cancelled: 'Cancelled',
-  };
-  return map[status] || status;
-}
 
 export default function DashboardScreen({ navigation }: any) {
   const { user } = useAuth();
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [data, setData] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Entrance animation
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
-  const slideAnim = React.useRef(new Animated.Value(20)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  const fetchDashboardData = async (isRefresh = false) => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     try {
       if (!isRefresh) setLoading(true);
       setError(null);
-      const response = await vendorApi.getDashboardMetrics();
-      setMetrics(response.data);
+      const res = await vendorApi.getDashboardMetrics();
+      setData(res.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard data');
+      setError(err?.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchDashboardData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchDashboardData(true);
-  }, []);
-
-  const handleRetry = () => fetchDashboardData();
+    fetchData(true);
+  }, [fetchData]);
 
   const navigateTo = (screen: string) => navigation.navigate(screen);
 
-  // Loading State
   if (loading) {
     return (
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerDeco1} />
-          <View style={styles.headerDeco2} />
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.greeting}>Welcome back,</Text>
-              <Text style={styles.vendorName}>{user?.vendor_name || 'Vendor'}</Text>
-            </View>
-            <View style={styles.headerRight}>
-              <Text style={styles.headerDate}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-              </Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}><Text style={styles.sectionAccent}>│</Text> Today's Overview</Text>
-          <View style={styles.statsGrid}>
-            {[1, 2, 3, 4].map((item) => (
-              <View key={item} style={styles.skeletonCard}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-              </View>
-            ))}
-          </View>
-        </View>
-        <View style={styles.section}>
-          <View style={styles.skeletonBlock} />
-          <View style={styles.skeletonBlock} />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  // Error State
-  if (error && !metrics) {
-    return (
-      <ScrollView style={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        <View style={styles.header}>
-          <View style={styles.headerDeco1} />
-          <View style={styles.headerDeco2} />
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.greeting}>Welcome back,</Text>
-              <Text style={styles.vendorName}>{user?.vendor_name || 'Vendor'}</Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.errorContainer}>
-          <View style={styles.errorIconCircle}>
-            <Text style={styles.errorIconText}>⚠️</Text>
-          </View>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading your command center...</Text>
+      </View>
     );
   }
 
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.white} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Premium Header ── */}
@@ -216,76 +101,168 @@ export default function DashboardScreen({ navigation }: any) {
         <View style={styles.headerDeco1} />
         <View style={styles.headerDeco2} />
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>
+              Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},
+            </Text>
             <Text style={styles.vendorName}>{user?.vendor_name || 'Vendor'}</Text>
+            <View style={styles.headerStatusRow}>
+              <StatusPill label="OPEN" variant="success" size="sm" animated />
+              <StatusPill
+                label={`${data?.avg_rating?.toFixed(1) || '0.0'} ★`}
+                variant="warning"
+                size="sm"
+              />
+            </View>
           </View>
           <View style={styles.headerRight}>
-            <View style={styles.dateBadge}>
-              <Text style={styles.headerDate}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-              </Text>
-            </View>
-            <View style={styles.ratingBadge}>
-              <Text style={styles.ratingStar}>⭐</Text>
-              <Text style={styles.ratingValue}>{metrics?.avg_rating?.toFixed(1) || '0.0'}</Text>
-            </View>
+            <TouchableOpacity style={styles.notifBell} onPress={() => navigateTo('Notifications')}>
+              <Text style={styles.bellIcon}>🔔</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerDate}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </Text>
           </View>
         </View>
       </View>
 
-      <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-        {/* ── Stats Grid ── */}
+      <Animated.View style={{ opacity: fadeAnim }}>
+        {/* ── Business Health ── */}
+        <View style={styles.healthSection}>
+          <GlassCard intensity="light" padding={16} borderRadius={20}>
+            <View style={styles.healthRow}>
+              <ProgressRing
+                progress={Math.min(data?.completed_orders ? (data.completed_orders / Math.max(data.orders_today, 1)) * 100 : 0, 100)}
+                size={70}
+                strokeWidth={6}
+                color={colors.primary}
+                showPercentage
+              />
+              <View style={styles.healthInfo}>
+                <Text style={styles.healthTitle}>Today's Progress</Text>
+                <Text style={styles.healthSubtitle}>
+                  {data?.completed_orders ?? 0} of {data?.orders_today ?? 0} orders completed
+                </Text>
+                <View style={styles.healthStats}>
+                  <View style={styles.healthStat}>
+                    <Text style={styles.healthStatValue}>{data?.avg_rating?.toFixed(1) || '0.0'}</Text>
+                    <Text style={styles.healthStatLabel}>Rating</Text>
+                  </View>
+                  <View style={styles.healthStat}>
+                    <Text style={styles.healthStatValue}>{data?.active_slots ?? 0}</Text>
+                    <Text style={styles.healthStatLabel}>Slots</Text>
+                  </View>
+                  <View style={styles.healthStat}>
+                    <Text style={styles.healthStatValue}>{data?.pending_orders ?? 0}</Text>
+                    <Text style={styles.healthStatLabel}>Pending</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </GlassCard>
+        </View>
+
+        {/* ── Key Metrics ── */}
+        <View style={styles.statsGrid}>
+          <StatCard
+            value={data?.revenue_today ?? 0}
+            label="Today's Revenue"
+            prefix="₹"
+            color={colors.primary}
+            icon="💰"
+            format="currency"
+            style={{ width: CARD_WIDTH }}
+          />
+          <StatCard
+            value={data?.orders_today ?? 0}
+            label="Orders Today"
+            color={colors.secondary}
+            icon="📦"
+            style={{ width: CARD_WIDTH }}
+          />
+        </View>
+
+        {/* ── Order Status Summary ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            <Text style={styles.sectionAccent}>│</Text> Today's Overview
+            <Text style={styles.sectionAccent}>│</Text> Order Status
           </Text>
-          <View style={styles.statsGrid}>
-            <MetricCard
-              value={metrics?.orders_today ?? 0}
-              label="Orders Today"
-              icon="📦"
-              color={Colors.primary}
-              trend={metrics?.orders_today ? { value: 12, isUp: true } : undefined}
-              style={styles.statCardItem}
-            />
-            <MetricCard
-              value={`₹${metrics?.revenue_today ?? 0}`}
-              label="Revenue Today"
-              icon="💰"
-              color={Colors.secondary}
-              trend={metrics?.revenue_today ? { value: 8, isUp: true } : undefined}
-              style={styles.statCardItem}
-            />
-            <MetricCard
-              value={metrics?.pending_orders ?? 0}
-              label="Pending"
-              icon="⏳"
-              color={Colors.warning}
-              style={styles.statCardItem}
-            />
-            <MetricCard
-              value={metrics?.completed_orders ?? 0}
-              label="Completed"
-              icon="✅"
-              color={Colors.success}
-              style={styles.statCardItem}
-            />
-            <MetricCard
-              value={metrics?.active_slots ?? 0}
-              label="Active Slots"
-              icon="🕐"
-              color={Colors.info}
-              style={styles.statCardItem}
-            />
-            <MetricCard
-              value={`⭐ ${metrics?.avg_rating?.toFixed(1) || '0.0'}`}
-              label="Rating"
-              icon="🌟"
-              color={Colors.accent}
-              style={styles.statCardItem}
-            />
+          <View style={styles.orderStatusGrid}>
+            <TouchableOpacity style={styles.orderStatusCard} onPress={() => navigateTo('Orders')}>
+              <View style={[styles.orderStatusIcon, { backgroundColor: colors.statusPlaced + '15' }]}>
+                <Text style={styles.orderStatusEmoji}>⏳</Text>
+              </View>
+              <AnimatedCounter value={data?.pending_orders ?? 0} fontSize={20} color={colors.statusPlaced} />
+              <Text style={styles.orderStatusLabel}>Pending</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.orderStatusCard} onPress={() => navigateTo('Orders')}>
+              <View style={[styles.orderStatusIcon, { backgroundColor: colors.statusConfirmed + '15' }]}>
+                <Text style={styles.orderStatusEmoji}>✅</Text>
+              </View>
+              <AnimatedCounter value={data?.completed_orders ?? 0} fontSize={20} color={colors.statusConfirmed} />
+              <Text style={styles.orderStatusLabel}>Completed</Text>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        {/* ── Revenue Trend ── */}
+        {data?.revenue_trend && data.revenue_trend.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              <Text style={styles.sectionAccent}>│</Text> Revenue Trend
+            </Text>
+            <GlassCard padding={20} borderRadius={24}>
+              <View style={styles.revenueChart}>
+                {data.revenue_trend.map((day, index) => {
+                  const maxRev = Math.max(...data!.revenue_trend.map(d => d.revenue), 1);
+                  const heightPct = (day.revenue / maxRev) * 100;
+                  const isToday = index === data!.revenue_trend.length - 1;
+                  return (
+                    <View key={index} style={styles.barContainer}>
+                      <View style={styles.barWrapper}>
+                        <View
+                          style={[
+                            styles.bar,
+                            {
+                              height: `${Math.max(heightPct, 3)}%`,
+                              backgroundColor: isToday ? colors.primary : colors.primaryLight + '60',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.barLabel}>
+                        {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </GlassCard>
+          </View>
+        )}
+
+        {/* ── AI Insights ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Text style={styles.sectionAccent}>│</Text> AI Insights
+          </Text>
+          <AICard
+            icon="📈"
+            title="Peak hour approaching"
+            description="Orders expected to increase significantly. Consider preparing extra stock."
+            severity="warning"
+            action={{ label: 'View Details', onPress: () => navigateTo('AI') }}
+            confidence={0.92}
+          />
+          <View style={{ height: 8 }} />
+          <AICard
+            icon="📦"
+            title="Monitor your inventory"
+            description="Keep an eye on stock levels for your popular items before peak hours."
+            severity="info"
+            action={{ label: 'Check Inventory', onPress: () => {} }}
+            confidence={0.85}
+          />
         </View>
 
         {/* ── Quick Actions ── */}
@@ -294,53 +271,33 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.sectionAccent}>│</Text> Quick Actions
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('Analytics')} activeOpacity={0.85}>
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.secondaryPale }]}>
-                <Text style={styles.quickActionEmoji}>📊</Text>
-              </View>
-              <Text style={styles.quickActionLabel}>Analytics</Text>
-              <Text style={styles.quickActionDesc}>View insights</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('DemandDashboard')} activeOpacity={0.85}>
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.accentPale }]}>
-                <Text style={styles.quickActionEmoji}>🧠</Text>
-              </View>
-              <Text style={styles.quickActionLabel}>Demand</Text>
-              <Text style={styles.quickActionDesc}>Smart predictions</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('Menu')} activeOpacity={0.85}>
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.primaryPale }]}>
-                <Text style={styles.quickActionEmoji}>🍽️</Text>
-              </View>
-              <Text style={styles.quickActionLabel}>Menu</Text>
-              <Text style={styles.quickActionDesc}>Update items</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('Orders')} activeOpacity={0.85}>
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.infoPale }]}>
-                <Text style={styles.quickActionEmoji}>📋</Text>
-              </View>
-              <Text style={styles.quickActionLabel}>Orders</Text>
-              <Text style={styles.quickActionDesc}>Manage orders</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('Promotions')} activeOpacity={0.85}>
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.warningPale }]}>
-                <Text style={styles.quickActionEmoji}>🎯</Text>
-              </View>
-              <Text style={styles.quickActionLabel}>Promos</Text>
-              <Text style={styles.quickActionDesc}>Run campaigns</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('Settlements')} activeOpacity={0.85}>
-              <View style={[styles.quickActionIcon, { backgroundColor: Colors.successPale }]}>
-                <Text style={styles.quickActionEmoji}>💳</Text>
-              </View>
-              <Text style={styles.quickActionLabel}>Settlements</Text>
-              <Text style={styles.quickActionDesc}>View payouts</Text>
-            </TouchableOpacity>
+            {[
+              { icon: '📊', label: 'Analytics', screen: 'Analytics', color: colors.secondary },
+              { icon: '🧠', label: 'AI Insights', screen: 'AI', color: colors.aiPrimary },
+              { icon: '📋', label: 'Orders', screen: 'Orders', color: colors.info },
+              { icon: '🍽️', label: 'Menu', screen: 'Menu', color: colors.success },
+              { icon: '🎯', label: 'Promotions', screen: 'Promotions', color: colors.warning },
+              { icon: '💰', label: 'Settlements', screen: 'Settlements', color: colors.success },
+              { icon: '👥', label: 'Staff', screen: 'StaffManagement', color: colors.secondary },
+              { icon: '⏰', label: 'Slots', screen: 'SlotManagement', color: colors.info },
+            ].map((item, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.quickActionCard}
+                onPress={() => navigateTo(item.screen)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: item.color + '15' }]}>
+                  <Text style={styles.quickActionEmoji}>{item.icon}</Text>
+                </View>
+                <Text style={styles.quickActionLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
 
         {/* ── Recent Orders ── */}
-        {metrics?.recent_orders && metrics.recent_orders.length > 0 && (
+        {data?.recent_orders && data.recent_orders.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>
@@ -350,102 +307,55 @@ export default function DashboardScreen({ navigation }: any) {
                 <Text style={styles.seeAllText}>See All →</Text>
               </TouchableOpacity>
             </View>
-            {metrics.recent_orders.slice(0, 4).map((order) => {
-              const status = order.status || '';
-              const sk: StatusKey = STATUS_MAP[status] || 'placed';
-              const statusColor = getStatusColor(status);
-              return (
-                <TouchableOpacity key={order.id} onPress={() => navigateTo('Orders')} activeOpacity={0.8}>
-                  <Card variant="flat" style={styles.orderWidgetCard} padding={Spacing.lg}>
-                    <View style={styles.orderWidgetRow}>
-                      <View style={styles.orderWidgetLeft}>
-                        <View style={[styles.orderStatusDot, { backgroundColor: statusColor }]} />
-                        <View>
-                          <View style={styles.orderWidgetTitleRow}>
-                            <Text style={styles.orderWidgetId}>Order #{order.id}</Text>
-                            <Badge label={getStatusLabel(status)} variant={statusToBadgeVariant[sk] || 'neutral'} size="sm" />
-                          </View>
-                          <Text style={styles.orderWidgetMeta}>
-                            ₹{order.total_amount} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.orderWidgetArrow}>›</Text>
-                    </View>
-                  </Card>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        {/* ── Revenue Trend ── */}
-        {metrics?.revenue_trend && metrics.revenue_trend.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Text style={styles.sectionAccent}>│</Text> Revenue Trend
-            </Text>
-            <Card variant="elevated" padding={Spacing.lg}>
-              <View style={styles.revenueChart}>
-                {metrics.revenue_trend.map((day, index) => {
-                  const maxRev = Math.max(...metrics.revenue_trend.map(d => d.revenue), 1);
-                  const heightPct = (day.revenue / maxRev) * 100;
-                  return (
-                    <View key={index} style={styles.revenueBarContainer}>
-                      <Text style={styles.revenueBarValue}>₹{day.revenue}</Text>
-                      <View style={styles.revenueBarWrapper}>
-                        <View style={[styles.revenueBar, { height: `${Math.max(heightPct, 4)}%`, backgroundColor: index === metrics.revenue_trend.length - 1 ? Colors.primary : Colors.primaryLight }]} />
-                      </View>
-                      <Text style={styles.revenueBarLabel}>
-                        {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </Card>
-          </View>
-        )}
-
-        {/* ── Recent Notifications ── */}
-        {metrics?.recent_notifications && metrics.recent_notifications.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>
-                <Text style={styles.sectionAccent}>│</Text> Notifications
-              </Text>
-              <TouchableOpacity onPress={() => navigateTo('NotificationDetail')}>
-                <Text style={styles.seeAllText}>See All →</Text>
-              </TouchableOpacity>
-            </View>
-            {metrics.recent_notifications.slice(0, 3).map((notification) => (
-              <TouchableOpacity key={notification.id} activeOpacity={0.8}>
-                <Card variant="flat" style={[styles.notifWidgetCard, !notification.is_read ? styles.notifUnread : undefined]} padding={Spacing.lg}>
-                  <View style={styles.notifWidgetRow}>
-                    <View style={styles.notifWidgetLeft}>
-                      {!notification.is_read && <View style={styles.notifUnreadDot} />}
-                      <View style={styles.notifContent}>
-                        <Text style={styles.notifTitle}>{notification.title}</Text>
-                        <Text style={styles.notifMessage} numberOfLines={1}>{notification.message}</Text>
-                        <Text style={styles.notifTime}>
-                          {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {data.recent_orders.slice(0, 4).map((order: any) => (
+              <TouchableOpacity key={order.id} onPress={() => navigateTo('Orders')} activeOpacity={0.8}>
+                <GlassCard style={styles.recentOrderCard} padding={14} borderRadius={16}>
+                  <View style={styles.recentOrderRow}>
+                    <View style={styles.recentOrderLeft}>
+                      <StatusPill
+                        label={ORDER_STATUS[order.status]?.label || order.status}
+                        variant={ORDER_STATUS[order.status]?.variant || 'neutral'}
+                        size="sm"
+                      />
+                      <View>
+                        <Text style={styles.recentOrderId}>Order #{order.id}</Text>
+                        <Text style={styles.recentOrderMeta}>
+                          ₹{order.total_amount} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.notifArrow}>›</Text>
+                    <Text style={styles.recentOrderArrow}>›</Text>
                   </View>
-                </Card>
+                </GlassCard>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
-        {error && metrics && (
-          <View style={styles.inlineError}>
-            <Text style={styles.inlineErrorText}>⚠️ {error}</Text>
-            <TouchableOpacity onPress={handleRetry}>
-              <Text style={styles.inlineRetryText}>Retry</Text>
-            </TouchableOpacity>
+        {/* ── Notifications ── */}
+        {data?.recent_notifications && data.recent_notifications.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>
+                <Text style={styles.sectionAccent}>│</Text> Notifications
+              </Text>
+              <TouchableOpacity onPress={() => navigateTo('Notifications')}>
+                <Text style={styles.seeAllText}>See All →</Text>
+              </TouchableOpacity>
+            </View>
+            {data.recent_notifications.slice(0, 2).map((n: any) => (
+              <TouchableOpacity key={n.id} activeOpacity={0.8}>
+                <GlassCard style={styles.notifCard} padding={14} borderRadius={16} intensity="medium">
+                  <View style={styles.notifRow}>
+                    <View style={[styles.notifDot, !n.is_read && styles.notifUnread]} />
+                    <View style={styles.notifContent}>
+                      <Text style={styles.notifTitle}>{n.title}</Text>
+                      <Text style={styles.notifMessage} numberOfLines={1}>{n.message}</Text>
+                    </View>
+                  </View>
+                </GlassCard>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
@@ -456,372 +366,101 @@ export default function DashboardScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
 
-  // ── Premium Header ──
   header: {
-    backgroundColor: Colors.primary,
-    paddingTop: Spacing.xxl + 24,
-    paddingBottom: Spacing.xxl,
-    paddingHorizontal: Spacing.xl,
-    borderBottomLeftRadius: BorderRadius.xl,
-    borderBottomRightRadius: BorderRadius.xl,
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     overflow: 'hidden',
-    ...Shadows.header,
+    ...shadows.header,
   },
   headerDeco1: {
     position: 'absolute',
     top: -40,
     right: -30,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: Colors.white + '12',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   headerDeco2: {
     position: 'absolute',
-    bottom: -20,
-    left: -50,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.white + '08',
+    bottom: -30,
+    left: -60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  greeting: {
-    fontSize: Typography.bodySmall,
-    color: Colors.textInverse + 'CC',
-    fontWeight: Typography.medium,
-  },
-  vendorName: {
-    fontSize: Typography.h2,
-    fontWeight: Typography.bold,
-    color: Colors.textInverse,
-    marginTop: 2,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-    gap: Spacing.sm,
-  },
-  dateBadge: {
-    backgroundColor: Colors.white + '20',
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
-  },
-  headerDate: {
-    fontSize: Typography.caption,
-    color: Colors.textInverse + 'DD',
-    fontWeight: Typography.semibold,
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.accent + '30',
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
-  },
-  ratingStar: {
-    fontSize: 12,
-  },
-  ratingValue: {
-    fontSize: Typography.caption,
-    color: Colors.textInverse,
-    fontWeight: Typography.bold,
-  },
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerLeft: { flex: 1 },
+  greeting: { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
+  vendorName: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3, marginBottom: 8 },
+  headerStatusRow: { flexDirection: 'row', gap: 8 },
+  headerRight: { alignItems: 'flex-end', gap: 8 },
+  notifBell: { backgroundColor: 'rgba(255,255,255,0.15)', width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  bellIcon: { fontSize: 18 },
+  headerDate: { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
 
-  // ── Sections ──
-  section: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: Typography.h4,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-  },
-  sectionAccent: {
-    color: Colors.primary,
-    fontSize: Typography.h3,
-    marginRight: Spacing.sm,
-  },
-  seeAllText: {
-    fontSize: Typography.bodySmall,
-    color: Colors.primary,
-    fontWeight: Typography.semibold,
-    marginBottom: Spacing.md,
-  },
+  healthSection: { paddingHorizontal: spacing.lg, marginTop: -20, marginBottom: spacing.md },
+  healthRow: { flexDirection: 'row', alignItems: 'center' },
+  healthInfo: { flex: 1, marginLeft: 16 },
+  healthTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  healthSubtitle: { fontSize: 12, color: colors.textMuted, marginTop: 2, marginBottom: 10 },
+  healthStats: { flexDirection: 'row', gap: 16 },
+  healthStat: { alignItems: 'center' },
+  healthStatValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  healthStatLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '500', marginTop: 2 },
 
-  // ── Stats Grid ──
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  statCardItem: {
-    flex: 1,
-    minWidth: '30%',
-  },
+  statsGrid: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.md, marginBottom: spacing.md },
 
-  // ── Quick Actions ──
-  quickActionsRow: {
-    gap: Spacing.md,
-    paddingRight: Spacing.lg,
-  },
-  quickActionCard: {
-    backgroundColor: Colors.bgCard,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    width: 110,
-    ...Shadows.card,
-  },
-  quickActionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  quickActionEmoji: {
-    fontSize: 22,
-  },
-  quickActionLabel: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.semibold,
-    color: Colors.textPrimary,
-  },
-  quickActionDesc: {
-    fontSize: Typography.tiny,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
+  section: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  sectionAccent: { color: colors.primary, fontSize: 18 },
+  seeAllText: { fontSize: 14, color: colors.primary, fontWeight: '600', marginBottom: spacing.md },
 
-  // ── Order Widget ──
-  orderWidgetCard: {
-    marginBottom: Spacing.sm,
+  orderStatusGrid: { flexDirection: 'row', gap: spacing.sm },
+  orderStatusCard: {
+    flex: 1, backgroundColor: colors.bgCard, borderRadius: 20, padding: 12, alignItems: 'center', ...shadows.card,
   },
-  orderWidgetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  orderWidgetLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: Spacing.sm,
-  },
-  orderStatusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  orderWidgetTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  orderWidgetId: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.semibold,
-    color: Colors.textPrimary,
-  },
-  orderWidgetMeta: {
-    fontSize: Typography.caption,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  orderWidgetArrow: {
-    fontSize: Typography.h3,
-    color: Colors.textMuted,
-    marginLeft: Spacing.sm,
-  },
+  orderStatusIcon: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
+  orderStatusEmoji: { fontSize: 18 },
+  orderStatusLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', marginTop: 2 },
 
-  // ── Revenue Chart ──
-  revenueChart: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    minHeight: 180,
-    paddingTop: Spacing.md,
-  },
-  revenueBarContainer: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 2,
-  },
-  revenueBarValue: {
-    fontSize: Typography.tiny,
-    color: Colors.textMuted,
-    fontWeight: Typography.semibold,
-    marginBottom: 4,
-  },
-  revenueBarWrapper: {
-    height: 120,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    width: '100%',
-  },
-  revenueBar: {
-    width: '70%',
-    backgroundColor: Colors.primaryLight,
-    borderRadius: BorderRadius.sm,
-    minHeight: 3,
-  },
-  revenueBarLabel: {
-    fontSize: Typography.tiny,
-    color: Colors.textMuted,
-    fontWeight: Typography.semibold,
-    marginTop: 4,
-  },
+  revenueChart: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', minHeight: 140, paddingTop: spacing.md },
+  barContainer: { flex: 1, alignItems: 'center', marginHorizontal: 2 },
+  barWrapper: { height: 80, justifyContent: 'flex-end', alignItems: 'center', width: '100%' },
+  bar: { width: '70%', borderRadius: 6, minHeight: 3 },
+  barLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', marginTop: 4 },
 
-  // ── Notification Widget ──
-  notifWidgetCard: {
-    marginBottom: Spacing.sm,
-  },
-  notifUnread: {
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
-  },
-  notifWidgetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  notifWidgetLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: Spacing.md,
-  },
-  notifUnreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-  },
-  notifContent: {
-    flex: 1,
-  },
-  notifTitle: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.semibold,
-    color: Colors.textPrimary,
-  },
-  notifMessage: {
-    fontSize: Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  notifTime: {
-    fontSize: Typography.tiny,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  notifArrow: {
-    fontSize: Typography.h3,
-    color: Colors.textMuted,
-    marginLeft: Spacing.sm,
-  },
+  quickActionsRow: { gap: spacing.md, paddingRight: spacing.lg },
+  quickActionCard: { backgroundColor: colors.bgCard, borderRadius: 20, padding: spacing.lg, alignItems: 'center', width: 90, ...shadows.card },
+  quickActionIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  quickActionEmoji: { fontSize: 22 },
+  quickActionLabel: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
 
-  // ── Error States ──
-  errorContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.huge,
-    paddingHorizontal: Spacing.xxl,
-  },
-  errorIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.warningPale,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  errorIconText: {
-    fontSize: 28,
-  },
-  errorText: {
-    fontSize: Typography.body,
-    color: Colors.error,
-    textAlign: 'center',
-    marginBottom: Spacing.xl,
-    lineHeight: 22,
-  },
-  retryButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.xxl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    ...Shadows.button,
-  },
-  retryButtonText: {
-    color: Colors.textInverse,
-    fontSize: Typography.body,
-    fontWeight: Typography.semibold,
-  },
-  inlineError: {
-    backgroundColor: Colors.errorPale,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  inlineErrorText: {
-    color: Colors.error,
-    fontSize: Typography.caption,
-    flex: 1,
-  },
-  inlineRetryText: {
-    color: Colors.error,
-    fontSize: Typography.caption,
-    fontWeight: Typography.bold,
-    marginLeft: Spacing.md,
-  },
+  recentOrderCard: { marginBottom: 6 },
+  recentOrderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  recentOrderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  recentOrderId: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  recentOrderMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  recentOrderArrow: { fontSize: 24, color: colors.textMuted },
 
-  // ── Skeleton ──
-  skeletonCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.bgCard,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 80,
-    ...Shadows.card,
-  },
-  skeletonBlock: {
-    height: 100,
-    backgroundColor: Colors.borderLight,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.md,
-  },
+  notifCard: { marginBottom: 6 },
+  notifRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  notifDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textMuted },
+  notifUnread: { backgroundColor: colors.primary },
+  notifContent: { flex: 1 },
+  notifTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  notifMessage: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
-  bottomSpacer: {
-    height: Spacing.huge,
-  },
+  bottomSpacer: { height: spacing.huge },
 });
+

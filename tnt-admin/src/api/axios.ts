@@ -2,7 +2,7 @@ import axios from 'axios';
 import { AUTH_STORAGE_KEY, useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 let redirectingToLogin = false;
 
 const api = axios.create({

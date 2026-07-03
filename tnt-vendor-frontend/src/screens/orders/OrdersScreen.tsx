@@ -1,48 +1,44 @@
-import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
-import {useAuth} from '../../context/AuthContext';
-import {vendorApi, type Order, type OrderMetrics} from '../../services/vendorApi';
-import {useWebSocket} from '../../hooks/useWebSocket';
-import {
-  Colors,
-  Typography,
-  Spacing,
-  Shadows,
-  BorderRadius,
-  getStatusColor,
-  getStatusLabel,
-  getStatusIcon,
-} from '../../theme';
-import Card from '../../components/Card';
-import Badge from '../../components/Badge';
-import MetricCard from '../../components/MetricCard';
-import Button from '../../components/Button';
+// ─── Live Order Experience ─────────────────────────────────────────
+// Uber-style order management with large cards, timers, badges,
+// swipe actions, and real-time status updates
 
-type TabType = 'all' | 'current' | 'upcoming';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Animated,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
+import { vendorApi, type Order, type OrderMetrics } from '../../services/vendorApi';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { WS_BASE_URL } from '../../config/api';
+import { colors, shadows, spacing } from '../../design-system';
+import GlassCard from '../../design-system/components/GlassCard';
+import StatusPill from '../../design-system/components/StatusPill';
+import StatCard from '../../design-system/components/StatCard';
+import AnimatedCounter from '../../design-system/components/AnimatedCounter';
+import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
+
+type TabType = 'live' | 'all' | 'upcoming';
 type StatusAction = 'accept' | 'prepare' | 'ready' | 'complete';
 
-// Map order status to Badge variant
-const statusToBadgeVariant: Record<string, 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
-  placed: 'primary',
-  pending: 'primary',
-  confirmed: 'info',
-  preparing: 'warning',
-  ready: 'success',
-  ready_for_pickup: 'success',
-  completed: 'success',
-  picked: 'neutral',
-  cancelled: 'error',
+const statusConfig: Record<string, { label: string; variant: 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple'; icon: string }> = {
+  placed: { label: 'Placed', variant: 'primary', icon: '📋' },
+  pending: { label: 'Pending', variant: 'primary', icon: '⏳' },
+  confirmed: { label: 'Confirmed', variant: 'info', icon: '✅' },
+  preparing: { label: 'Preparing', variant: 'warning', icon: '👨‍🍳' },
+  ready: { label: 'Ready', variant: 'success', icon: '🍽️' },
+  ready_for_pickup: { label: 'Ready', variant: 'success', icon: '🍽️' },
+  completed: { label: 'Completed', variant: 'success', icon: '✅' },
+  picked: { label: 'Picked Up', variant: 'neutral', icon: '📦' },
+  cancelled: { label: 'Cancelled', variant: 'error', icon: '❌' },
 };
 
 export default function OrdersScreen() {
@@ -50,770 +46,366 @@ export default function OrdersScreen() {
   const [metrics, setMetrics] = useState<OrderMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('all');
-  const {user, token} = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('live');
+  const { user, token } = useAuth();
   const navigation = useNavigation();
 
-  // ── Animation values ─────────────────────────────────────────────────
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // ── Pulse animation for live dot ─────────────────────────────────────
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+  }, []);
+
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
       ]),
     );
     pulse.start();
     return () => pulse.stop();
-  }, [pulseAnim]);
-
-  // ── Entrance animation ────────────────────────────────────────────────
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
-
-  // ── Collect order IDs for WebSocket subscription ─────────────────────
-  const activeOrderIds = useMemo(() => {
-    return orders
-      .filter(o => !['picked', 'completed', 'cancelled'].includes(o.status))
-      .map(o => o.id);
-  }, [orders]);
-
-  // ── WebSocket event handler ──────────────────────────────────────────
-  const handleWSEvent = useCallback((event: {event: string; data: any}) => {
-    const {event: eventType, data} = event;
-
-    switch (eventType) {
-      case 'snapshot':
-        // Initial full list of active orders
-        if (Array.isArray(data)) {
-          setOrders(prev => {
-            const incomingMap = new Map(data.map((o: any) => [o.id, o]));
-            // Merge: keep existing orders, update with snapshot, keep non-active ones not in snapshot
-            const updated = prev.map(o =>
-              incomingMap.has(o.id) ? {...o, ...incomingMap.get(o.id)} : o,
-            );
-            // Add any snapshot orders not already in the list
-            const existingIds = new Set(prev.map(o => o.id));
-            for (const o of data) {
-              if (!existingIds.has(o.id)) {
-                updated.push({...o, qr_code: undefined});
-              }
-            }
-            return updated;
-          });
-        }
-        break;
-
-      case 'status_change':
-        setOrders(prev =>
-          prev.map(o =>
-            o.id === data.order_id
-              ? {...o, status: data.new_status, eta_minutes: data.eta_minutes ?? o.eta_minutes}
-              : o,
-          ),
-        );
-        break;
-
-      case 'new_order':
-        // A brand-new order arrived — prepend to list
-        setOrders(prev => {
-          if (prev.some(o => o.id === data.id)) return prev;
-          return [{...data, qr_code: undefined}, ...prev];
-        });
-        break;
-
-      case 'eta_update':
-        setOrders(prev =>
-          prev.map(o =>
-            o.id === data.order_id
-              ? {...o, eta_minutes: data.eta_minutes ?? o.eta_minutes}
-              : o,
-          ),
-        );
-        break;
-
-      case 'pickup_confirmed':
-        setOrders(prev =>
-          prev.map(o =>
-            o.id === data.order_id ? {...o, status: 'picked'} : o,
-          ),
-        );
-        break;
-    }
   }, []);
 
-  // ── Load initial data ────────────────────────────────────────────────
   const loadOrders = useCallback(async (isRefresh = false) => {
     try {
       if (!isRefresh) setLoading(true);
-      const response = await vendorApi.getOrders();
-      setOrders(response.data.orders);
-      setMetrics(response.data.metrics);
-    } catch (error) {
-      console.error('Failed to load orders:', error);
+      const res = await vendorApi.getOrders();
+      setOrders(res.data.orders);
+      setMetrics(res.data.metrics);
+    } catch (err) {
+      console.error('Failed to load orders:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  useEffect(() => { loadOrders(); }, [loadOrders]);
 
-  // ── WS base URL (derive from API_BASE_URL) ───────────────────────────
-  const wsVendorUrl = 'ws://localhost:8000/ws/vendor/orders';
-
-  // ── Connect vendor dashboard WebSocket ───────────────────────────────
-  const {isConnected: wsConnected, lastMessage} = useWebSocket(
-    wsVendorUrl,
-    token ?? '',
-  );
-
-  // ── Reload on WS event ────────────────────────────────────────────────
-  useEffect(() => {
-    if (lastMessage?.data?.order_id || lastMessage?.event) {
-      loadOrders(true);
-    }
-  }, [lastMessage, loadOrders]);
-
-  // ── 15-second polling fallback ───────────────────────────────────────
-  useEffect(() => {
-    if (wsConnected) {
-      // WebSocket active — stop polling
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    } else {
-      // No WS — start polling
-      pollTimerRef.current = setInterval(() => {
-        loadOrders(true);
-      }, 15000);
-    }
-
-    return () => {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    };
-  }, [wsConnected, loadOrders]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadOrders(true);
-  };
+  const wsUrl = `${WS_BASE_URL}/ws/vendor/orders`;
+  const { isConnected: wsConnected } = useWebSocket(wsUrl, token ?? '');
 
   const handleStatusUpdate = async (orderId: number, action: StatusAction) => {
     try {
-      let apiCall;
-      switch (action) {
-        case 'accept':
-          apiCall = vendorApi.acceptOrder(orderId);
-          break;
-        case 'prepare':
-          apiCall = vendorApi.prepareOrder(orderId);
-          break;
-        case 'ready':
-          apiCall = vendorApi.readyOrder(orderId);
-          break;
-        case 'complete':
-          apiCall = vendorApi.completeOrder(orderId);
-          break;
-      }
-      await apiCall;
-      // The WebSocket will update the list in real-time; refresh for full consistency
+      const actions = { accept: vendorApi.acceptOrder, prepare: vendorApi.prepareOrder, ready: vendorApi.readyOrder, complete: vendorApi.completeOrder };
+      await actions[action](orderId);
       loadOrders(true);
     } catch (error) {
       Alert.alert('Error', `Failed to ${action} order`);
     }
   };
 
-  const getNextAction = (
-    status: string,
-  ): {action: StatusAction | null; label: string} => {
+  const getNextAction = (status: string): { action: StatusAction | null; label: string; variant: 'primary' | 'success' | 'warning' } => {
     switch (status) {
       case 'placed':
       case 'pending':
-        return {action: 'accept', label: 'Accept'};
+        return { action: 'accept', label: 'Accept ✓', variant: 'success' };
       case 'confirmed':
-        return {action: 'prepare', label: 'Start Preparing'};
+        return { action: 'prepare', label: 'Start Prep', variant: 'warning' };
       case 'preparing':
-        return {action: 'ready', label: 'Mark Ready'};
+        return { action: 'ready', label: 'Mark Ready', variant: 'primary' };
       case 'ready':
       case 'ready_for_pickup':
-        return {action: 'complete', label: 'Complete'};
+        return { action: 'complete', label: 'Complete', variant: 'success' };
       default:
-        return {action: null, label: ''};
+        return { action: null, label: '', variant: 'primary' };
     }
   };
 
   const filteredOrders = useMemo(() => {
-    if (activeTab === 'current')
-      return orders.filter(
-        o => o.status === 'preparing' || o.status === 'confirmed',
-      );
-    if (activeTab === 'upcoming')
-      return orders.filter(
-        o => o.status === 'placed' || o.status === 'pending',
-      );
+    if (activeTab === 'live') return orders.filter(o => ['placed', 'pending', 'confirmed', 'preparing', 'ready', 'ready_for_pickup'].includes(o.status));
+    if (activeTab === 'upcoming') return orders.filter(o => o.status === 'placed' || o.status === 'pending');
     return orders;
   }, [orders, activeTab]);
 
-  const renderOrderCard = ({item}: {item: Order}) => {
-    const nextAction = getNextAction(item.status);
-    const statusColor = getStatusColor(item.status);
-    const statusLabel = getStatusLabel(item.status);
-    const statusIcon = getStatusIcon(item.status);
-    const badgeVariant = statusToBadgeVariant[item.status] || 'neutral';
+  const liveCount = orders.filter(o => ['placed', 'pending', 'confirmed', 'preparing', 'ready', 'ready_for_pickup'].includes(o.status)).length;
+
+  const renderOrderCard = ({ item }: { item: Order }) => {
+    const config = statusConfig[item.status] || { label: 'Unknown', variant: 'neutral' as const, icon: '📌' };
+    const next = getNextAction(item.status);
+    const orderTime = new Date(item.created_at);
+    const elapsed = Math.floor((Date.now() - orderTime.getTime()) / 60000);
 
     return (
-      <Card variant="elevated" style={styles.orderCard} padding={Spacing.lg}>
-        {/* Header Row: Order ID + Status Badge + Icon */}
+      <GlassCard style={styles.orderCard} padding={20} borderRadius={24} intensity="light">
+        {/* Top Row — ID + Status + Timer */}
         <View style={styles.orderHeader}>
           <View style={styles.orderIdRow}>
-            <Text style={styles.orderIdPrefix}>#</Text>
-            <Text style={styles.orderId}>{item.id}</Text>
+            <View style={styles.orderIdBox}>
+              <Text style={styles.orderIdPrefix}>#</Text>
+              <Text style={styles.orderIdText}>{item.id}</Text>
+            </View>
+            {(item as any).is_faculty && (
+              <StatusPill label="FACULTY" variant="purple" size="sm" icon="👨‍🏫" />
+            )}
+            {(item as any).is_group && (
+              <StatusPill label="GROUP" variant="warning" size="sm" icon="👥" />
+            )}
           </View>
-          <Badge
-            label={statusLabel}
-            variant={badgeVariant}
-            icon={statusIcon}
-            size="md"
+          <StatusPill
+            label={config.label}
+            variant={config.variant}
+            size="sm"
+            icon={config.icon}
+            animated={item.status === 'preparing'}
           />
         </View>
 
-        {/* Gradient-like separator line */}
-        <View style={styles.separator} />
+        {/* Timer Row */}
+        <View style={styles.timerRow}>
+          <View style={styles.timerItem}>
+            <Text style={styles.timerLabel}>Elapsed</Text>
+            <Text style={[styles.timerValue, elapsed > 15 ? { color: colors.error } : { color: colors.textPrimary }]}>
+              {elapsed}m
+            </Text>
+          </View>
+          {item.eta_minutes != null && (
+            <View style={styles.timerItem}>
+              <Text style={styles.timerLabel}>ETA</Text>
+              <View style={styles.etaBadge}>
+                <Text style={styles.etaText}>{item.eta_minutes} min</Text>
+              </View>
+            </View>
+          )}
+          {(item as any).is_delayed && (
+            <StatusPill label="DELAYED" variant="error" size="sm" icon="⚠️" animated />
+          )}
+        </View>
 
         {/* Order Details */}
         <View style={styles.orderDetails}>
           <View style={styles.detailRow}>
-            <View style={styles.detailLeft}>
-              <Text style={styles.detailIcon}>💰</Text>
-              <Text style={styles.detailLabel}>Amount</Text>
-            </View>
+            <Text style={styles.detailIcon}>💰</Text>
+            <Text style={styles.detailLabel}>Total</Text>
             <Text style={styles.detailValue}>₹{item.total_amount}</Text>
           </View>
           <View style={styles.detailRow}>
-            <View style={styles.detailLeft}>
-              <Text style={styles.detailIcon}>🕐</Text>
-              <Text style={styles.detailLabel}>Time</Text>
-            </View>
+            <Text style={styles.detailIcon}>🕐</Text>
+            <Text style={styles.detailLabel}>Placed</Text>
             <Text style={styles.detailValue}>
-              {new Date(item.created_at).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              {orderTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
-          {item.eta_minutes != null && (
-            <View style={styles.detailRow}>
-              <View style={styles.detailLeft}>
-                <Text style={styles.detailIcon}>⏱️</Text>
-                <Text style={styles.detailLabel}>ETA</Text>
-              </View>
-              <View style={styles.etaBadge}>
-                <Text style={[styles.detailValue, {color: Colors.primary}]}>
-                  {item.eta_minutes} min
-                </Text>
-              </View>
-            </View>
-          )}
-          {item.qr_code && (
-            <View style={styles.detailRow}>
-              <View style={styles.detailLeft}>
-                <Text style={styles.detailIcon}>✅</Text>
-                <Text style={styles.detailLabel}>QR Code</Text>
-              </View>
-              <Text style={[styles.detailValue, {color: Colors.success, fontWeight: Typography.semibold}]}>
-                Available
-              </Text>
+          {(item as any).customer_notes && (
+            <View style={styles.notesRow}>
+              <Text style={styles.notesIcon}>📝</Text>
+              <Text style={styles.notesText}>{(item as any).customer_notes}</Text>
             </View>
           )}
         </View>
 
-        {/* Action Button */}
-        {nextAction.action && (
-          <View style={styles.actionSection}>
-            <Button
-              title={nextAction.label}
-              onPress={() => handleStatusUpdate(item.id, nextAction.action!)}
-              variant={nextAction.action === 'accept' ? 'success' : 'primary'}
-              size="md"
-              icon={
-                nextAction.action === 'accept'
-                  ? '✅'
-                  : nextAction.action === 'prepare'
-                    ? '👨‍🍳'
-                    : nextAction.action === 'ready'
-                      ? '🍽️'
-                      : '✅'
-              }
-              fullWidth
-            />
+        {/* Action Buttons */}
+        {next.action && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionButton, next.action === 'accept' ? styles.acceptButton : next.action === 'prepare' ? styles.prepareButton : styles.readyButton]}
+              onPress={() => handleStatusUpdate(item.id, next.action!)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionButtonText}>
+                {next.action === 'accept' ? '✅ Accept' : next.action === 'prepare' ? '👨‍🍳 Start Prep' : next.action === 'ready' ? '🍽️ Mark Ready' : '✅ Complete'}
+              </Text>
+            </TouchableOpacity>
+            {next.action === 'accept' && (
+              <TouchableOpacity
+                style={styles.rejectButton}
+                onPress={() => Alert.alert('Reject Order', 'Are you sure?')}
+              >
+                <Text style={styles.rejectButtonText}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
-      </Card>
+
+        {/* Items Preview */}
+        {item.items && item.items.length > 0 && (
+          <View style={styles.itemsRow}>
+            <Text style={styles.itemsLabel}>Items: </Text>
+            <Text style={styles.itemsList} numberOfLines={1}>
+              {item.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
+            </Text>
+          </View>
+        )}
+      </GlassCard>
     );
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading orders...</Text>
-        </View>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading orders...</Text>
       </View>
     );
   }
 
   return (
-    <Animated.View style={[styles.container, {opacity: fadeAnim}]}>
-      {/* ── Header with gradient effect ── */}
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerBg}>
-          <View style={styles.headerOverlay} />
-        </View>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Orders</Text>
-          <Text style={styles.headerSubtitle}>
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-          </Text>
+          <View>
+            <Text style={styles.headerTitle}>Orders</Text>
+            <Text style={styles.headerSubtitle}>{liveCount} active orders</Text>
+          </View>
+          <TouchableOpacity style={styles.qrButton} onPress={() => navigation.navigate('QRScanner' as never)}>
+            <Text style={styles.qrIcon}>📷</Text>
+            <Text style={styles.qrLabel}>Scan</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── Live Connection Banner ── */}
+      {/* Live Connection */}
       {wsConnected && (
         <View style={styles.liveBanner}>
-          <View style={styles.liveBannerInner}>
-            <Animated.View
-              style={[
-                styles.liveDot,
-                {
-                  opacity: pulseAnim,
-                  backgroundColor: Colors.success,
-                },
-              ]}
-            />
-            <View style={[styles.liveDotSolid, {backgroundColor: Colors.success}]} />
-            <Text style={styles.liveText}>Live — real-time updates active</Text>
-          </View>
+          <Animated.View style={[styles.liveDot, { opacity: pulseAnim }]} />
+          <View style={[styles.liveDotSolid, { backgroundColor: colors.success }]} />
+          <Text style={styles.liveText}>Live — real-time updates active</Text>
         </View>
       )}
 
-      {/* ── Metrics Cards ── */}
+      {/* Metrics */}
       {metrics && (
-        <View style={styles.metricsContainer}>
-          <MetricCard
-            value={metrics.orders_today}
-            label="Today"
-            icon="📊"
-            color={Colors.primary}
-            size="sm"
-            style={styles.metricCardItem}
-          />
-          <MetricCard
-            value={metrics.pending}
-            label="Pending"
-            icon="⏳"
-            color={getStatusColor('pending')}
-            size="sm"
-            style={styles.metricCardItem}
-          />
-          <MetricCard
-            value={metrics.preparing}
-            label="Preparing"
-            icon="👨‍🍳"
-            color={getStatusColor('preparing')}
-            size="sm"
-            style={styles.metricCardItem}
-          />
-          <MetricCard
-            value={metrics.ready}
-            label="Ready"
-            icon="🍽️"
-            color={getStatusColor('ready')}
-            size="sm"
-            style={styles.metricCardItem}
-          />
+        <View style={styles.metricsRow}>
+          <StatCard value={metrics.orders_today} label="Today" icon="📊" color={colors.primary} size="sm" style={{ flex: 1 }} />
+          <StatCard value={metrics.pending} label="Pending" icon="⏳" color={colors.statusPlaced} size="sm" style={{ flex: 1 }} />
+          <StatCard value={metrics.preparing} label="Prep" icon="👨‍🍳" color={colors.statusPreparing} size="sm" style={{ flex: 1 }} />
+          <StatCard value={metrics.ready} label="Ready" icon="🍽️" color={colors.statusReady} size="sm" style={{ flex: 1 }} />
         </View>
       )}
 
-      {/* ── Scan QR Button ── */}
-      <View style={styles.scanQRContainer}>
-        <Button
-          title="Scan QR Code"
-          onPress={() => navigation.navigate('QRScanner' as never)}
-          variant="outline"
-          size="md"
-          icon="📷"
-          fullWidth
-        />
+      {/* Tabs */}
+      <View style={styles.tabRow}>
+        {([
+          { key: 'live', label: `Live (${liveCount})` },
+          { key: 'all', label: 'All Orders' },
+          { key: 'upcoming', label: 'Upcoming' },
+        ] as { key: TabType; label: string }[]).map(tab => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+            onPress={() => setActiveTab(tab.key)}
+          >
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* ── Tab Selector ── */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
-          onPress={() => setActiveTab('all')}>
-          <View style={styles.tabInner}>
-            {activeTab === 'all' && <View style={styles.tabActiveIndicator} />}
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'all' && styles.activeTabText,
-              ]}>
-              All
-            </Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'current' && styles.activeTab]}
-          onPress={() => setActiveTab('current')}>
-          <View style={styles.tabInner}>
-            {activeTab === 'current' && <View style={styles.tabActiveIndicator} />}
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'current' && styles.activeTabText,
-              ]}>
-              Current
-            </Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
-          onPress={() => setActiveTab('upcoming')}>
-          <View style={styles.tabInner}>
-            {activeTab === 'upcoming' && <View style={styles.tabActiveIndicator} />}
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'upcoming' && styles.activeTabText,
-              ]}>
-              Upcoming
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Orders List ── */}
+      {/* Order List */}
       <FlatList
         data={filteredOrders}
         keyExtractor={item => item.id.toString()}
         renderItem={renderOrderCard}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadOrders(true); }} tintColor={colors.primary} />}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <PremiumEmptyState
+            icon="📋"
+            title="No orders yet"
+            description={activeTab === 'live' ? 'All caught up! New orders will appear here.' : 'No orders found for this filter.'}
           />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <Text style={styles.emptyIcon}>
-                {activeTab === 'all' ? '📋' : '✅'}
-              </Text>
-            </View>
-            <Text style={styles.emptyTitle}>No orders</Text>
-            <Text style={styles.emptySub}>
-              {activeTab === 'all'
-                ? 'No orders yet for this vendor'
-                : activeTab === 'current'
-                  ? 'No orders currently being prepared'
-                  : 'No upcoming orders'}
-            </Text>
-          </View>
-        }
-        showsVerticalScrollIndicator={false}
       />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.bg,
-  },
-  loadingContent: {
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  loadingText: {
-    fontSize: Typography.bodySmall,
-    color: Colors.textMuted,
-    fontWeight: Typography.medium,
-  },
+  container: { flex: 1, backgroundColor: colors.bg },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
 
-  // ── Header ──
   header: {
-    backgroundColor: Colors.primary,
-    paddingTop: Spacing.xxxl,
-    paddingBottom: Spacing.xxl,
-    paddingHorizontal: Spacing.xl,
-    borderBottomLeftRadius: BorderRadius.xl,
-    borderBottomRightRadius: BorderRadius.xl,
-    ...Shadows.header,
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  headerBg: {
-    ...StyleSheet.absoluteFillObject,
-    borderBottomLeftRadius: BorderRadius.xl,
-    borderBottomRightRadius: BorderRadius.xl,
-    overflow: 'hidden',
+  headerContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  qrButton: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, gap: 6,
   },
-  headerOverlay: {
-    flex: 1,
-    backgroundColor: Colors.primaryDark,
-    opacity: 0.15,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  headerTitle: {
-    fontSize: Typography.h2,
-    fontWeight: Typography.bold,
-    color: Colors.textInverse,
-  },
-  headerSubtitle: {
-    fontSize: Typography.bodySmall,
-    color: Colors.textInverse,
-    opacity: 0.85,
-    fontWeight: Typography.medium,
-  },
+  qrIcon: { fontSize: 16 },
+  qrLabel: { fontSize: 14, fontWeight: '600', color: colors.textInverse },
 
-  // ── Live Banner ──
   liveBanner: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primaryPale,
-    borderWidth: 1.5,
-    borderColor: Colors.primaryLight,
-    overflow: 'hidden',
-    ...Shadows.card,
+    flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.lg, marginTop: spacing.sm,
+    paddingVertical: 8, paddingHorizontal: 14, backgroundColor: colors.successPale,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.success + '30',
   },
-  liveBannerInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm + 2,
-    paddingHorizontal: Spacing.lg,
-  },
-  liveDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: Spacing.sm,
-    position: 'absolute',
-    left: Spacing.lg,
-  },
-  liveDotSolid: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: Spacing.sm,
-  },
-  liveText: {
-    fontSize: Typography.caption,
-    fontWeight: Typography.semibold,
-    color: Colors.primaryDark,
-    letterSpacing: 0.3,
+  liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success, position: 'absolute', left: 14 },
+  liveDotSolid: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  liveText: { fontSize: 12, fontWeight: '600', color: colors.successDark },
+
+  metricsRow: {
+    flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,
   },
 
-  // ── Metrics ──
-  metricsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    gap: Spacing.sm,
-    flexWrap: 'wrap',
-  },
-  metricCardItem: {
-    flex: 1,
-    minWidth: '22%',
-  },
-
-  // ── Scan QR Button ──
-  scanQRContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
-
-  // ── Tab Selector ──
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-    gap: Spacing.sm,
+  tabRow: {
+    flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,
   },
   tab: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.bgCard,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    ...Shadows.card,
+    flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.bgCard,
+    alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, ...shadows.sm,
   },
-  activeTab: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  tabInner: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  tabActiveIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.textInverse,
-  },
-  tabText: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.semibold,
-    color: Colors.textSecondary,
-  },
-  activeTabText: {
-    color: Colors.textInverse,
-  },
+  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+  tabTextActive: { color: colors.textInverse },
 
-  // ── Orders List ──
-  listContainer: {
-    padding: Spacing.lg,
-    paddingBottom: Spacing.huge,
-  },
+  listContent: { padding: spacing.lg, paddingBottom: spacing.huge },
 
-  // ── Order Card ──
-  orderCard: {
-    marginBottom: Spacing.md,
-  },
+  orderCard: { marginBottom: spacing.md },
   orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
   },
-  orderIdRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 2,
-  },
-  orderIdPrefix: {
-    fontSize: Typography.h4,
-    fontWeight: Typography.bold,
-    color: Colors.textMuted,
-  },
-  orderId: {
-    fontSize: Typography.h3,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-  },
-  separator: {
-    height: 2,
-    backgroundColor: Colors.bgTertiary,
-    borderRadius: 1,
-    marginBottom: Spacing.md,
-  },
-  orderDetails: {
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  detailLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  detailIcon: {
-    fontSize: Typography.bodySmall,
-  },
-  detailLabel: {
-    fontSize: Typography.bodySmall,
-    color: Colors.textSecondary,
-    fontWeight: Typography.medium,
-  },
-  detailValue: {
-    fontSize: Typography.bodySmall,
-    color: Colors.textPrimary,
-    fontWeight: Typography.semibold,
-  },
-  etaBadge: {
-    backgroundColor: Colors.primaryPale,
-    paddingHorizontal: Spacing.sm + 2,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
-  },
-  actionSection: {
-    marginTop: Spacing.xs,
-  },
+  orderIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  orderIdBox: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  orderIdPrefix: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
+  orderIdText: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, letterSpacing: -0.5 },
 
-  // ── Empty State ──
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: Spacing.huge,
-    paddingHorizontal: Spacing.xxl,
-    gap: Spacing.md,
+  timerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.borderLight, borderBottomWidth: 1, borderBottomColor: colors.borderLight,
+    marginBottom: 12,
   },
-  emptyIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.bgTertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
+  timerItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  timerLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+  timerValue: { fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  etaBadge: { backgroundColor: colors.primaryPale, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  etaText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+
+  orderDetails: { gap: 6, marginBottom: 12 },
+  detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailIcon: { fontSize: 14 },
+  detailLabel: { fontSize: 14, color: colors.textSecondary, fontWeight: '500', flex: 1 },
+  detailValue: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  notesRow: { flexDirection: 'row', backgroundColor: colors.warningPale, padding: 8, borderRadius: 8, marginTop: 4, gap: 6 },
+  notesIcon: { fontSize: 14 },
+  notesText: { fontSize: 12, color: colors.warningDark, flex: 1, fontStyle: 'italic' },
+
+  actionRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  actionButton: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center', ...shadows.button },
+  acceptButton: { backgroundColor: colors.success },
+  prepareButton: { backgroundColor: colors.warning },
+  readyButton: { backgroundColor: colors.primary },
+  actionButtonText: { color: colors.textInverse, fontSize: 15, fontWeight: '700' },
+  rejectButton: {
+    width: 50, height: 50, borderRadius: 14, backgroundColor: colors.errorPale,
+    justifyContent: 'center', alignItems: 'center',
   },
-  emptyIcon: {
-    fontSize: 32,
-  },
-  emptyTitle: {
-    fontSize: Typography.h4,
-    fontWeight: Typography.bold,
-    color: Colors.textPrimary,
-  },
-  emptySub: {
-    fontSize: Typography.bodySmall,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  rejectButtonText: { fontSize: 18, color: colors.error, fontWeight: '700' },
+
+  itemsRow: { flexDirection: 'row', paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  itemsLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  itemsList: { fontSize: 12, color: colors.textSecondary, flex: 1 },
 });
