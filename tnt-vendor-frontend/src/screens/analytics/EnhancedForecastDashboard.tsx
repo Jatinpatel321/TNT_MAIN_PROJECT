@@ -102,8 +102,8 @@ export default function EnhancedForecastDashboard() {
             ]}
           />
         </View>
-        <View style={styles.confidenceLabels}>
-          <Text style={styles.confidenceValue}>
+        <View style={styles.confidenceLabel}>
+          <Text style={styles.confidenceText}>
             {Math.round(overallConfidence * 100)}% - {getConfidenceLabel(overallConfidence)}
           </Text>
           <Text style={styles.confidenceNote}>
@@ -147,7 +147,7 @@ export default function EnhancedForecastDashboard() {
       {data?.insights && (
         <View style={styles.insightsCard}>
           <Text style={styles.insightsTitle}>AI Insights</Text>
-          {data.insights.map((insight, index) => (
+          {data.insights.map((insight: any, index: number) => (
             <View key={index} style={styles.insightItem}>
               <Text style={styles.insightBullet}>•</Text>
               <Text style={styles.insightText}>{insight}</Text>
@@ -360,6 +360,8 @@ function DailyView({forecast, getConfidenceColor}: any) {
             data={revenueData}
             width={screenWidth - 40}
             height={220}
+            yAxisLabel=""
+            yAxisSuffix=""
             chartConfig={chartConfig}
             style={styles.chart}
           />
@@ -462,6 +464,8 @@ function WeeklyView({forecast, getConfidenceColor}: any) {
             data={chartData}
             width={screenWidth - 40}
             height={220}
+            yAxisLabel=""
+            yAxisSuffix=""
             chartConfig={chartConfig}
             style={styles.chart}
           />
@@ -548,7 +552,7 @@ function MonthlyView({forecast, getConfidenceColor}: any) {
           styles.growthValue,
           {color: (forecast.yoy_growth || 0) >= 0 ? '#10B981' : '#EF4444'}
         ]}>
-          {(forecast.yoy_growth || 0) >= 0 ? '+' : ''}{(forecast.yoy_growth || 0) * 100?.toFixed(1)}%
+          {(forecast.yoy_growth || 0) >= 0 ? '+' : ''}{((forecast.yoy_growth || 0) * 100).toFixed(1)}%
         </Text>
       </View>
 
@@ -560,6 +564,8 @@ function MonthlyView({forecast, getConfidenceColor}: any) {
             data={chartData}
             width={screenWidth - 40}
             height={220}
+            yAxisLabel=""
+            yAxisSuffix=""
             chartConfig={chartConfig}
             style={styles.chart}
           />

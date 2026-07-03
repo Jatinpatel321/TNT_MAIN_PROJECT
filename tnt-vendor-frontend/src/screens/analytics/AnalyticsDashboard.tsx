@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { analyticsApi } from '../../services/analyticsApi';
+import { vendorApi } from '../../services/vendorApi';
 import { colors, shadows, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatCard from '../../design-system/components/StatCard';
@@ -21,13 +22,14 @@ import ForecastCard from '../../design-system/components/ForecastCard';
 import RevenueCard from '../../design-system/components/RevenueCard';
 import AICard from '../../design-system/components/AICard';
 
-type TabType = 'revenue' | 'orders' | 'items' | 'peak' | 'waste';
+type TabType = 'revenue' | 'orders' | 'items' | 'peak' | 'waste' | 'stationery';
 
 export default function AnalyticsDashboard({ navigation }: any) {
   const [activeTab, setActiveTab] = useState<TabType>('revenue');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [stationeryData, setStationeryData] = useState<any>(null);
   const { user } = useAuth();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -54,6 +56,13 @@ export default function AnalyticsDashboard({ navigation }: any) {
         peak: peakRes.data,
         waste: wasteRes.data,
       });
+      // Load stationery forecast in background (non-blocking)
+      try {
+        const stRes = await vendorApi.getForecastByType();
+        setStationeryData((stRes as any).data);
+      } catch {
+        // Not a stationery vendor — stationeryData stays null
+      }
     } catch (err) {
       console.error('Analytics load error:', err);
     } finally {
@@ -68,6 +77,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
     { key: 'items', label: 'Items', icon: '🔥' },
     { key: 'peak', label: 'Peak Hours', icon: '⏰' },
     { key: 'waste', label: 'Waste', icon: '♻️' },
+    { key: 'stationery', label: 'Print Jobs', icon: '🖨️' },
   ];
 
   if (loading) {
@@ -281,6 +291,81 @@ export default function AnalyticsDashboard({ navigation }: any) {
             )}
           </Animated.View>
         )}
+        {/* Stationery / Print-Jobs Tab */}
+        {activeTab === 'stationery' && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            {stationeryData?.stationery_breakdown ? (
+              <>
+                <GlassCard padding={16} borderRadius={20} style={{ marginBottom: spacing.md }}>
+                  <Text style={styles.sectionTitle}>🖨️ Print Job Breakdown</Text>
+                  <Text style={styles.sectionSubtitle}>Last 30 days by service type</Text>
+                  {[
+                    { label: 'Print Jobs', value: stationeryData.stationery_breakdown.print_jobs, icon: '🖨️', color: colors.primary },
+                    { label: 'Xerox / Copy', value: stationeryData.stationery_breakdown.xerox_jobs, icon: '📋', color: colors.secondary },
+                    { label: 'Binding', value: stationeryData.stationery_breakdown.binding_jobs, icon: '📚', color: colors.info },
+                    { label: 'Total Jobs', value: stationeryData.stationery_breakdown.total_jobs, icon: '📊', color: colors.success },
+                  ].map((row, i) => (
+                    <View key={i} style={styles.dataRow}>
+                      <Text style={styles.dataLabel}>{row.icon}  {row.label}</Text>
+                      <Text style={[styles.dataAmount, { color: row.color }]}>{row.value}</Text>
+                    </View>
+                  ))}
+                </GlassCard>
+
+                {/* Load vs capacity using peak data */}
+                {data?.peak?.hourly_distribution && (
+                  <GlassCard padding={16} borderRadius={20} style={{ marginBottom: spacing.md }}>
+                    <Text style={styles.sectionTitle}>⏱ Busiest Print Windows</Text>
+                    <Text style={styles.sectionSubtitle}>Peak order hours (proxy for print load)</Text>
+                    <View style={styles.chartContainer}>
+                      {data.peak.hourly_distribution
+                        .filter((_: any, i: number) => i >= 8 && i <= 20)
+                        .map((h: any, i: number) => {
+                          const maxOrders = Math.max(...data.peak.hourly_distribution.map((d: any) => d.orders), 1);
+                          const height = (h.orders / maxOrders) * 80;
+                          return (
+                            <View key={i} style={styles.barCol}>
+                              <View style={[styles.bar, { height: Math.max(height, 4), backgroundColor: h.is_peak ? colors.primary : `${colors.primary}40` }]} />
+                              <Text style={styles.barLabel}>{h.hour.split(':')[0]}</Text>
+                            </View>
+                          );
+                        })}
+                    </View>
+                    {data.peak.busiest_hour && (
+                      <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 8 }}>
+                        🏆 Busiest hour: <Text style={{ color: colors.primary, fontWeight: '700' }}>{data.peak.busiest_hour}</Text>
+                      </Text>
+                    )}
+                  </GlassCard>
+                )}
+
+                {/* Forecast summary */}
+                {stationeryData?.daily?.summary && (
+                  <ForecastCard
+                    title="Stationery Demand Forecast"
+                    icon="📈"
+                    color={colors.info}
+                    data={[
+                      { label: 'Predicted Orders (7d)', value: stationeryData.daily.summary.total_orders || 0 },
+                      { label: 'Avg Daily Revenue', value: stationeryData.daily.summary.avg_daily_revenue || 0, unit: '₹' },
+                    ]}
+                    style={{ marginBottom: spacing.md }}
+                  />
+                )}
+              </>
+            ) : (
+              <GlassCard padding={24} borderRadius={20} style={{ margin: spacing.lg, alignItems: 'center' }}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>🖨️</Text>
+                <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>Stationery Analytics</Text>
+                <Text style={[styles.sectionSubtitle, { textAlign: 'center' }]}>
+                  Not available — this vendor is not classified as a stationery vendor,
+                  or no stationery orders have been placed yet.
+                </Text>
+              </GlassCard>
+            )}
+          </Animated.View>
+        )}
+
         <View style={{ height: spacing.huge }} />
       </ScrollView>
     </View>

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export interface UploadResponse {
@@ -17,7 +17,7 @@ export const imageUploadApi = {
       name: 'logo.jpg',
     } as any);
 
-    return axios.post(`${API_BASE_URL}/v1/vendors/profile/upload/logo`, formData, {
+    return apiClient.post(`${API_BASE_URL}/v1/vendors/profile/upload/logo`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -27,7 +27,7 @@ export const imageUploadApi = {
           onProgress(progress);
         }
       },
-    });
+    }).then(res => res.data);
   },
 
   uploadCoverImage: async (imageUri: string, onProgress?: (progress: number) => void): Promise<UploadResponse> => {
@@ -38,7 +38,7 @@ export const imageUploadApi = {
       name: 'cover.jpg',
     } as any);
 
-    return axios.post(`${API_BASE_URL}/v1/vendors/profile/upload/cover`, formData, {
+    return apiClient.post(`${API_BASE_URL}/v1/vendors/profile/upload/cover`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -48,10 +48,10 @@ export const imageUploadApi = {
           onProgress(progress);
         }
       },
-    });
+    }).then(res => res.data);
   },
 
   deleteImage: async (imageType: 'logo' | 'cover'): Promise<void> => {
-    await axios.delete(`${API_BASE_URL}/v1/vendors/profile/upload/${imageType}`);
+    await apiClient.delete(`${API_BASE_URL}/v1/vendors/profile/upload/${imageType}`);
   },
 };

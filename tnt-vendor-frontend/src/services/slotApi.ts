@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export interface Slot {
@@ -86,50 +86,50 @@ export interface SlotRule {
 
 export const slotApi = {
   getSlots: (vendorId?: number) =>
-    axios.get<Slot[]>(`${API_BASE_URL}/v1/slots/`, { params: { vendor_id: vendorId } }),
+    apiClient.get<Slot[]>(`${API_BASE_URL}/v1/slots/`, { params: { vendor_id: vendorId } }),
 
   createSlot: (data: SlotCreate) =>
-    axios.post<Slot>(`${API_BASE_URL}/v1/slots/`, data),
+    apiClient.post<Slot>(`${API_BASE_URL}/v1/slots/`, data),
 
   updateSlot: (slotId: number, data: SlotUpdate) =>
-    axios.put<Slot>(`${API_BASE_URL}/v1/slots/${slotId}`, data),
+    apiClient.put<Slot>(`${API_BASE_URL}/v1/slots/${slotId}`, data),
 
   deleteSlot: (slotId: number) =>
-    axios.delete(`${API_BASE_URL}/v1/slots/${slotId}`),
+    apiClient.delete(`${API_BASE_URL}/v1/slots/${slotId}`),
 
   bulkCreateSlots: (data: BulkSlotCreate) =>
-    axios.post<Slot[]>(`${API_BASE_URL}/v1/slots/bulk-create`, data),
+    apiClient.post<Slot[]>(`${API_BASE_URL}/v1/slots/bulk-create`, data),
 
   lockSlot: (slotId: number) =>
-    axios.post(`${API_BASE_URL}/v1/slots/${slotId}/lock`),
+    apiClient.post(`${API_BASE_URL}/v1/slots/${slotId}/lock`),
 
   unlockSlot: (slotId: number) =>
-    axios.post(`${API_BASE_URL}/v1/slots/${slotId}/unlock`),
+    apiClient.post(`${API_BASE_URL}/v1/slots/${slotId}/unlock`),
 
   getAnalytics: () =>
-    axios.get<SlotAnalytics>(`${API_BASE_URL}/v1/slots/analytics`),
+    apiClient.get<SlotAnalytics>(`${API_BASE_URL}/v1/slots/analytics`),
 
   getCapacityRules: () =>
-    axios.get<CapacityRule[]>(`${API_BASE_URL}/v1/slots/capacity-rules`),
+    apiClient.get<CapacityRule[]>(`${API_BASE_URL}/v1/slots/capacity-rules`),
 
   createCapacityRule: (data: any) =>
-    axios.post<CapacityRule>(`${API_BASE_URL}/v1/slots/capacity-rules`, data),
+    apiClient.post<CapacityRule>(`${API_BASE_URL}/v1/slots/capacity-rules`, data),
 
   updateCapacityRule: (ruleId: number, data: any) =>
-    axios.put<CapacityRule>(`${API_BASE_URL}/v1/slots/capacity-rules/${ruleId}`, data),
+    apiClient.put<CapacityRule>(`${API_BASE_URL}/v1/slots/capacity-rules/${ruleId}`, data),
 
   deleteCapacityRule: (ruleId: number) =>
-    axios.delete(`${API_BASE_URL}/v1/slots/capacity-rules/${ruleId}`),
+    apiClient.delete(`${API_BASE_URL}/v1/slots/capacity-rules/${ruleId}`),
 
   getRules: () =>
-    axios.get<SlotRule[]>(`${API_BASE_URL}/v1/slots/rules`),
+    apiClient.get<SlotRule[]>(`${API_BASE_URL}/v1/slots/rules`),
 
   createRule: (data: any) =>
-    axios.post<SlotRule>(`${API_BASE_URL}/v1/slots/rules`, data),
+    apiClient.post<SlotRule>(`${API_BASE_URL}/v1/slots/rules`, data),
 
   updateRule: (ruleId: number, data: any) =>
-    axios.put<SlotRule>(`${API_BASE_URL}/v1/slots/rules/${ruleId}`, data),
+    apiClient.put<SlotRule>(`${API_BASE_URL}/v1/slots/rules/${ruleId}`, data),
 
   deleteRule: (ruleId: number) =>
-    axios.delete(`${API_BASE_URL}/v1/slots/rules/${ruleId}`),
+    apiClient.delete(`${API_BASE_URL}/v1/slots/rules/${ruleId}`),
 };

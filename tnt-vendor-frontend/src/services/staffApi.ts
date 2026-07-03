@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export interface StaffMember {
@@ -48,17 +48,17 @@ export interface UpdateStaffData {
 
 export const staffApi = {
   getStaff: () =>
-    axios.get<{ staff: StaffMember[]; total: number }>(`${API_BASE_URL}/v1/vendors/profile/staff`),
+    apiClient.get<{ staff: StaffMember[]; total: number }>(`${API_BASE_URL}/v1/vendors/profile/staff`),
 
   addStaff: (data: AddStaffData) =>
-    axios.post<StaffMember>(`${API_BASE_URL}/v1/vendors/profile/staff`, data),
+    apiClient.post<StaffMember>(`${API_BASE_URL}/v1/vendors/profile/staff`, data),
 
   updateStaff: (staffId: number, data: UpdateStaffData) =>
-    axios.put<StaffMember>(`${API_BASE_URL}/v1/vendors/profile/staff/${staffId}`, data),
+    apiClient.put<StaffMember>(`${API_BASE_URL}/v1/vendors/profile/staff/${staffId}`, data),
 
   deleteStaff: (staffId: number) =>
-    axios.delete(`${API_BASE_URL}/v1/vendors/profile/staff/${staffId}`),
+    apiClient.delete(`${API_BASE_URL}/v1/vendors/profile/staff/${staffId}`),
 
   getPermissions: () =>
-    axios.get<PermissionsResponse>(`${API_BASE_URL}/v1/vendors/profile/permissions`),
+    apiClient.get<PermissionsResponse>(`${API_BASE_URL}/v1/vendors/profile/permissions`),
 };

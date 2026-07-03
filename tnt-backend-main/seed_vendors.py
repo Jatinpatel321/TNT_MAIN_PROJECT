@@ -39,17 +39,15 @@ VENDOR_PASSWORD_HASH = "$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZm
 STAFF_PASSWORD_HASH = "$2b$12$YhFLwiIfQB5XGm/gzVqS9uBbtV0xDGXAC2dI1I65A5kPpmfZmIMlS"
 
 VENDOR_DATA = [
-    # (vendor_name, category, owner_user_id, status)
-    ("Campus Cafe", "food", 66, "active"),
-    ("Burger Hub", "food", 67, "active"),
-    ("Spice Corner", "food", 68, "active"),
-    ("Green Bowl", "food", 69, "active"),
-    ("Pizza Station", "food", 70, "active"),
-    ("Xerox Point", "stationery", 71, "active"),
-    ("Print Hub", "stationery", 72, "active"),
-    ("Campus Stationery", "stationery", 73, "active"),
-    ("Food Junction", "food", 74, "active"),
-    ("Snack Corner", "food", 75, "active"),
+    # (vendor_name, category, status)
+    ("Campus Cafe", "food", "active"),
+    ("Parul Mess", "food", "active"),
+    ("Juice Junction", "food", "active"),
+    ("Stationery Shop", "stationery", "active"),
+    ("Book Nook", "stationery", "active"),
+    ("Tandoor Express", "food", "active"),
+    ("Pizza Hub", "food", "pending"),
+    ("Art & Craft", "stationery", "inactive"),
 ]
 
 STAFF_DATA = [
@@ -58,9 +56,9 @@ STAFF_DATA = [
      '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}'),
     ("Campus Cafe", "Karan Dev", "staff", "+919800000002",
      '{"orders": ["view", "status_update"]}'),
-    ("Burger Hub", "Sohan Lal", "manager", "+919800000003",
+    ("Parul Mess", "Sohan Lal", "manager", "+919800000003",
      '{"orders": ["view", "edit", "status_update"], "menu": ["edit"]}'),
-    ("Burger Hub", "Ramesh Ram", "staff", "+919800000004",
+    ("Parul Mess", "Ramesh Ram", "staff", "+919800000004",
      '{"orders": ["view", "status_update"]}'),
 ]
 
@@ -89,15 +87,16 @@ def main():
             print("   ✅ Vendors table already populated — skipping insert.")
         else:
             print("\n   📦 Seeding vendors table …")
-            for name, category, owner_id, status in VENDOR_DATA:
-                # Check owner_id exists in users
+            for name, category, status in VENDOR_DATA:
+                # Check owner_id exists in users by name match
                 user = db.execute(
-                    text("SELECT id FROM users WHERE id = :uid"),
-                    {"uid": owner_id}
+                    text("SELECT id FROM users WHERE name = :name AND role = 'vendor'"),
+                    {"name": name}
                 ).fetchone()
                 if not user:
-                    print(f"   ⚠️  User id={owner_id} not found — skipping vendor '{name}'")
+                    print(f"   ⚠️  User name='{name}' not found in users table — skipping vendor '{name}'")
                     continue
+                owner_id = user[0]
 
                 db.execute(
                     text("""
@@ -131,7 +130,7 @@ def main():
                 db.execute(
                     text("""
                         INSERT INTO vendor_staff (vendor_id, name, role, phone, permissions, password_hash, is_active, created_at)
-                        VALUES (:vid, :name, :role, :phone, :perms::jsonb, :pwd, true, NOW())
+                        VALUES (:vid, :name, :role, :phone, CAST(:perms AS JSON), :pwd, true, NOW())
                     """),
                     {
                         "vid": vid,

@@ -1,21 +1,21 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export const analyticsApi = {
-  getDashboard: () => axios.get(`${API_BASE_URL}/v1/vendors/analytics/dashboard`),
+  getDashboard: () => apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/dashboard`),
   getDailySales: (days: number = 30) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/analytics/daily?days=${days}`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/daily?days=${days}`),
   getWeeklySales: (weeks: number = 12) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/analytics/weekly?weeks=${weeks}`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/weekly?weeks=${weeks}`),
   getMonthlySales: (months: number = 12) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/analytics/monthly?months=${months}`),
-  getYearlySales: () => axios.get(`${API_BASE_URL}/v1/vendors/analytics/yearly`),
-  getPeakHours: () => axios.get(`${API_BASE_URL}/v1/vendors/analytics/peak-hours`),
-  getItemAnalysis: () => axios.get(`${API_BASE_URL}/v1/vendors/analytics/items`),
-  getWasteAnalysis: () => axios.get(`${API_BASE_URL}/v1/vendors/analytics/waste`),
-  getRevenueTrends: () => axios.get(`${API_BASE_URL}/v1/vendors/analytics/revenue-trends`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/monthly?months=${months}`),
+  getYearlySales: () => apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/yearly`),
+  getPeakHours: () => apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/peak-hours`),
+  getItemAnalysis: () => apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/items`),
+  getWasteAnalysis: () => apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/waste`),
+  getRevenueTrends: () => apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/revenue-trends`),
   exportCsv: (reportType: string) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/analytics/export/csv/${reportType}`, {
+    apiClient.get(`${API_BASE_URL}/v1/vendors/analytics/export/csv/${reportType}`, {
       responseType: 'text',
     }),
 };

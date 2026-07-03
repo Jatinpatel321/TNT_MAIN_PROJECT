@@ -372,14 +372,16 @@ class TestVendorFrontendEndpoints:
         """New vendor routers should be included in the v1 API router."""
         from app.api.v1 import api_v1_router
 
-        # Get all leaf route paths from v1 router, including nested included routers
-        def collect_paths(router):
+        def collect_paths(router, prefix=""):
             paths = []
-            for route in router.routes:
+            for route in getattr(router, "routes", []):
                 if hasattr(route, "path"):
-                    paths.append(route.path)
-                if hasattr(route, "routes"):
-                    paths.extend(r.path for r in route.routes if hasattr(r, "path"))
+                    path = route.path
+                    if prefix and not path.startswith(prefix):
+                        path = prefix + path
+                    paths.append(path)
+                elif hasattr(route, "original_router"):
+                    paths.extend(collect_paths(route.original_router, prefix + getattr(router, "prefix", "")))
             return paths
 
         routes = collect_paths(api_v1_router)

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionsContext';
+import { useTheme, ThemeMode } from '../../context/ThemeContext';
 import { colors, shadows, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
@@ -57,6 +58,7 @@ const MORE_SECTIONS: { title: string; items: MoreItem[] }[] = [
 export default function MoreScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
+  const { mode: themeMode, isDark, setMode: setThemeMode } = useTheme();
 
   const handleNavigate = (screen: string) => {
     navigation.navigate(screen);
@@ -97,6 +99,32 @@ export default function MoreScreen({ navigation }: any) {
             >
               <Text style={styles.logoutText}>Sign Out</Text>
             </TouchableOpacity>
+          </View>
+        </GlassCard>
+      </View>
+
+      {/* Theme Toggle */}
+      <View style={styles.statusSection}>
+        <GlassCard intensity="light" padding={16} borderRadius={20}>
+          <Text style={styles.themeSectionLabel}>🌙 Appearance</Text>
+          <View style={styles.themeRow}>
+            {(['light', 'dark', 'system'] as ThemeMode[]).map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[
+                  styles.themeChip,
+                  themeMode === m && styles.themeChipActive,
+                ]}
+                onPress={() => setThemeMode(m)}
+              >
+                <Text style={[
+                  styles.themeChipText,
+                  themeMode === m && styles.themeChipTextActive,
+                ]}>
+                  {m === 'light' ? '☀️ Light' : m === 'dark' ? '🌙 Dark' : '⚙️ System'}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </GlassCard>
       </View>
@@ -275,6 +303,42 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: spacing.huge,
+  },
+
+  // ── Theme Toggle ─────────────────────────────────────────────
+  themeSectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  themeChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: colors.bgSecondary,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  themeChipActive: {
+    backgroundColor: colors.primaryPale,
+    borderColor: colors.primary,
+  },
+  themeChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  themeChipTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
   },
 });
 

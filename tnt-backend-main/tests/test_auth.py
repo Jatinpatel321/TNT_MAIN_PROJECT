@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.users.model import User, UserRole
 from app.modules.vendors.model import Vendor, VendorStatus
-from app.core.security import create_access_token
+from app.modules.vendors.auth_service import _create_access_token as create_access_token
 
 
 class TestVendorAuthAPI:

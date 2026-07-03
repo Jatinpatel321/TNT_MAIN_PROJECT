@@ -328,6 +328,7 @@ from app.modules.recommendations.prediction_router import router as prediction_r
 from app.modules.search.router import router as search_router
 from app.ml.router import router as ml_router
 
+app.include_router(api_v1_router)
 app.include_router(auth_router, deprecated=True)
 app.include_router(fraud_router, deprecated=True)
 app.include_router(backup_router, deprecated=True)
@@ -349,7 +350,7 @@ app.include_router(group_cart_router, deprecated=True)
 app.include_router(ai_router, deprecated=True)
 app.include_router(menu_router, deprecated=True)
 app.include_router(vendors_router, deprecated=True)
-app.include_router(vendor_auth_router, deprecated=True)
+app.include_router(vendor_auth_router, prefix="/vendor", deprecated=True)
 app.include_router(vendor_ai_router, deprecated=True)
 app.include_router(vendor_retention_router, deprecated=True)
 app.include_router(vendor_analytics_router, deprecated=True)

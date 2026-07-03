@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export interface BusinessHours {
@@ -23,23 +23,23 @@ export interface BusinessSettings {
 
 export const businessSettingsApi = {
   getSettings: () =>
-    axios.get<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`),
+    apiClient.get<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`),
 
   updateBusinessHours: (hours: BusinessHours) =>
-    axios.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
+    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
       business_hours: hours,
     }),
 
   updateHolidays: (holidays: Holiday[]) =>
-    axios.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
+    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
       holidays,
     }),
 
   updatePickupInstructions: (instructions: string) =>
-    axios.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
+    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
       pickup_instructions: instructions,
     }),
 
   updateAllSettings: (settings: Partial<BusinessSettings>) =>
-    axios.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, settings),
+    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, settings),
 };

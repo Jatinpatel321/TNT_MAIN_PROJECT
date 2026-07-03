@@ -72,21 +72,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   value: {
-    fontSize: Typography.h2,
-    fontWeight: Typography.bold,
+    fontSize: Typography.fontSize.h2,
+    fontWeight: Typography.fontWeight.bold,
     marginBottom: 2,
   },
   smallValue: {
-    fontSize: Typography.h4,
+    fontSize: Typography.fontSize.h4,
   },
   label: {
-    fontSize: Typography.caption,
+    fontSize: Typography.fontSize.caption,
     color: Colors.textMuted,
     textAlign: 'center',
-    fontWeight: Typography.medium,
+    fontWeight: Typography.fontWeight.medium,
   },
   smallLabel: {
-    fontSize: Typography.tiny,
+    fontSize: Typography.fontSize.tiny,
   },
   trendRow: {
     flexDirection: 'row',
@@ -96,10 +96,10 @@ const styles = StyleSheet.create({
   },
   trendArrow: {
     fontSize: 12,
-    fontWeight: Typography.bold,
+    fontWeight: Typography.fontWeight.bold,
   },
   trendValue: {
-    fontSize: Typography.caption,
-    fontWeight: Typography.semibold,
+    fontSize: Typography.fontSize.caption,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });

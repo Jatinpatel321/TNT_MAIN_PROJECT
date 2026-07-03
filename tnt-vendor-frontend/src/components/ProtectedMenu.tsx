@@ -62,7 +62,7 @@ export default function ProtectedMenu({ items, columns = 3 }: ProtectedMenuProps
       {visibleItems.map((item) => (
         <TouchableOpacity
           key={item.id}
-          style={styles.menuItem}
+          style={[styles.menuItem, { width: `${100 / columns}%` }]}
           onPress={item.onPress}
         >
           <View style={styles.iconContainer}>
@@ -82,7 +82,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   menuItem: {
-    width: `${100 / columns}%`,
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',

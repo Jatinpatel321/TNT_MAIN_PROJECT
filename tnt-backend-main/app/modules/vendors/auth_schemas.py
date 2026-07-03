@@ -29,7 +29,7 @@ class VendorProfileResponse(BaseModel):
 class VendorLoginRequest(BaseModel):
     """Login with vendor_id + password for vendor-owner flow."""
 
-    vendor_id: int = Field(..., description="Vendor ID")
+    vendor_id: Optional[int] = Field(None, description="Vendor ID")
     password: str = Field(..., min_length=4, description="Password")
     staff_phone: Optional[str] = Field(
         None, description="Staff phone — use for staff login instead of vendor_id"
@@ -93,3 +93,10 @@ class VendorStaffUpdate(BaseModel):
     phone: Optional[str] = None
     is_active: Optional[bool] = None
     permissions: Optional[dict] = None
+
+
+class VendorRegisterRequest(BaseModel):
+    vendor_name: str = Field(..., min_length=1, max_length=150)
+    category: str = Field(..., min_length=1, max_length=50)
+    owner_phone: str = Field(..., min_length=10)
+    password: str = Field(..., min_length=4)

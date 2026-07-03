@@ -111,7 +111,7 @@ export default function SmartDemandDashboard() {
               )}
             </GlassCard>
 
-            {data?.recommendations?.length > 0 && (
+            {data && data.recommendations && data.recommendations.length > 0 && (
               <GlassCard padding={16} borderRadius={18} style={{marginTop: spacing.sm}}>
                 <Text style={styles.cardTitle}>AI Recommendations</Text>
                 {data.recommendations.slice(0, 5).map((rec: any, i: number) => (

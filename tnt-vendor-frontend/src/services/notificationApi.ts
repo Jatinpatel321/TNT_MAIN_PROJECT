@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export interface Notification {
@@ -21,22 +21,22 @@ export const notificationApi = {
     const params: any = {};
     if (unreadOnly) params.unread_only = true;
     if (type) params.notification_type = type;
-    return axios.get(`${API_BASE_URL}/v1/notifications/vendor`, { params });
+    return apiClient.get(`${API_BASE_URL}/v1/notifications/vendor`, { params });
   },
-  getUnreadCount: () => axios.get<UnreadCountResponse>(`${API_BASE_URL}/v1/notifications/unread-count`),
+  getUnreadCount: () => apiClient.get<UnreadCountResponse>(`${API_BASE_URL}/v1/notifications/unread-count`),
   markAsRead: (notificationId: number) =>
-    axios.post(`${API_BASE_URL}/v1/notifications/${notificationId}/read`),
-  markAllAsRead: () => axios.post(`${API_BASE_URL}/v1/notifications/mark-all-read`),
+    apiClient.post(`${API_BASE_URL}/v1/notifications/${notificationId}/read`),
+  markAllAsRead: () => apiClient.post(`${API_BASE_URL}/v1/notifications/mark-all-read`),
   notifyDelay: (orderId: number, delayMinutes: number, reason: string) =>
-    axios.post(`${API_BASE_URL}/v1/notifications/vendor/notify-delay`, {
+    apiClient.post(`${API_BASE_URL}/v1/notifications/vendor/notify-delay`, {
       order_id: orderId,
       delay_minutes: delayMinutes,
       reason,
     }),
   notifyReady: (orderId: number) =>
-    axios.post(`${API_BASE_URL}/v1/notifications/vendor/notify-ready`, { order_id: orderId }),
+    apiClient.post(`${API_BASE_URL}/v1/notifications/vendor/notify-ready`, { order_id: orderId }),
   notifyCustom: (orderId: number, message: string) =>
-    axios.post(`${API_BASE_URL}/v1/notifications/vendor/notify-custom`, {
+    apiClient.post(`${API_BASE_URL}/v1/notifications/vendor/notify-custom`, {
       order_id: orderId,
       message,
     }),

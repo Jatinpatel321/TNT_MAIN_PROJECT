@@ -17,8 +17,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { vendorApi, type Order, type OrderMetrics } from '../../services/vendorApi';
-import { useWebSocket } from '../../hooks/useWebSocket';
-import { WS_BASE_URL } from '../../config/api';
+import { useVendorWebSocket } from '../../hooks/useVendorWebSocket';
 import { colors, shadows, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
@@ -84,8 +83,42 @@ export default function OrdersScreen() {
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
-  const wsUrl = `${WS_BASE_URL}/ws/vendor/orders`;
-  const { isConnected: wsConnected } = useWebSocket(wsUrl, token ?? '');
+  const [wsDisconnected, setWsDisconnected] = useState(false);
+
+  // ── WebSocket — vendor-wide order channel ───────────────────────
+  const handleWsEvent = useCallback((evt: { event: string; data: any }) => {
+    if (evt.event === 'new_order' && evt.data) {
+      setOrders(prev => {
+        const exists = prev.some(o => o.id === evt.data.id);
+        return exists ? prev : [evt.data, ...prev];
+      });
+    } else if (evt.event === 'order_updated' && evt.data) {
+      setOrders(prev => prev.map(o => o.id === evt.data.id ? { ...o, ...evt.data } : o));
+    } else if (evt.event === 'snapshot' && Array.isArray(evt.data)) {
+      setOrders(evt.data);
+    }
+  }, []);
+
+  const { isConnected: wsConnected, reconnectsFailed } = useVendorWebSocket(
+    [], // vendor-wide channel
+    token ?? null,
+    handleWsEvent,
+    { useVendorChannel: true, onDisconnected: () => setWsDisconnected(true) },
+  );
+
+  // When WS reconnects, clear the banner and refresh
+  useEffect(() => {
+    if (wsConnected) {
+      setWsDisconnected(false);
+    }
+  }, [wsConnected]);
+
+  // Polling fallback: every 30 s when WS is not connected
+  useEffect(() => {
+    if (wsConnected) return;
+    const id = setInterval(() => loadOrders(true), 30_000);
+    return () => clearInterval(id);
+  }, [wsConnected, loadOrders]);
 
   const handleStatusUpdate = async (orderId: number, action: StatusAction) => {
     try {
@@ -142,6 +175,9 @@ export default function OrdersScreen() {
             )}
             {(item as any).is_group && (
               <StatusPill label="GROUP" variant="warning" size="sm" icon="👥" />
+            )}
+            {item.booking_type === 'combined' && (
+              <StatusPill label="COMBINED" variant="info" size="sm" icon="🔗" />
             )}
           </View>
           <StatusPill
@@ -266,6 +302,13 @@ export default function OrdersScreen() {
         </View>
       )}
 
+      {/* WS Disconnected fallback banner */}
+      {wsDisconnected && !wsConnected && (
+        <TouchableOpacity style={styles.disconnectedBanner} onPress={() => loadOrders(true)} activeOpacity={0.8}>
+          <Text style={styles.disconnectedText}>⚠ Live updates paused — tap to refresh</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Metrics */}
       {metrics && (
         <View style={styles.metricsRow}>
@@ -346,6 +389,19 @@ const styles = StyleSheet.create({
   liveDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success, position: 'absolute', left: 14 },
   liveDotSolid: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   liveText: { fontSize: 12, fontWeight: '600', color: colors.successDark },
+
+  disconnectedBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: colors.warningPale,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.warning + '40',
+    alignItems: 'center',
+  },
+  disconnectedText: { fontSize: 12, fontWeight: '700', color: colors.warningDark },
 
   metricsRow: {
     flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,

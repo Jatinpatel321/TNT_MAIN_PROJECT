@@ -32,6 +32,7 @@ from app.modules.vendors.auth_schemas import (
     VendorStaffUpdate,
     VendorTokenRefreshRequest,
     VendorTokenRefreshResponse,
+    VendorRegisterRequest,
 )
 from app.modules.vendors.auth_service import (
     create_staff,
@@ -48,18 +49,15 @@ from app.modules.vendors.auth_service import (
     update_vendor_profile,
 )
 
-router = APIRouter(prefix="/vendor", tags=["Vendor Auth"])
+router = APIRouter(prefix="", tags=["Vendor Auth"])
 
 
 # ─── Registration & Auth ────────────────────────────────────────────────────
 
 
-@router.post("/register")
+@router.post("/register", response_model=VendorProfileResponse)
 def register(
-    vendor_name: str,
-    category: str,
-    owner_phone: str,
-    password: str,
+    body: VendorRegisterRequest,
     db: Session = Depends(get_db),
 ):
     """Register a new vendor business.
@@ -69,13 +67,13 @@ def register(
     Returns the new vendor profile with PENDING status.
     """
     result = register_vendor(
-        vendor_name=vendor_name,
-        category=category,
-        owner_phone=owner_phone,
-        password=password,
+        vendor_name=body.vendor_name,
+        category=body.category,
+        owner_phone=body.owner_phone,
+        password=body.password,
         db=db,
     )
-    return {"success": True, "vendor": result}
+    return result
 
 
 @router.post("/login", response_model=VendorLoginResponse)
@@ -89,9 +87,10 @@ def login(
     To login as an **owner**: provide ``vendor_id`` + ``password``.
     To login as **staff**: provide ``staff_phone`` + ``password``.
     """
-    if body.staff_phone:
+    staff_phone = body.staff_phone or body.phone
+    if staff_phone:
         return login_as_vendor_staff(
-            phone=body.staff_phone,
+            phone=staff_phone,
             password=body.password,
             db=db,
             request=request,
@@ -127,6 +126,15 @@ def refresh(
 
 
 # ─── Profile ─────────────────────────────────────────────────────────────────
+
+
+@router.get("/me", response_model=VendorProfileResponse)
+def get_me(
+    db: Session = Depends(get_db),
+    vendor_ctx: dict = Depends(get_current_vendor),
+):
+    """Alias for profile endpoint to support /me tests and clients."""
+    return get_vendor_profile(vendor_ctx, db)
 
 
 @router.get("/profile", response_model=VendorProfileResponse)

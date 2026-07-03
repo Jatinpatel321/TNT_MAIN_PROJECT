@@ -1,7 +1,4 @@
-// ─── Menu Management ──────────────────────────────────────────────
-// Modern catalog with large cards, availability switches, AI insights
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,58 +7,189 @@ import {
   TouchableOpacity,
   TextInput,
   Animated,
+  ActivityIndicator,
+  Alert,
+  Modal,
 } from 'react-native';
-import { colors, shadows, spacing } from '../../design-system';
+import { colors, shadows, spacing, borderRadius } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
+import apiClient from '../../services/apiClient';
+import { API_BASE_URL } from '../../config/api';
+import { useAuth } from '../../context/AuthContext';
 
 interface MenuItem {
   id: number;
+  vendor_id: number;
   name: string;
   price: number;
   category: string;
-  available: boolean;
-  image?: string;
-  order_count?: number;
-  popularity?: number;
+  is_available: boolean;
+  image_url?: string;
+  prep_time_minutes?: number;
+  available_quantity?: number;
   stock_level?: number;
-  is_best_seller?: boolean;
-  ai_suggested_price?: number;
+  inventory_id?: number;
+  is_low_stock?: boolean;
 }
 
-const CATEGORIES = ['All', 'Breakfast', 'Beverages', 'Lunch', 'Snacks', 'Specials'];
+const CATEGORIES = ['All', 'Breakfast', 'Beverages', 'Lunch', 'Snacks', 'Specials', 'Stationery'];
 
-const MENU_ITEMS: MenuItem[] = [
-  { id: 1, name: 'Masala Dosa', price: 80, category: 'Breakfast', available: true, order_count: 45, popularity: 92, stock_level: 30, is_best_seller: true },
-  { id: 2, name: 'Idli Sambar', price: 50, category: 'Breakfast', available: true, order_count: 38, popularity: 85, stock_level: 25 },
-  { id: 3, name: 'Filter Coffee', price: 20, category: 'Beverages', available: true, order_count: 62, popularity: 96, stock_level: 50, is_best_seller: true },
-  { id: 4, name: 'Vada', price: 30, category: 'Breakfast', available: false, order_count: 12, popularity: 45, stock_level: 0 },
-  { id: 5, name: 'Upma', price: 40, category: 'Breakfast', available: true, order_count: 20, popularity: 60, stock_level: 15 },
-  { id: 6, name: 'Tea', price: 15, category: 'Beverages', available: true, order_count: 55, popularity: 90, stock_level: 40 },
-];
+export default function MenuScreen({ navigation }: any) {
+  const { user } = useAuth();
+  const vendorId = user?.id;
 
-export default function MenuScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Restock states
+  const [isRestockVisible, setIsRestockVisible] = useState(false);
+  const [selectedRestockItem, setSelectedRestockItem] = useState<MenuItem | null>(null);
+  const [restockQty, setRestockQty] = useState('');
+  const [isRestockLoading, setIsRestockLoading] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-  }, []);
 
-  const toggleAvailability = (id: number) => {
-    setMenuItems(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, available: !item.available } : item,
-      ),
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    fetchData();
+  }, [vendorId]);
+
+  const fetchData = async () => {
+    if (!vendorId) return;
+    setIsLoading(true);
+    try {
+      // 1. Fetch menu items
+      const itemsRes = await apiClient.get(`${API_BASE_URL}/v1/menu/items?vendor_id=${vendorId}`);
+      const rawItems = itemsRes.data.items || [];
+
+      // 2. Fetch inventory dashboard
+      let inventoryMap: Record<number, { id: number; current_stock: number; low_stock_threshold: number }> = {};
+      try {
+        const invRes = await apiClient.get(`${API_BASE_URL}/v1/vendors/inventory/dashboard`);
+        const invItems = invRes.data.items || [];
+        invItems.forEach((inv: any) => {
+          inventoryMap[inv.menu_item_id] = {
+            id: inv.id,
+            current_stock: inv.current_stock,
+            low_stock_threshold: inv.low_stock_threshold,
+          };
+        });
+      } catch (e) {
+        console.log('Failed to load inventory dashboard metrics, fallback to empty');
+      }
+
+      // Merge items and inventory
+      const mergedItems = rawItems.map((item: any) => {
+        const inv = inventoryMap[item.id];
+        return {
+          ...item,
+          stock_level: inv ? inv.current_stock : undefined,
+          inventory_id: inv ? inv.id : undefined,
+          is_low_stock: inv ? inv.current_stock < inv.low_stock_threshold : false,
+        };
+      });
+
+      setMenuItems(mergedItems);
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to load menu items.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleAvailability = async (id: number, currentAvailable: boolean) => {
+    try {
+      await apiClient.put(`${API_BASE_URL}/v1/menu/items/${id}/toggle`);
+      setMenuItems(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, is_available: !currentAvailable } : item,
+        ),
+      );
+    } catch (err) {
+      Alert.alert('Error', 'Failed to toggle availability.');
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this menu item?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`${API_BASE_URL}/v1/menu/items/${id}`);
+              fetchData();
+            } catch (err) {
+              Alert.alert('Error', 'Failed to delete menu item.');
+            }
+          },
+        },
+      ]
     );
+  };
+
+  const openRestockModal = (item: MenuItem) => {
+    setSelectedRestockItem(item);
+    setRestockQty('');
+    setIsRestockVisible(true);
+  };
+
+  const handleRestock = async () => {
+    if (!selectedRestockItem) return;
+    const qty = parseInt(restockQty, 10);
+    if (isNaN(qty) || qty <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid positive quantity.');
+      return;
+    }
+
+    setIsRestockLoading(true);
+    try {
+      if (selectedRestockItem.inventory_id) {
+        // Restock existing inventory
+        const formData = new FormData();
+        formData.append('quantity', qty.toString());
+        await apiClient.post(
+          `${API_BASE_URL}/v1/menu/inventory/${selectedRestockItem.inventory_id}/restock`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+      } else {
+        // Create new inventory record
+        const formData = new FormData();
+        formData.append('menu_item_id', selectedRestockItem.id.toString());
+        formData.append('current_stock', qty.toString());
+        formData.append('low_stock_threshold', '10');
+        formData.append('auto_disable', 'true');
+        await apiClient.post(`${API_BASE_URL}/v1/menu/inventory`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+
+      setIsRestockVisible(false);
+      fetchData();
+      Alert.alert('Success', 'Stock level updated successfully!');
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert('Error', err.response?.data?.detail || 'Failed to restock item.');
+    } finally {
+      setIsRestockLoading(false);
+    }
   };
 
   const filteredItems = menuItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
+    const matchesCategory =
+      selectedCategory === 'All' ||
+      item.category?.toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
@@ -69,63 +197,65 @@ export default function MenuScreen() {
     <GlassCard style={styles.menuCard} padding={16} borderRadius={20} intensity="light">
       <View style={styles.menuRow}>
         {/* Image Placeholder */}
-        <View style={[styles.imagePlaceholder, { backgroundColor: item.available ? colors.primaryPale : colors.bgTertiary }]}>
-          <Text style={styles.imageEmoji}>🍽️</Text>
+        <View style={[styles.imagePlaceholder, { backgroundColor: item.is_available ? colors.primaryPale : colors.bgTertiary }]}>
+          <Text style={styles.imageEmoji}>{item.category === 'stationery' ? '✏️' : '🍽️'}</Text>
         </View>
 
         {/* Info */}
         <View style={styles.menuInfo}>
           <View style={styles.menuHeaderRow}>
             <Text style={styles.menuName}>{item.name}</Text>
-            {item.is_best_seller && (
-              <StatusPill label="Best Seller" variant="warning" size="sm" icon="🏆" />
+            {item.is_low_stock && (
+              <StatusPill label="Low Stock" variant="error" size="sm" />
             )}
           </View>
-          <Text style={styles.menuCategory}>{item.category}</Text>
+          <Text style={styles.menuCategory}>{item.category?.toUpperCase()}</Text>
           <View style={styles.menuMeta}>
             <Text style={styles.menuPrice}>₹{item.price}</Text>
-            {item.ai_suggested_price && (
-              <Text style={styles.aiPriceSuggestion}>
-                AI: ₹{item.ai_suggested_price}
-              </Text>
+            {item.prep_time_minutes && (
+              <Text style={styles.prepTime}>⏱️ {item.prep_time_minutes}m</Text>
             )}
           </View>
 
-          {/* Stats row */}
-          <View style={styles.statsRow}>
-            {item.popularity != null && (
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{item.popularity}%</Text>
-                <Text style={styles.statLabel}>Popular</Text>
-              </View>
-            )}
-            {item.order_count != null && (
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{item.order_count}</Text>
-                <Text style={styles.statLabel}>Orders</Text>
-              </View>
-            )}
-            {item.stock_level != null && (
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: item.stock_level < 10 ? colors.error : colors.success }]}>
-                  {item.stock_level}
-                </Text>
-                <Text style={styles.statLabel}>Stock</Text>
-              </View>
-            )}
+          {/* Stock Info */}
+          <View style={styles.stockRow}>
+            <Text style={styles.stockLabel}>
+              Stock: {item.stock_level !== undefined ? item.stock_level : 'N/A'}
+            </Text>
+            <TouchableOpacity style={styles.restockBtn} onPress={() => openRestockModal(item)}>
+              <Text style={styles.restockBtnText}>+ Restock</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Toggle */}
-        <TouchableOpacity
-          style={[styles.toggleButton, item.available ? styles.toggleActive : styles.toggleInactive]}
-          onPress={() => toggleAvailability(item.id)}
-        >
-          <View style={[styles.toggleCircle, item.available && styles.toggleCircleActive]} />
-          <Text style={[styles.toggleLabel, { color: item.available ? colors.success : colors.textMuted }]}>
-            {item.available ? 'ON' : 'OFF'}
-          </Text>
-        </TouchableOpacity>
+        {/* Actions Column */}
+        <View style={styles.actionsCol}>
+          {/* Toggle */}
+          <TouchableOpacity
+            style={[styles.toggleButton, item.is_available ? styles.toggleActive : styles.toggleInactive]}
+            onPress={() => toggleAvailability(item.id, item.is_available)}
+          >
+            <View style={[styles.toggleCircle, item.is_available && styles.toggleCircleActive]} />
+            <Text style={[styles.toggleLabel, { color: item.is_available ? colors.success : colors.textMuted }]}>
+              {item.is_available ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => navigation.navigate('AddEditMenuItem', { item, onRefresh: fetchData })}
+            >
+              <Text style={styles.actionBtnText}>✏️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => handleDelete(item.id)}
+            >
+              <Text style={styles.actionBtnText}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </GlassCard>
   );
@@ -134,9 +264,34 @@ export default function MenuScreen() {
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Menu</Text>
-        <Text style={styles.headerSubtitle}>{menuItems.filter(i => i.available).length} items available</Text>
+        <View>
+          <Text style={styles.headerTitle}>Menu Catalog</Text>
+          <Text style={styles.headerSubtitle}>
+            {menuItems.filter(i => i.is_available).length} items active
+          </Text>
+        </View>
+        <View style={styles.headerBtns}>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => navigation.navigate('AddEditMenuItem', { onRefresh: fetchData })}
+          >
+            <Text style={styles.headerBtnText}>+ Add Item</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerBtn, styles.stationeryBtn]}
+            onPress={() => navigation.navigate('StationeryServices')}
+          >
+            <Text style={styles.headerBtnText}>✏️ Services</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerBtn, { backgroundColor: colors.info }]}
+            onPress={() => navigation.navigate('MenuBulkImport')}
+          >
+            <Text style={styles.headerBtnText}>📥 CSV</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -144,7 +299,7 @@ export default function MenuScreen() {
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search menu items..."
+            placeholder="Search catalog items..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -158,39 +313,88 @@ export default function MenuScreen() {
       </View>
 
       {/* Category Chips */}
-      <FlatList
-        horizontal
-        data={CATEGORIES}
-        keyExtractor={item => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipsContainer}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.chip, selectedCategory === item && styles.chipActive]}
-            onPress={() => setSelectedCategory(item)}
-          >
-            <Text style={[styles.chipText, selectedCategory === item && styles.chipTextActive]}>
-              {item}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      <View style={{ height: 50, marginTop: spacing.sm }}>
+        <FlatList
+          horizontal
+          data={CATEGORIES}
+          keyExtractor={item => item}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.chip, selectedCategory === item && styles.chipActive]}
+              onPress={() => setSelectedCategory(item)}
+            >
+              <Text style={[styles.chipText, selectedCategory === item && styles.chipTextActive]}>
+                {item}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
 
       {/* Menu List */}
-      <FlatList
-        data={filteredItems}
-        keyExtractor={item => item.id.toString()}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <PremiumEmptyState
-            icon="🍽️"
-            title="No items found"
-            description={searchQuery ? 'Try a different search term.' : 'No items in this category.'}
-          />
-        }
-      />
+      {isLoading && menuItems.length === 0 ? (
+        <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={filteredItems}
+          keyExtractor={item => item.id.toString()}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshing={isLoading}
+          onRefresh={fetchData}
+          ListEmptyComponent={
+            <PremiumEmptyState
+              icon="🍽️"
+              title="No items found"
+              description={searchQuery ? 'Try a different search term.' : 'No items in this category.'}
+            />
+          }
+        />
+      )}
+
+      {/* Restock Modal */}
+      <Modal visible={isRestockVisible} animationType="slide" transparent>
+        <View style={styles.modalBg}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Restock {selectedRestockItem?.name}</Text>
+            <Text style={styles.modalSub}>
+              Current Stock: {selectedRestockItem?.stock_level !== undefined ? selectedRestockItem.stock_level : 'N/A'}
+            </Text>
+
+            <TextInput
+              style={styles.qtyInput}
+              placeholder="Enter Restock Quantity"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numeric"
+              value={restockQty}
+              onChangeText={setRestockQty}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setIsRestockVisible(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSave]}
+                onPress={handleRestock}
+                disabled={isRestockLoading}
+              >
+                {isRestockLoading ? (
+                  <ActivityIndicator color={colors.textInverse} size="small" />
+                ) : (
+                  <Text style={styles.modalBtnSaveText}>Update Stock</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Animated.View>
   );
 }
@@ -204,9 +408,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
-  headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  headerTitle: { fontSize: 24, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
+  headerBtns: {
+    gap: spacing.xs,
+  },
+  headerBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  stationeryBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  headerBtnText: {
+    color: colors.textInverse,
+    fontSize: 12,
+    fontWeight: '600',
+  },
 
   searchContainer: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   searchBar: {
@@ -217,10 +442,11 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: colors.textPrimary, paddingVertical: 12 },
   clearIcon: { fontSize: 14, color: colors.textMuted, padding: 4 },
 
-  chipsContainer: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: 8 },
+  chipsContainer: { paddingHorizontal: spacing.lg, gap: 8, height: 40 },
   chip: {
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
     backgroundColor: colors.bgCard, borderWidth: 1.5, borderColor: colors.border, marginRight: 8,
+    height: 36, justifyContent: 'center',
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
@@ -228,7 +454,7 @@ const styles = StyleSheet.create({
 
   listContent: { padding: spacing.lg, paddingBottom: spacing.huge },
 
-  menuCard: { marginBottom: spacing.sm },
+  menuCard: { marginBottom: spacing.sm, backgroundColor: colors.bgCard },
   menuRow: { flexDirection: 'row', alignItems: 'center' },
   imagePlaceholder: {
     width: 64, height: 64, borderRadius: 16,
@@ -238,23 +464,127 @@ const styles = StyleSheet.create({
   menuInfo: { flex: 1 },
   menuHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   menuName: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  menuCategory: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  menuCategory: { fontSize: 10, color: colors.textMuted, marginTop: 2, fontWeight: '600' },
   menuMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   menuPrice: { fontSize: 18, fontWeight: '700', color: colors.success },
-  aiPriceSuggestion: { fontSize: 11, color: colors.aiPrimary, fontWeight: '600', backgroundColor: colors.primaryPale, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  statsRow: { flexDirection: 'row', gap: 12, marginTop: 6 },
-  statItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  statValue: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-  statLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '500' },
+  prepTime: { fontSize: 12, color: colors.textSecondary },
 
+  stockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  stockLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  restockBtn: {
+    backgroundColor: colors.primaryPale,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+  },
+  restockBtnText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  actionsCol: {
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+    marginLeft: 8,
+  },
   toggleButton: {
-    width: 48, height: 64, borderRadius: 14, justifyContent: 'center', alignItems: 'center',
-    marginLeft: 8, gap: 4,
+    width: 48, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center',
+    gap: 2,
   },
   toggleActive: { backgroundColor: colors.successPale },
   toggleInactive: { backgroundColor: colors.bgTertiary },
-  toggleCircle: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.textMuted },
+  toggleCircle: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.textMuted },
   toggleCircleActive: { backgroundColor: colors.success },
-  toggleLabel: { fontSize: 9, fontWeight: '700' },
-});
+  toggleLabel: { fontSize: 8, fontWeight: '700' },
 
+  btnRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  actionBtn: {
+    padding: 6,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteBtn: {
+    backgroundColor: colors.errorPale,
+    borderColor: colors.errorPale,
+  },
+  actionBtnText: {
+    fontSize: 12,
+  },
+
+  // Modal styles
+  modalBg: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.bgCard,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    alignItems: 'center',
+    ...shadows.lg,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  modalSub: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  qtyInput: {
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    width: '100%',
+    color: colors.textPrimary,
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: colors.bgSecondary,
+  },
+  modalBtnCancelText: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  modalBtnSave: {
+    backgroundColor: colors.primary,
+  },
+  modalBtnSaveText: {
+    color: colors.textInverse,
+    fontWeight: '700',
+  },
+});

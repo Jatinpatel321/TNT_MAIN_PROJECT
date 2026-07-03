@@ -283,31 +283,31 @@ const styles = StyleSheet.create({
     width: LOGO_SIZE,
     height: LOGO_SIZE,
     borderRadius: LOGO_SIZE / 2,
-    backgroundColor: Colors.white + '20',
+    backgroundColor: Colors.textInverse + '20',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: Colors.white + '40',
+    borderColor: Colors.textInverse + '40',
   },
   logoEmoji: {
     fontSize: LOGO_SIZE * 0.45,
   },
   brandName: {
     fontSize: 36,
-    fontWeight: Typography.bold,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textInverse,
     letterSpacing: 1,
   },
   tagline: {
-    fontSize: Typography.h4,
-    fontWeight: Typography.semibold,
+    fontSize: Typography.fontSize.h4,
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.textInverse + 'E0',
     marginTop: 4,
     letterSpacing: 4,
     textTransform: 'uppercase',
   },
   subtitle: {
-    fontSize: Typography.bodySmall,
+    fontSize: Typography.fontSize.bodySmall,
     color: Colors.textInverse + '99',
     textAlign: 'center',
     marginTop: 8,
@@ -324,13 +324,13 @@ const styles = StyleSheet.create({
     ...Shadows.modal,
   },
   formTitle: {
-    fontSize: Typography.h3,
-    fontWeight: Typography.bold,
+    fontSize: Typography.fontSize.h3,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.textPrimary,
     marginBottom: 4,
   },
   formSubtitle: {
-    fontSize: Typography.bodySmall,
+    fontSize: Typography.fontSize.bodySmall,
     color: Colors.textMuted,
     marginBottom: 24,
   },
@@ -354,8 +354,8 @@ const styles = StyleSheet.create({
   },
   modeToggleText: {
     color: Colors.textMuted,
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.bold,
+    fontSize: Typography.fontSize.bodySmall,
+    fontWeight: Typography.fontWeight.bold,
   },
   modeToggleTextActive: {
     color: Colors.textInverse,
@@ -366,8 +366,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: Typography.bodySmall,
-    fontWeight: Typography.semibold,
+    fontSize: Typography.fontSize.bodySmall,
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.textSecondary,
     marginBottom: 8,
   },
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     paddingVertical: 14,
-    fontSize: Typography.body,
+    fontSize: Typography.fontSize.body,
     color: Colors.textPrimary,
   },
 
@@ -405,8 +405,8 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: Colors.textInverse,
-    fontSize: Typography.h4,
-    fontWeight: Typography.bold,
+    fontSize: Typography.fontSize.h4,
+    fontWeight: Typography.fontWeight.bold,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
 
   // Footer
   footerText: {
-    fontSize: Typography.caption,
+    fontSize: Typography.fontSize.caption,
     color: Colors.textMuted,
     textAlign: 'center',
     marginTop: 20,

@@ -1,21 +1,21 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 import { API_BASE_URL } from '../config/api';
 
 export const aiApi = {
-  getDashboard: () => axios.get(`${API_BASE_URL}/v1/vendors/ai/dashboard`),
+  getDashboard: () => apiClient.get(`${API_BASE_URL}/v1/vendors/ai/dashboard`),
   getDailyForecast: (days: number = 7) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/ai/forecast/daily?days=${days}`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/ai/forecast/daily?days=${days}`),
   getWeeklyForecast: (weeks: number = 4) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/ai/forecast/weekly?weeks=${weeks}`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/ai/forecast/weekly?weeks=${weeks}`),
   getMonthlyForecast: (months: number = 3) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/ai/forecast/monthly?months=${months}`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/ai/forecast/monthly?months=${months}`),
   getPopularItems: (limit: number = 10) =>
-    axios.get(`${API_BASE_URL}/v1/vendors/ai/popular-items?limit=${limit}`),
-  getWorkload: () => axios.get(`${API_BASE_URL}/v1/vendors/ai/workload`),
-  getPeakTimes: () => axios.get(`${API_BASE_URL}/v1/vendors/ai/peak-times`),
-  getWasteInsights: () => axios.get(`${API_BASE_URL}/v1/vendors/ai/waste-insights`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/ai/popular-items?limit=${limit}`),
+  getWorkload: () => apiClient.get(`${API_BASE_URL}/v1/vendors/ai/workload`),
+  getPeakTimes: () => apiClient.get(`${API_BASE_URL}/v1/vendors/ai/peak-times`),
+  getWasteInsights: () => apiClient.get(`${API_BASE_URL}/v1/vendors/ai/waste-insights`),
   getInventorySuggestions: () =>
-    axios.get(`${API_BASE_URL}/v1/vendors/ai/inventory-suggestions`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/ai/inventory-suggestions`),
   getRecommendations: () =>
-    axios.get(`${API_BASE_URL}/v1/vendors/ai/recommendations`),
+    apiClient.get(`${API_BASE_URL}/v1/vendors/ai/recommendations`),
 };

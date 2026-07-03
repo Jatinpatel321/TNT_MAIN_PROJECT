@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 class MenuItemCreate(BaseModel):
@@ -105,7 +105,31 @@ class StationeryServiceResponse(BaseModel):
 
 
 class PaginatedResponse(BaseModel):
-    items: List[dict]
+    items: List[Any]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class MenuItemPaginatedResponse(BaseModel):
+    items: List[MenuItemResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class InventoryPaginatedResponse(BaseModel):
+    items: List[InventoryResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class StationeryServicePaginatedResponse(BaseModel):
+    items: List[StationeryServiceResponse]
     total: int
     page: int
     page_size: int

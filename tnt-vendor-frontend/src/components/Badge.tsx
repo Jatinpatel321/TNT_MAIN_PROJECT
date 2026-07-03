@@ -50,11 +50,11 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   label: {
-    fontSize: Typography.caption,
-    fontWeight: Typography.semibold,
+    fontSize: Typography.fontSize.caption,
+    fontWeight: Typography.fontWeight.semibold,
     letterSpacing: 0.3,
   },
   smLabel: {
-    fontSize: Typography.tiny,
+    fontSize: Typography.fontSize.tiny,
   },
 });

@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   // Text
   text: {
-    fontWeight: Typography.semibold,
+    fontWeight: Typography.fontWeight.semibold,
     textAlign: 'center',
   },
   text_primary: { color: Colors.textInverse },
@@ -122,9 +122,9 @@ const styles = StyleSheet.create({
   text_success: { color: Colors.textInverse },
   text_outline: { color: Colors.primary },
   text_ghost: { color: Colors.primary },
-  textSize_sm: { fontSize: Typography.bodySmall },
-  textSize_md: { fontSize: Typography.body },
-  textSize_lg: { fontSize: Typography.h4 },
+  textSize_sm: { fontSize: Typography.fontSize.bodySmall },
+  textSize_md: { fontSize: Typography.fontSize.body },
+  textSize_lg: { fontSize: Typography.fontSize.h4 },
   icon: { fontSize: 18 },
   icon_primary: { color: Colors.textInverse },
   icon_secondary: { color: Colors.textInverse },

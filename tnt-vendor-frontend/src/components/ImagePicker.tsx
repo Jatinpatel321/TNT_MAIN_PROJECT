@@ -16,10 +16,8 @@ export default function ImagePicker({ onImageSelected, title = 'Select Image' }:
     }
 
     const result = await ExpoImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ExpoImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      maxWidth: 1024,
-      maxHeight: 1024,
       allowsEditing: false,
     });
 
@@ -36,10 +34,8 @@ export default function ImagePicker({ onImageSelected, title = 'Select Image' }:
     }
 
     const result = await ExpoImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ExpoImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      maxWidth: 1024,
-      maxHeight: 1024,
       allowsEditing: false,
     });
 

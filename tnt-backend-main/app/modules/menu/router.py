@@ -10,7 +10,8 @@ from app.modules.menu.schemas import (
     MenuItemCreate, MenuItemUpdate, MenuItemResponse,
     InventoryCreate, InventoryUpdate, InventoryResponse,
     StationeryServiceCreate, StationeryServiceUpdate, StationeryServiceResponse,
-    PaginatedResponse
+    PaginatedResponse, MenuItemPaginatedResponse, InventoryPaginatedResponse,
+    StationeryServicePaginatedResponse
 )
 from app.modules.menu.service import (
     create_menu_item, get_menu_item, get_menu_items_by_vendor, update_menu_item,
@@ -70,7 +71,7 @@ def add_menu_item(
     return item
 
 
-@router.get("/items", response_model=PaginatedResponse)
+@router.get("/items", response_model=MenuItemPaginatedResponse)
 def get_menu_items(
     vendor_id: int,
     page: int = Query(1, ge=1),
@@ -120,15 +121,23 @@ def edit_menu_item(
         from app.core.file_upload import save_menu_image
         image_url = save_menu_image(image)
     
-    data = MenuItemUpdate(
-        name=name,
-        price=price,
-        description=description,
-        is_available=is_available,
-        prep_time_minutes=prep_time_minutes,
-        available_quantity=available_quantity,
-        image_url=image_url
-    )
+    update_kwargs = {}
+    if name is not None:
+        update_kwargs["name"] = name
+    if price is not None:
+        update_kwargs["price"] = price
+    if description is not None:
+        update_kwargs["description"] = description
+    if is_available is not None:
+        update_kwargs["is_available"] = is_available
+    if prep_time_minutes is not None:
+        update_kwargs["prep_time_minutes"] = prep_time_minutes
+    if available_quantity is not None:
+        update_kwargs["available_quantity"] = available_quantity
+    if image_url is not None:
+        update_kwargs["image_url"] = image_url
+
+    data = MenuItemUpdate(**update_kwargs)
     
     item = update_menu_item(db, item_id, db_user.id, data)
     if not item:
@@ -203,7 +212,7 @@ def create_inventory_record(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/inventory", response_model=PaginatedResponse)
+@router.get("/inventory", response_model=InventoryPaginatedResponse)
 def get_inventory_list(
     vendor_id: int,
     page: int = Query(1, ge=1),
@@ -323,7 +332,7 @@ def add_stationery_service(
     return service
 
 
-@router.get("/stationery", response_model=PaginatedResponse)
+@router.get("/stationery", response_model=StationeryServicePaginatedResponse)
 def get_stationery_services(
     vendor_id: int,
     page: int = Query(1, ge=1),

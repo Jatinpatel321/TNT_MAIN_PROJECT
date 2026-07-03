@@ -29,7 +29,7 @@ export default function UnreadCounter({
 
   const sizeStyles = getSizeStyles();
 
-  const Container = onPress ? TouchableOpacity : View;
+  const Container = (onPress ? TouchableOpacity : View) as React.ComponentType<any>;
 
   return (
     <Container 
