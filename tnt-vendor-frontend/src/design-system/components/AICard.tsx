@@ -3,8 +3,10 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
-import colors from '../tokens/colors';
+import staticColors from '../tokens/colors';
 import shadows from '../tokens/shadows';
+import { useTheme } from '../../context/ThemeContext';
+
 
 interface AICardProps {
   icon: string;
@@ -16,13 +18,6 @@ interface AICardProps {
   style?: ViewStyle;
 }
 
-const severityConfig = {
-  info: { bg: colors.primaryPale, border: colors.primary, text: colors.primary },
-  success: { bg: colors.successPale, border: colors.success, text: colors.successDark },
-  warning: { bg: colors.warningPale, border: colors.warning, text: colors.warningDark },
-  danger: { bg: colors.errorPale, border: colors.error, text: colors.errorDark },
-};
-
 export default function AICard({
   icon,
   title,
@@ -32,17 +27,26 @@ export default function AICard({
   confidence,
   style,
 }: AICardProps) {
+  const { colors } = useTheme();
+  
+  const severityConfig = {
+    info: { bg: colors.primaryPale, border: colors.primary, text: colors.primary },
+    success: { bg: colors.successPale, border: colors.success, text: colors.success },
+    warning: { bg: colors.warningPale, border: colors.warning, text: colors.warningDark },
+    danger: { bg: colors.errorPale, border: colors.error, text: colors.error },
+  };
+
   const config = severityConfig[severity];
 
   return (
-    <View style={[styles.card, { borderLeftColor: config.border }, style]}>
+    <View style={[styles.card, { backgroundColor: colors.bgCard, borderLeftColor: config.border }, style]}>
       <View style={styles.header}>
         <View style={[styles.iconCircle, { backgroundColor: config.bg }]}>
           <Text style={styles.icon}>{icon}</Text>
         </View>
         <View style={styles.content}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>{description}</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>{description}</Text>
         </View>
         {confidence !== undefined && (
           <View style={[styles.confidenceBadge, { backgroundColor: config.bg }]}>
@@ -61,9 +65,10 @@ export default function AICard({
   );
 }
 
+const colors = staticColors;
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
     borderRadius: 16,
     padding: 16,
     borderLeftWidth: 4,
@@ -90,12 +95,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textPrimary,
     marginBottom: 4,
   },
   description: {
     fontSize: 13,
-    color: colors.textSecondary,
     lineHeight: 18,
   },
   confidenceBadge: {
@@ -120,3 +123,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

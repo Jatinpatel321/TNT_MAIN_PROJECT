@@ -10,7 +10,7 @@ import { ordersApi } from '../../api/orders';
 import { adminApi } from '../../api/admin';
 import { useOrderWebSocket } from '../../hooks/useOrderWebSocket';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { formatOrderId, formatDateTime, formatTimeAgo, formatPaise } from '../../utils/format';
+import { formatOrderId, formatDateTime, formatTimeAgo, formatPaise, formatCurrency } from '../../utils/format';
 import { ACTIVE_ORDER_STATUSES } from '../../utils/constants';
 import type { Order, OrderTimeline } from '../../types';
 import { cn } from '../../utils/cn';
@@ -336,7 +336,7 @@ export default function OrderDetail() {
           {[
             { icon: User, label: 'Customer', value: order.user_name || `User #${order.user_id}` },
             { icon: Store, label: 'Vendor', value: order.vendor_name || `Vendor #${order.vendor_id}` },
-            { icon: IndianRupee, label: 'Amount', value: `₹${(order.total_amount / 100).toFixed(2)}`, bold: true },
+            { icon: IndianRupee, label: 'Amount', value: formatCurrency(order.total_amount, { showDecimals: true }), bold: true },
             { icon: CreditCard, label: 'Payment', value: order.payment_method || 'Razorpay' },
           ].map(({ icon: Icon, label, value, bold }) => (
             <div key={label} className="flex items-center gap-2 text-sm">
@@ -379,18 +379,18 @@ export default function OrderDetail() {
                     <div>
                       <p style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{item.name}</p>
                       <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                        ₹{(item.unit_price / 100).toFixed(2)} × {item.quantity}
+                        {formatCurrency(item.unit_price, { showDecimals: true })} × {item.quantity}
                       </p>
                     </div>
                     <span className="font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-                      ₹{((item.unit_price * item.quantity) / 100).toFixed(2)}
+                      {formatCurrency(item.unit_price * item.quantity, { showDecimals: true })}
                     </span>
                   </div>
                 ))}
                 <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--border-default)' }}>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Total</span>
                   <span className="font-bold font-mono text-lg" style={{ color: 'var(--primary)' }}>
-                    ₹{(order.total_amount / 100).toFixed(2)}
+                    {formatCurrency(order.total_amount, { showDecimals: true })}
                   </span>
                 </div>
               </div>
@@ -407,7 +407,7 @@ export default function OrderDetail() {
             </h3>
             <div className="space-y-2 text-sm">
               {[
-                { label: 'Amount', value: `₹${(order.total_amount / 100).toFixed(2)}` },
+                { label: 'Amount', value: formatCurrency(order.total_amount, { showDecimals: true }) },
                 { label: 'Method', value: order.payment_method || 'Razorpay' },
                 { label: 'Payment ID', value: order.razorpay_payment_id || 'N/A' },
                 { label: 'Fraud Flag', value: order.fraud_flag ? '⚠ Flagged' : 'Clean' },

@@ -24,7 +24,11 @@ Public surface:
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import HTTPException
+
+logger = logging.getLogger("tnt.orders.order_service")
 from sqlalchemy.orm import Session
 
 from app.core.load_insights import get_load_label, is_express_pickup_eligible
@@ -131,10 +135,73 @@ def place_order(
         notification_type=NotificationType.ORDER_PLACED,
         reference_id=order.id,
     )
-    # Commit the notification created above (checkout_order_for_user already
-    # committed the order itself via @transactional; this is a second, smaller
-    # commit just for the notification row).
+
+    # ── R1: Send push notification to vendor about the new order ──────────
+    try:
+        from app.modules.notifications.service import send_vendor_push
+
+        # Build a brief summary of items for the notification body
+        from app.modules.menu.model import MenuItem
+        from app.modules.orders.model import OrderItem as OItem
+
+        item_rows = db.query(OItem).filter(OItem.order_id == order.id).all()
+        item_summaries = []
+        for oi in item_rows:
+            mi = db.query(MenuItem).filter(MenuItem.id == oi.menu_item_id).first()
+            name = mi.name if mi else f"Item #{oi.menu_item_id}"
+            item_summaries.append(f"{oi.quantity}x {name}")
+
+        item_text = ", ".join(item_summaries[:3])
+        if len(item_summaries) > 3:
+            item_text += f" +{len(item_summaries) - 3} more"
+
+        push_sent = send_vendor_push(
+            vendor_id=order.vendor_id,
+            title=f"New Order #{order.id}",
+            message=f"{item_text} — ₹{order.total_amount}",
+            data={
+                "type": "new_order",
+                "order_id": order.id,
+                "vendor_id": order.vendor_id,
+                "eta_minutes": eta_minutes,
+            },
+        )
+        if push_sent:
+            logger.info("vendor_push_new_order sent vendor_id=%s order_id=%s", order.vendor_id, order.id)
+    except Exception:
+        logger.exception("vendor_push_new_order failed vendor_id=%s order_id=%s", order.vendor_id, order.id)
+
+    # ── R4: Check if this slot just became full → notify vendor ───────────
+    try:
+        if slot.current_orders >= slot.max_orders:
+            from app.modules.notifications.service import send_vendor_push
+
+            send_vendor_push(
+                vendor_id=order.vendor_id,
+                title="Slot Full",
+                message=f"Slot {slot.start_time.strftime('%I:%M %p')} has reached capacity ({slot.current_orders}/{slot.max_orders} orders).",
+                data={
+                    "type": "slot_full",
+                    "slot_id": slot.id,
+                    "vendor_id": order.vendor_id,
+                    "current_orders": slot.current_orders,
+                    "max_orders": slot.max_orders,
+                },
+            )
+    except Exception:
+        logger.exception("vendor_push_slot_full failed vendor_id=%s", order.vendor_id)
+
+    # Commit notifications created above
     db.commit()
+
+    # Broadcast new_order event via WebSocket
+    try:
+        from app.core.order_events import publish_order_event
+        from app.modules.orders.vendor_ws_router import _enrich_order
+        payload = _enrich_order(order, db)
+        publish_order_event(order.id, "new_order", payload)
+    except Exception:
+        logger.exception("Failed to publish order event for new order #%s", order.id)
 
     return {
         "order_id": order.id,

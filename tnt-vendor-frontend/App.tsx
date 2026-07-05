@@ -14,7 +14,7 @@ import { colors, shadows, spacing, borderRadius } from './src/design-system';
 // Context
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { PermissionsProvider } from './src/context/PermissionsContext';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 // ── Screen Imports ────────────────────────────────────────────────
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -47,13 +47,20 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 import BusinessHoursScreen from './src/screens/business/BusinessHoursScreen';
 import HolidaySettingsScreen from './src/screens/business/HolidaySettingsScreen';
 import AIInventoryPlanningDashboard from './src/screens/inventory/AIInventoryPlanningDashboard';
+import RestockSuggestionsScreen from './src/screens/inventory/RestockSuggestionsScreen';
 import CoverImageUploadScreen from './src/screens/media/CoverImageUploadScreen';
 import LogoUploadScreen from './src/screens/media/LogoUploadScreen';
+import PerformanceIntelligenceDashboard from './src/screens/analytics/PerformanceIntelligenceDashboard';
+import EnhancedForecastDashboard from './src/screens/analytics/EnhancedForecastDashboard';
+import PickupInstructionsScreen from './src/screens/business/PickupInstructionsScreen';
+import ReviewsScreen from './src/screens/reviews/ReviewsScreen';
+import LoyaltyPointsScreen from './src/screens/promotions/LoyaltyPointsScreen';
+import ComplaintsScreen from './src/screens/complaints/ComplaintsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
+function TabIcon({ name, focused, colors }: { name: string; focused: boolean; colors: any }) {
   const iconMap: Record<string, string> = {
     Dashboard: 'dashboard',
     Orders: 'receipt-long',
@@ -69,14 +76,14 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
         size={focused ? 24 : 22}
         color={focused ? colors.primary : colors.textMuted}
       />
-      {focused && <View style={tabStyles.activeDot} />}
+      {focused && <View style={[tabStyles.activeDot, { backgroundColor: colors.primary }]} />}
     </View>
   );
 }
 
-function TabLabel({ label, focused }: { label: string; focused: boolean }) {
+function TabLabel({ label, focused, colors }: { label: string; focused: boolean; colors: any }) {
   return (
-    <Text style={[tabStyles.label, focused && tabStyles.labelActive]}>
+    <Text style={[tabStyles.label, focused && { color: colors.primary, fontWeight: '700' }, !focused && { color: colors.textMuted }]}>
       {label}
     </Text>
   );
@@ -84,15 +91,16 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 
 function TabNavigator() {
   const { user } = useAuth();
+  const { colors } = useTheme();
   const role = user?.role || 'staff';
 
   const getVisibleTabs = () => {
     switch (role) {
-      case 'owner':
+      case 'vendor_owner':
         return ['Dashboard', 'Orders', 'Menu', 'Analytics', 'More'];
-      case 'manager':
+      case 'vendor_manager':
         return ['Dashboard', 'Orders', 'Menu', 'Analytics', 'More'];
-      default:
+      default: // vendor_staff
         return ['Dashboard', 'Orders', 'Menu', 'More'];
     }
   };
@@ -101,14 +109,14 @@ function TabNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused }) => (
-          <TabIcon name={route.name} focused={focused} />
+          <TabIcon name={route.name} focused={focused} colors={colors} />
         ),
         tabBarLabel: ({ focused }) => (
-          <TabLabel label={route.name} focused={focused} />
+          <TabLabel label={route.name} focused={focused} colors={colors} />
         ),
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: tabStyles.tabBar,
+        tabBarStyle: [tabStyles.tabBar, { backgroundColor: colors.bgCard }],
         tabBarItemStyle: tabStyles.tabItem,
         headerShown: false,
       })}
@@ -126,7 +134,6 @@ function TabNavigator() {
 
 const tabStyles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.bgCard,
     borderTopWidth: 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -148,20 +155,217 @@ const tabStyles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.primary,
     marginTop: 2,
   },
   label: {
     fontSize: 10,
     fontWeight: '600',
-    color: colors.textMuted,
     marginTop: 2,
   },
-  labelActive: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
 });
+
+function AppNavigator() {
+  const { colors } = useTheme();
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Login"
+        screenOptions={{
+          headerShown: true,
+          headerBackTitle: 'Back',
+          headerStyle: {
+            backgroundColor: colors.bgCard,
+          },
+          headerTintColor: colors.textPrimary,
+          headerTitleStyle: {
+            fontWeight: '600',
+            fontSize: 17,
+          },
+          headerShadowVisible: false,
+          contentStyle: {
+            backgroundColor: colors.bg,
+          },
+        }}
+      >
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Main"
+          component={TabNavigator}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AddEditMenuItem"
+          component={AddEditMenuItemScreen}
+          options={{ title: 'Manage Item' }}
+        />
+        <Stack.Screen
+          name="StationeryServices"
+          component={StationeryServicesScreen}
+          options={{ title: 'Stationery Services' }}
+        />
+        <Stack.Screen
+          name="MenuBulkImport"
+          component={MenuBulkImportScreen}
+          options={{ title: 'Bulk Menu', headerShown: false }}
+        />
+        <Stack.Screen
+          name="QRScanner"
+          component={QRScanScreen}
+          options={{
+            title: 'Scan QR Code',
+            headerStyle: { backgroundColor: '#000' },
+            headerTintColor: '#fff',
+          }}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: 'Notifications' }}
+        />
+        <Stack.Screen
+          name="Complaints"
+          component={ComplaintsScreen}
+          options={{ title: 'Complaints & Support' }}
+        />
+        <Stack.Screen
+          name="NotificationDetail"
+          component={NotificationDetailScreen}
+          options={{ title: 'Details' }}
+        />
+        <Stack.Screen
+          name="Settlements"
+          component={SettlementDashboard}
+          options={{ title: 'Settlements' }}
+        />
+        <Stack.Screen
+          name="Promotions"
+          component={PromotionsDashboard}
+          options={{ title: 'Promotions' }}
+        />
+        <Stack.Screen
+          name="AI"
+          component={AIDashboardScreen}
+          options={{ title: 'AI Insights' }}
+        />
+        <Stack.Screen
+          name="DemandDashboard"
+          component={SmartDemandDashboard}
+          options={{ title: 'Smart Demand' }}
+        />
+        <Stack.Screen
+          name="SlotManagement"
+          component={SlotDashboardScreen}
+          options={{ title: 'Slot Management' }}
+        />
+        <Stack.Screen
+          name="SlotConfiguration"
+          component={SlotConfigurationScreen}
+          options={{ title: 'Create Slot' }}
+        />
+        <Stack.Screen
+          name="CapacitySettings"
+          component={CapacitySettingsScreen}
+          options={{ title: 'Capacity Settings' }}
+        />
+        <Stack.Screen
+          name="PeakHourSettings"
+          component={PeakHourSettingsScreen}
+          options={{ title: 'Peak Hours' }}
+        />
+        <Stack.Screen
+          name="FacultyPrioritySettings"
+          component={FacultyPrioritySettingsScreen}
+          options={{ title: 'Faculty Priority' }}
+        />
+        <Stack.Screen
+          name="StaffManagement"
+          component={StaffListScreen}
+          options={{ title: 'Staff' }}
+        />
+        <Stack.Screen
+          name="AddStaff"
+          component={AddStaffScreen}
+          options={{ title: 'Add Staff' }}
+        />
+        <Stack.Screen
+          name="EditStaff"
+          component={EditStaffScreen}
+          options={{ title: 'Edit Staff' }}
+        />
+        <Stack.Screen
+          name="StaffPermissions"
+          component={StaffPermissionsScreen}
+          options={{ title: 'Permissions' }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ title: 'Profile' }}
+        />
+        <Stack.Screen
+          name="BusinessHours"
+          component={BusinessHoursScreen}
+          options={{ title: 'Business Hours' }}
+        />
+        <Stack.Screen
+          name="HolidaySettings"
+          component={HolidaySettingsScreen}
+          options={{ title: 'Holidays', headerShown: false }}
+        />
+        <Stack.Screen
+          name="InventoryPlanning"
+          component={AIInventoryPlanningDashboard}
+          options={{ title: 'Inventory AI' }}
+        />
+        <Stack.Screen
+          name="CoverImageUpload"
+          component={CoverImageUploadScreen}
+          options={{ title: 'Cover Image' }}
+        />
+        <Stack.Screen
+          name="LogoUpload"
+          component={LogoUploadScreen}
+          options={{ title: 'Upload Logo' }}
+        />
+        <Stack.Screen
+          name="PerformanceIntelligence"
+          component={PerformanceIntelligenceDashboard}
+          options={{ title: 'Performance' }}
+        />
+        <Stack.Screen
+          name="EnhancedForecast"
+          component={EnhancedForecastDashboard}
+          options={{ title: 'Forecast' }}
+        />
+        <Stack.Screen
+          name="PickupInstructions"
+          component={PickupInstructionsScreen}
+          options={{ title: 'Pickup Instructions' }}
+        />
+        <Stack.Screen
+          name="Reviews"
+          component={ReviewsScreen}
+          options={{ title: 'Reviews' }}
+        />
+        <Stack.Screen
+          name="RestockSuggestions"
+          component={RestockSuggestionsScreen}
+          options={{ title: 'Auto-Restock' }}
+        />
+        <Stack.Screen
+          name="LoyaltyPoints"
+          component={LoyaltyPointsScreen}
+          options={{ title: 'Loyalty & Rewards' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
 
 export default function App() {
   return (
@@ -171,167 +375,7 @@ export default function App() {
           <ThemeProvider>
             <AuthProvider>
               <PermissionsProvider>
-                <NavigationContainer>
-                  <Stack.Navigator
-                    initialRouteName="Login"
-                    screenOptions={{
-                      headerShown: true,
-                      headerBackTitle: 'Back',
-                      headerStyle: {
-                        backgroundColor: colors.bgCard,
-                      },
-                      headerTintColor: colors.textPrimary,
-                      headerTitleStyle: {
-                        fontWeight: '600',
-                        fontSize: 17,
-                      },
-                      headerShadowVisible: false,
-                      contentStyle: {
-                        backgroundColor: colors.bg,
-                      },
-                    }}
-                  >
-                    <Stack.Screen
-                      name="Login"
-                      component={LoginScreen}
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="Main"
-                      component={TabNavigator}
-                      options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="AddEditMenuItem"
-                      component={AddEditMenuItemScreen}
-                      options={{ title: 'Manage Item' }}
-                    />
-                    <Stack.Screen
-                      name="StationeryServices"
-                      component={StationeryServicesScreen}
-                      options={{ title: 'Stationery Services' }}
-                    />
-                    <Stack.Screen
-                      name="MenuBulkImport"
-                      component={MenuBulkImportScreen}
-                      options={{ title: 'Bulk Menu', headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="QRScanner"
-                      component={QRScanScreen}
-                      options={{
-                        title: 'Scan QR Code',
-                        headerStyle: { backgroundColor: '#000' },
-                        headerTintColor: '#fff',
-                      }}
-                    />
-                    <Stack.Screen
-                      name="Notifications"
-                      component={NotificationsScreen}
-                      options={{ title: 'Notifications' }}
-                    />
-                    <Stack.Screen
-                      name="NotificationDetail"
-                      component={NotificationDetailScreen}
-                      options={{ title: 'Details' }}
-                    />
-                    <Stack.Screen
-                      name="Settlements"
-                      component={SettlementDashboard}
-                      options={{ title: 'Settlements' }}
-                    />
-                    <Stack.Screen
-                      name="Promotions"
-                      component={PromotionsDashboard}
-                      options={{ title: 'Promotions' }}
-                    />
-                    <Stack.Screen
-                      name="AI"
-                      component={AIDashboardScreen}
-                      options={{ title: 'AI Insights' }}
-                    />
-                    <Stack.Screen
-                      name="DemandDashboard"
-                      component={SmartDemandDashboard}
-                      options={{ title: 'Smart Demand' }}
-                    />
-                    <Stack.Screen
-                      name="SlotManagement"
-                      component={SlotDashboardScreen}
-                      options={{ title: 'Slot Management' }}
-                    />
-                    <Stack.Screen
-                      name="SlotConfiguration"
-                      component={SlotConfigurationScreen}
-                      options={{ title: 'Create Slot' }}
-                    />
-                    <Stack.Screen
-                      name="CapacitySettings"
-                      component={CapacitySettingsScreen}
-                      options={{ title: 'Capacity Settings' }}
-                    />
-                    <Stack.Screen
-                      name="PeakHourSettings"
-                      component={PeakHourSettingsScreen}
-                      options={{ title: 'Peak Hours' }}
-                    />
-                    <Stack.Screen
-                      name="FacultyPrioritySettings"
-                      component={FacultyPrioritySettingsScreen}
-                      options={{ title: 'Faculty Priority' }}
-                    />
-                    <Stack.Screen
-                      name="StaffManagement"
-                      component={StaffListScreen}
-                      options={{ title: 'Staff' }}
-                    />
-                    <Stack.Screen
-                      name="AddStaff"
-                      component={AddStaffScreen}
-                      options={{ title: 'Add Staff' }}
-                    />
-                    <Stack.Screen
-                      name="EditStaff"
-                      component={EditStaffScreen}
-                      options={{ title: 'Edit Staff' }}
-                    />
-                    <Stack.Screen
-                      name="StaffPermissions"
-                      component={StaffPermissionsScreen}
-                      options={{ title: 'Permissions' }}
-                    />
-                    <Stack.Screen
-                      name="Profile"
-                      component={ProfileScreen}
-                      options={{ title: 'Profile' }}
-                    />
-                    <Stack.Screen
-                      name="BusinessHours"
-                      component={BusinessHoursScreen}
-                      options={{ title: 'Business Hours' }}
-                    />
-                    <Stack.Screen
-                      name="HolidaySettings"
-                      component={HolidaySettingsScreen}
-                      options={{ title: 'Holidays', headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="InventoryPlanning"
-                      component={AIInventoryPlanningDashboard}
-                      options={{ title: 'Inventory AI' }}
-                    />
-                    <Stack.Screen
-                      name="CoverImageUpload"
-                      component={CoverImageUploadScreen}
-                      options={{ title: 'Cover Image' }}
-                    />
-                    <Stack.Screen
-                      name="LogoUpload"
-                      component={LogoUploadScreen}
-                      options={{ title: 'Upload Logo' }}
-                    />
-                  </Stack.Navigator>
-                </NavigationContainer>
+                <AppNavigator />
               </PermissionsProvider>
             </AuthProvider>
           </ThemeProvider>

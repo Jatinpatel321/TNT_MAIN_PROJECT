@@ -1,14 +1,15 @@
 import apiClient from './apiClient';
-import { API_BASE_URL } from '../config/api';
+
+// ── Vendor profile endpoints ──────────────────────────────────────────────
+// GET  /v1/vendors/auth/profile  → VendorProfileResponse
+// PUT  /v1/vendors/auth/profile  → VendorProfileResponse
+// Staff endpoints live at /v1/vendors/auth/staff (use staffApi.ts for those)
 
 export const profileApi = {
-  getProfile: () => apiClient.get(`${API_BASE_URL}/v1/vendors/profile/`),
-  updateProfile: (data: any) => apiClient.put(`${API_BASE_URL}/v1/vendors/profile/`, data),
-  getStaff: () => apiClient.get(`${API_BASE_URL}/v1/vendors/profile/staff`),
-  addStaff: (data: any) => apiClient.post(`${API_BASE_URL}/v1/vendors/profile/staff`, data),
-  updateStaff: (staffId: number, data: any) =>
-    apiClient.put(`${API_BASE_URL}/v1/vendors/profile/staff/${staffId}`, data),
-  deleteStaff: (staffId: number) =>
-    apiClient.delete(`${API_BASE_URL}/v1/vendors/profile/staff/${staffId}`),
-  getPermissions: () => apiClient.get(`${API_BASE_URL}/v1/vendors/profile/permissions`),
+  /** Get the authenticated vendor's profile */
+  getProfile: () => apiClient.get(`/v1/vendors/auth/profile`),
+
+  /** Update vendor profile — name and category (owner only) */
+  updateProfile: (data: { vendor_name?: string; category?: string }) =>
+    apiClient.put(`/v1/vendors/auth/profile`, data),
 };

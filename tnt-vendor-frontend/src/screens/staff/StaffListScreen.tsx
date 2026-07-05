@@ -13,25 +13,12 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import { staffApi } from '../../services/staffApi';
+import { staffApi, type StaffMember } from '../../services/staffApi';
 import { colors, shadows, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import StatCard from '../../design-system/components/StatCard';
 import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
-
-interface StaffMember {
-  id: number;
-  user_id: number;
-  name: string;
-  phone: string;
-  email?: string;
-  role: 'owner' | 'manager' | 'staff';
-  permissions: string[];
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
 
 export default function StaffListScreen({ navigation }: any) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -48,9 +35,11 @@ export default function StaffListScreen({ navigation }: any) {
     try {
       if (!isRefresh) setLoading(true);
       const response = await staffApi.getStaff();
-      setStaff(response.data.staff);
+      // Backend returns a list directly (not wrapped in { staff: [] })
+      const data = response.data;
+      setStaff(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      console.error('Staff fetch error:', err);
+      console.error('Staff fetch error:', err?.response?.data || err?.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -63,22 +52,32 @@ export default function StaffListScreen({ navigation }: any) {
   }, []);
 
   const handleDeleteStaff = (member: StaffMember) => {
-    if (member.role === 'owner') { Alert.alert('Error', 'Cannot delete owner'); return; }
     Alert.alert('Delete Staff', `Remove ${member.name}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          await staffApi.deleteStaff(member.id);
-          fetchStaff();
-        } catch (err: any) { Alert.alert('Error', err.message); }
-      }},
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await staffApi.deleteStaff(member.id);
+            fetchStaff();
+          } catch (err: any) {
+            Alert.alert('Error', err?.response?.data?.detail || err.message);
+          }
+        },
+      },
     ]);
   };
 
   const roleConfig: Record<string, { label: string; color: string; icon: string }> = {
-    owner: { label: 'Owner', color: colors.secondary, icon: '👑' },
     manager: { label: 'Manager', color: colors.info, icon: '👔' },
     staff: { label: 'Staff', color: colors.success, icon: '👤' },
+  };
+
+  /** Returns count of granted permissions (dict keys) */
+  const permissionCount = (perms: StaffMember['permissions']): number => {
+    if (!perms) return 0;
+    return Object.keys(perms).length;
   };
 
   if (loading) {
@@ -100,7 +99,7 @@ export default function StaffListScreen({ navigation }: any) {
         <View style={styles.headerDeco1} />
         <View style={styles.headerDeco2} />
         <Text style={styles.headerTitle}>Staff Management</Text>
-        <Text style={styles.headerSubtitle}>{staff.length} team members</Text>
+        <Text style={styles.headerSubtitle}>{staff.length} team member{staff.length !== 1 ? 's' : ''}</Text>
       </View>
 
       <Animated.View style={{ opacity: fadeAnim }}>
@@ -117,7 +116,13 @@ export default function StaffListScreen({ navigation }: any) {
         </View>
 
         {staff.length === 0 ? (
-          <PremiumEmptyState icon="👥" title="No team members" description="Add your first staff member to get started" onAction={() => navigation.navigate('AddStaff')} actionLabel="Add Staff" />
+          <PremiumEmptyState
+            icon="👥"
+            title="No team members"
+            description="Add your first staff member to get started"
+            onAction={() => navigation.navigate('AddStaff')}
+            actionLabel="Add Staff"
+          />
         ) : (
           <View style={styles.section}>
             {staff.map(member => {
@@ -132,18 +137,28 @@ export default function StaffListScreen({ navigation }: any) {
                       <Text style={styles.memberName}>{member.name}</Text>
                       <Text style={styles.memberPhone}>{member.phone}</Text>
                     </View>
-                    <StatusPill label={role.label} variant={member.role as any} size="sm" />
+                    <StatusPill label={role.label} variant="primary" size="sm" />
                   </View>
                   <View style={styles.memberMeta}>
                     <StatusPill label={member.is_active ? 'Active' : 'Inactive'} variant={member.is_active ? 'success' : 'neutral'} size="sm" />
-                    <Text style={styles.permissionsCount}>{member.permissions.length} permissions</Text>
+                    <Text style={styles.permissionsCount}>{permissionCount(member.permissions)} permissions</Text>
                   </View>
                   <View style={styles.memberActions}>
-                    <ActionBtn label="Edit" color={colors.info} onPress={() => navigation.navigate('EditStaff', { staff: member })} />
-                    <ActionBtn label="Permissions" color={colors.secondary} onPress={() => navigation.navigate('StaffPermissions', { staff: member })} />
-                    {member.role !== 'owner' && (
-                      <ActionBtn label="Delete" color={colors.error} onPress={() => handleDeleteStaff(member)} />
-                    )}
+                    <ActionBtn
+                      label="Edit"
+                      color={colors.info}
+                      onPress={() => navigation.navigate('EditStaff', { staff: member })}
+                    />
+                    <ActionBtn
+                      label="Permissions"
+                      color={colors.secondary}
+                      onPress={() => navigation.navigate('StaffPermissions', { staff: member })}
+                    />
+                    <ActionBtn
+                      label="Delete"
+                      color={colors.error}
+                      onPress={() => handleDeleteStaff(member)}
+                    />
                   </View>
                 </GlassCard>
               );

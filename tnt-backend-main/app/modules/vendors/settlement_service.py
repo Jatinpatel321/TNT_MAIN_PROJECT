@@ -69,10 +69,10 @@ class VendorSettlementService:
             Payment.status == PaymentStatus.REFUNDED,
         ).scalar() or 0
 
-        total_earned = float(online + cash)
+        total_earned = float(online + cash) / 100
         wallet.total_earned = total_earned
-        wallet.total_refunded = float(refunds)
-        wallet.balance = total_earned - float(refunds)
+        wallet.total_refunded = float(refunds) / 100
+        wallet.balance = total_earned - (float(refunds) / 100)
         wallet.total_pending = total_earned * 0.3  # 30% pending settlement
         wallet.total_settled = total_earned - wallet.total_pending
 
@@ -114,6 +114,10 @@ class VendorSettlementService:
             Payment.created_at >= today_start,
         ).scalar() or 0
 
+        today_online_rupees = float(today_online) / 100
+        today_cash_rupees = float(today_cash) / 100
+        today_refunds_rupees = float(today_refunds) / 100
+
         return {
             "vendor_id": vendor_id,
             "wallet": {
@@ -124,15 +128,15 @@ class VendorSettlementService:
                 "current_balance": round(wallet.balance, 2),
             },
             "today": {
-                "online_payments": round(float(today_online), 2),
-                "cash_orders": round(float(today_cash), 2),
-                "refunds": round(float(today_refunds), 2),
-                "net_revenue": round(float(today_online + today_cash - today_refunds), 2),
+                "online_payments": round(today_online_rupees, 2),
+                "cash_orders": round(today_cash_rupees, 2),
+                "refunds": round(today_refunds_rupees, 2),
+                "net_revenue": round(today_online_rupees + today_cash_rupees - today_refunds_rupees, 2),
             },
             "breakdown": {
-                "online_total": round(float(today_online) if today_online else 0, 2),
-                "cash_total": round(float(today_cash) if today_cash else 0, 2),
-                "refund_total": round(float(today_refunds) if today_refunds else 0, 2),
+                "online_total": round(today_online_rupees, 2),
+                "cash_total": round(today_cash_rupees, 2),
+                "refund_total": round(today_refunds_rupees, 2),
             },
         }
 
@@ -190,9 +194,8 @@ class VendorSettlementService:
                 "created_at": p.created_at.isoformat(),
                 "razorpay_payment_id": p.razorpay_payment_id,
             })
-
         for o in cash_orders:
-            amount = float(o.total_amount or 0)
+            amount = float(o.total_amount or 0) / 100
             transactions.append({
                 "id": o.id,
                 "type": TransactionType.CASH_ORDER.value,
@@ -422,7 +425,7 @@ class VendorSettlementService:
                 "date": day.date().isoformat(),
                 "day_name": day.strftime("%A"),
                 "online": round(float(online) / 100, 2),
-                "cash": round(float(cash), 2),
+                "cash": round(float(cash) / 100, 2),
                 "refunds": round(float(refunds) / 100, 2),
                 "net": round(float(online + cash - refunds) / 100, 2),
             })

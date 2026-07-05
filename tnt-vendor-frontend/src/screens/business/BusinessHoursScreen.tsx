@@ -13,10 +13,12 @@ import {
   Animated,
 } from 'react-native';
 import { businessSettingsApi } from '../../services/businessSettingsApi';
-import { colors, shadows, spacing } from '../../design-system';
+import { colors as staticColors, shadows, spacing } from '../../design-system';
+const colors = staticColors;
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import Button from '../../design-system/components/Button';
+import { useTheme } from '../../context/ThemeContext';
 
 const DAYS = [
   { key: 'monday', label: 'Monday', short: 'Mon' },
@@ -35,7 +37,9 @@ interface DayHours {
 }
 
 export default function BusinessHoursScreen({ navigation }: any) {
+  const { colors: themeColors } = useTheme();
   const [hours, setHours] = useState<{ [key: string]: DayHours }>({});
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -94,28 +98,40 @@ export default function BusinessHoursScreen({ navigation }: any) {
     setHours(prev => {
       const current = prev[key][field];
       const [h, m] = current.split(':').map(Number);
-      let newH = (h + (increment ? 1 : -1) + 24) % 24;
-      const newTime = `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      
+      let newH = h;
+      let newM = m;
+      
+      if (m === 0) {
+        // First click: set to :30
+        newM = 30;
+      } else {
+        // Second click: advance by 1 hour, reset minutes to :00
+        newH = (h + (increment ? 1 : -1) + 24) % 24;
+        newM = 0;
+      }
+      
+      const newTime = `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
       return { ...prev, [key]: { ...prev[key], [field]: newTime } };
     });
   };
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading business hours...</Text>
+      <View style={[styles.container, { backgroundColor: themeColors.bg }, styles.centered]}>
+        <ActivityIndicator size="large" color={themeColors.primary} />
+        <Text style={[styles.loadingText, { color: themeColors.textMuted }]}>Loading business hours...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, { backgroundColor: themeColors.bg }]} showsVerticalScrollIndicator={false}>
+      <View style={[styles.header, { backgroundColor: themeColors.primary }]}>
         <View style={styles.headerDeco1} />
         <View style={styles.headerDeco2} />
-        <Text style={styles.headerTitle}>Business Hours</Text>
-        <Text style={styles.headerSubtitle}>Set your operating hours for each day</Text>
+        <Text style={[styles.headerTitle, { color: themeColors.textInverse }]}>Business Hours</Text>
+        <Text style={[styles.headerSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>Set your operating hours for each day</Text>
       </View>
 
       <Animated.View style={{ opacity: fadeAnim }}>
@@ -126,7 +142,7 @@ export default function BusinessHoursScreen({ navigation }: any) {
               <GlassCard padding={16} borderRadius={18} intensity={dayHours.is_closed ? 'light' : 'medium'}>
                 <View style={styles.dayHeader}>
                   <View style={styles.dayInfo}>
-                    <Text style={styles.dayLabel}>{day.label}</Text>
+                    <Text style={[styles.dayLabel, { color: themeColors.textPrimary }]}>{day.label}</Text>
                     <TouchableOpacity onPress={() => toggleDayClosed(day.key)}>
                       <StatusPill
                         label={dayHours.is_closed ? 'CLOSED' : 'OPEN'}
@@ -136,8 +152,8 @@ export default function BusinessHoursScreen({ navigation }: any) {
                     </TouchableOpacity>
                   </View>
                   {index === 0 && (
-                    <TouchableOpacity style={styles.copyBtn} onPress={() => copyToAllDays(day.key)}>
-                      <Text style={styles.copyBtnText}>Copy to All</Text>
+                    <TouchableOpacity style={[styles.copyBtn, { backgroundColor: themeColors.primaryPale }]} onPress={() => copyToAllDays(day.key)}>
+                      <Text style={[styles.copyBtnText, { color: themeColors.primary }]}>Copy to All</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -145,27 +161,27 @@ export default function BusinessHoursScreen({ navigation }: any) {
                 {!dayHours.is_closed && (
                   <View style={styles.timeRow}>
                     <View style={styles.timeBlock}>
-                      <Text style={styles.timeLabel}>Opens</Text>
+                      <Text style={[styles.timeLabel, { color: themeColors.textMuted }]}>Opens</Text>
                       <View style={styles.timeDisplay}>
-                        <TouchableOpacity onPress={() => cycleTime(day.key, 'open', false)} style={styles.timeArrow}>
-                          <Text style={styles.arrowText}>▲</Text>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'open', false)} style={[styles.timeArrow, { backgroundColor: themeColors.bgSecondary }]}>
+                          <Text style={[styles.arrowText, { color: themeColors.textSecondary }]}>▲</Text>
                         </TouchableOpacity>
-                        <Text style={styles.timeValue}>{dayHours.open}</Text>
-                        <TouchableOpacity onPress={() => cycleTime(day.key, 'open', true)} style={styles.timeArrow}>
-                          <Text style={styles.arrowText}>▼</Text>
+                        <Text style={[styles.timeValue, { color: themeColors.textPrimary }]}>{dayHours.open}</Text>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'open', true)} style={[styles.timeArrow, { backgroundColor: themeColors.bgSecondary }]}>
+                          <Text style={[styles.arrowText, { color: themeColors.textSecondary }]}>▼</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
-                    <Text style={styles.timeSeparator}>→</Text>
+                    <Text style={[styles.timeSeparator, { color: themeColors.textMuted }]}>→</Text>
                     <View style={styles.timeBlock}>
-                      <Text style={styles.timeLabel}>Closes</Text>
+                      <Text style={[styles.timeLabel, { color: themeColors.textMuted }]}>Closes</Text>
                       <View style={styles.timeDisplay}>
-                        <TouchableOpacity onPress={() => cycleTime(day.key, 'close', false)} style={styles.timeArrow}>
-                          <Text style={styles.arrowText}>▲</Text>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'close', false)} style={[styles.timeArrow, { backgroundColor: themeColors.bgSecondary }]}>
+                          <Text style={[styles.arrowText, { color: themeColors.textSecondary }]}>▲</Text>
                         </TouchableOpacity>
-                        <Text style={styles.timeValue}>{dayHours.close}</Text>
-                        <TouchableOpacity onPress={() => cycleTime(day.key, 'close', true)} style={styles.timeArrow}>
-                          <Text style={styles.arrowText}>▼</Text>
+                        <Text style={[styles.timeValue, { color: themeColors.textPrimary }]}>{dayHours.close}</Text>
+                        <TouchableOpacity onPress={() => cycleTime(day.key, 'close', true)} style={[styles.timeArrow, { backgroundColor: themeColors.bgSecondary }]}>
+                          <Text style={[styles.arrowText, { color: themeColors.textSecondary }]}>▼</Text>
                         </TouchableOpacity>
                       </View>
                     </View>

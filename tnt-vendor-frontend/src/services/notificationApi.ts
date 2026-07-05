@@ -1,5 +1,4 @@
 import apiClient from './apiClient';
-import { API_BASE_URL } from '../config/api';
 
 export interface Notification {
   id: number;
@@ -21,22 +20,22 @@ export const notificationApi = {
     const params: any = {};
     if (unreadOnly) params.unread_only = true;
     if (type) params.notification_type = type;
-    return apiClient.get(`${API_BASE_URL}/v1/notifications/vendor`, { params });
+    return apiClient.get(`/v1/notifications/vendor`, { params });
   },
-  getUnreadCount: () => apiClient.get<UnreadCountResponse>(`${API_BASE_URL}/v1/notifications/unread-count`),
+  getUnreadCount: () => apiClient.get<UnreadCountResponse>(`/v1/notifications/unread-count`),
   markAsRead: (notificationId: number) =>
-    apiClient.post(`${API_BASE_URL}/v1/notifications/${notificationId}/read`),
-  markAllAsRead: () => apiClient.post(`${API_BASE_URL}/v1/notifications/mark-all-read`),
+    apiClient.post(`/v1/notifications/${notificationId}/read`),
+  markAllAsRead: () => apiClient.post(`/v1/notifications/mark-all-read`),
   notifyDelay: (orderId: number, delayMinutes: number, reason: string) =>
-    apiClient.post(`${API_BASE_URL}/v1/notifications/vendor/notify-delay`, {
+    apiClient.post(`/v1/notifications/vendor/notify-delay`, {
       order_id: orderId,
       delay_minutes: delayMinutes,
       reason,
     }),
   notifyReady: (orderId: number) =>
-    apiClient.post(`${API_BASE_URL}/v1/notifications/vendor/notify-ready`, { order_id: orderId }),
+    apiClient.post(`/v1/notifications/vendor/notify-ready`, { order_id: orderId }),
   notifyCustom: (orderId: number, message: string) =>
-    apiClient.post(`${API_BASE_URL}/v1/notifications/vendor/notify-custom`, {
+    apiClient.post(`/v1/notifications/vendor/notify-custom`, {
       order_id: orderId,
       message,
     }),

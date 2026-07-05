@@ -14,15 +14,22 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { vendorApi, type DashboardMetrics } from '../../services/vendorApi';
-import { colors, shadows, spacing } from '../../design-system';
+import { useTheme } from '../../context/ThemeContext';
+import { colors as staticColors, shadows, spacing } from '../../design-system';
+const colors = staticColors;
+
+
 import StatCard from '../../design-system/components/StatCard';
 import GlassCard from '../../design-system/components/GlassCard';
 import ProgressRing from '../../design-system/components/ProgressRing';
 import StatusPill from '../../design-system/components/StatusPill';
 import AICard from '../../design-system/components/AICard';
 import AnimatedCounter from '../../design-system/components/AnimatedCounter';
+import { formatPaise } from '../../utils/format';
+
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -30,19 +37,21 @@ const CARD_WIDTH = (width - 48) / 2;
 type StatusVariant = 'primary' | 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple';
 
 const ORDER_STATUS: Record<string, { label: string; variant: StatusVariant; color: string }> = {
-  placed: { label: 'Placed', variant: 'primary', color: colors.statusPlaced },
-  pending: { label: 'Pending', variant: 'primary', color: colors.statusPlaced },
-  confirmed: { label: 'Confirmed', variant: 'info', color: colors.statusConfirmed },
-  preparing: { label: 'Preparing', variant: 'warning', color: colors.statusPreparing },
-  ready: { label: 'Ready', variant: 'success', color: colors.statusReady },
-  ready_for_pickup: { label: 'Ready', variant: 'success', color: colors.statusReady },
-  completed: { label: 'Completed', variant: 'success', color: colors.statusCompleted },
-  picked: { label: 'Picked', variant: 'neutral', color: colors.statusPicked },
-  cancelled: { label: 'Cancelled', variant: 'error', color: colors.statusCancelled },
+  placed: { label: 'Placed', variant: 'primary', color: staticColors.statusPlaced },
+  pending: { label: 'Pending', variant: 'primary', color: staticColors.statusPlaced },
+  confirmed: { label: 'Confirmed', variant: 'info', color: staticColors.statusConfirmed },
+  preparing: { label: 'Preparing', variant: 'warning', color: staticColors.statusPreparing },
+  ready: { label: 'Ready', variant: 'success', color: staticColors.statusReady },
+  ready_for_pickup: { label: 'Ready', variant: 'success', color: staticColors.statusReady },
+  completed: { label: 'Completed', variant: 'success', color: staticColors.statusCompleted },
+  picked: { label: 'Picked', variant: 'neutral', color: staticColors.statusPicked },
+  cancelled: { label: 'Cancelled', variant: 'error', color: staticColors.statusCancelled },
 };
 
 export default function DashboardScreen({ navigation }: any) {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = getStyles(colors);
   const [data, setData] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,21 +92,22 @@ export default function DashboardScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <View style={[styles.container, { backgroundColor: colors.bg }, styles.centered]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading your command center...</Text>
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Loading your command center...</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-      showsVerticalScrollIndicator={false}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+      <ScrollView
+        style={{ flex: 1 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        showsVerticalScrollIndicator={false}
+      >
       {/* ── Premium Header ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.headerDeco1} />
         <View style={styles.headerDeco2} />
         <View style={styles.headerContent}>
@@ -105,7 +115,7 @@ export default function DashboardScreen({ navigation }: any) {
             <Text style={styles.greeting}>
               Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'},
             </Text>
-            <Text style={styles.vendorName}>{user?.vendor_name || 'Vendor'}</Text>
+            <Text style={[styles.vendorName, { color: colors.textInverse }]}>{user?.vendor_name || 'Vendor'}</Text>
             <View style={styles.headerStatusRow}>
               <StatusPill label="OPEN" variant="success" size="sm" animated />
               <StatusPill
@@ -139,22 +149,22 @@ export default function DashboardScreen({ navigation }: any) {
                 showPercentage
               />
               <View style={styles.healthInfo}>
-                <Text style={styles.healthTitle}>Today's Progress</Text>
-                <Text style={styles.healthSubtitle}>
+                <Text style={[styles.healthTitle, { color: colors.textPrimary }]}>Today's Progress</Text>
+                <Text style={[styles.healthSubtitle, { color: colors.textMuted }]}>
                   {data?.completed_orders ?? 0} of {data?.orders_today ?? 0} orders completed
                 </Text>
                 <View style={styles.healthStats}>
                   <View style={styles.healthStat}>
-                    <Text style={styles.healthStatValue}>{data?.avg_rating?.toFixed(1) || '0.0'}</Text>
-                    <Text style={styles.healthStatLabel}>Rating</Text>
+                    <Text style={[styles.healthStatValue, { color: colors.textPrimary }]}>{data?.avg_rating?.toFixed(1) || '0.0'}</Text>
+                    <Text style={[styles.healthStatLabel, { color: colors.textMuted }]}>Rating</Text>
                   </View>
                   <View style={styles.healthStat}>
-                    <Text style={styles.healthStatValue}>{data?.active_slots ?? 0}</Text>
-                    <Text style={styles.healthStatLabel}>Slots</Text>
+                    <Text style={[styles.healthStatValue, { color: colors.textPrimary }]}>{data?.active_slots ?? 0}</Text>
+                    <Text style={[styles.healthStatLabel, { color: colors.textMuted }]}>Slots</Text>
                   </View>
                   <View style={styles.healthStat}>
-                    <Text style={styles.healthStatValue}>{data?.pending_orders ?? 0}</Text>
-                    <Text style={styles.healthStatLabel}>Pending</Text>
+                    <Text style={[styles.healthStatValue, { color: colors.textPrimary }]}>{data?.pending_orders ?? 0}</Text>
+                    <Text style={[styles.healthStatLabel, { color: colors.textMuted }]}>Pending</Text>
                   </View>
                 </View>
               </View>
@@ -171,36 +181,36 @@ export default function DashboardScreen({ navigation }: any) {
             color={colors.primary}
             icon="💰"
             format="currency"
-            style={{ width: CARD_WIDTH }}
+            style={{ flexBasis: '45%', flexGrow: 1 }}
           />
           <StatCard
             value={data?.orders_today ?? 0}
             label="Orders Today"
             color={colors.secondary}
             icon="📦"
-            style={{ width: CARD_WIDTH }}
+            style={{ flexBasis: '45%', flexGrow: 1 }}
           />
         </View>
 
         {/* ── Order Status Summary ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Text style={styles.sectionAccent}>│</Text> Order Status
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            <Text style={[styles.sectionAccent, { color: colors.primary }]}>│</Text> Order Status
           </Text>
           <View style={styles.orderStatusGrid}>
-            <TouchableOpacity style={styles.orderStatusCard} onPress={() => navigateTo('Orders')}>
+            <TouchableOpacity style={[styles.orderStatusCard, { backgroundColor: colors.bgCard }]} onPress={() => navigateTo('Orders')}>
               <View style={[styles.orderStatusIcon, { backgroundColor: colors.statusPlaced + '15' }]}>
                 <Text style={styles.orderStatusEmoji}>⏳</Text>
               </View>
               <AnimatedCounter value={data?.pending_orders ?? 0} fontSize={20} color={colors.statusPlaced} />
-              <Text style={styles.orderStatusLabel}>Pending</Text>
+              <Text style={[styles.orderStatusLabel, { color: colors.textMuted }]}>Pending</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.orderStatusCard} onPress={() => navigateTo('Orders')}>
+            <TouchableOpacity style={[styles.orderStatusCard, { backgroundColor: colors.bgCard }]} onPress={() => navigateTo('Orders')}>
               <View style={[styles.orderStatusIcon, { backgroundColor: colors.statusConfirmed + '15' }]}>
                 <Text style={styles.orderStatusEmoji}>✅</Text>
               </View>
               <AnimatedCounter value={data?.completed_orders ?? 0} fontSize={20} color={colors.statusConfirmed} />
-              <Text style={styles.orderStatusLabel}>Completed</Text>
+              <Text style={[styles.orderStatusLabel, { color: colors.textMuted }]}>Completed</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -208,8 +218,8 @@ export default function DashboardScreen({ navigation }: any) {
         {/* ── Revenue Trend ── */}
         {data?.revenue_trend && data.revenue_trend.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Text style={styles.sectionAccent}>│</Text> Revenue Trend
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              <Text style={[styles.sectionAccent, { color: colors.primary }]}>│</Text> Revenue Trend
             </Text>
             <GlassCard padding={20} borderRadius={24}>
               <View style={styles.revenueChart}>
@@ -230,7 +240,7 @@ export default function DashboardScreen({ navigation }: any) {
                           ]}
                         />
                       </View>
-                      <Text style={styles.barLabel}>
+                      <Text style={[styles.barLabel, { color: colors.textMuted }]}>
                         {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)}
                       </Text>
                     </View>
@@ -243,8 +253,8 @@ export default function DashboardScreen({ navigation }: any) {
 
         {/* ── AI Insights ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Text style={styles.sectionAccent}>│</Text> AI Insights
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            <Text style={[styles.sectionAccent, { color: colors.primary }]}>│</Text> AI Insights
           </Text>
           <AICard
             icon="📈"
@@ -267,8 +277,8 @@ export default function DashboardScreen({ navigation }: any) {
 
         {/* ── Quick Actions ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Text style={styles.sectionAccent}>│</Text> Quick Actions
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            <Text style={[styles.sectionAccent, { color: colors.primary }]}>│</Text> Quick Actions
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsRow}>
             {[
@@ -283,14 +293,14 @@ export default function DashboardScreen({ navigation }: any) {
             ].map((item, i) => (
               <TouchableOpacity
                 key={i}
-                style={styles.quickActionCard}
+                style={[styles.quickActionCard, { backgroundColor: colors.bgCard }]}
                 onPress={() => navigateTo(item.screen)}
                 activeOpacity={0.8}
               >
                 <View style={[styles.quickActionIcon, { backgroundColor: item.color + '15' }]}>
                   <Text style={styles.quickActionEmoji}>{item.icon}</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>{item.label}</Text>
+                <Text style={[styles.quickActionLabel, { color: colors.textPrimary }]} numberOfLines={1}>{item.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -300,11 +310,11 @@ export default function DashboardScreen({ navigation }: any) {
         {data?.recent_orders && data.recent_orders.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>
-                <Text style={styles.sectionAccent}>│</Text> Recent Orders
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+                <Text style={[styles.sectionAccent, { color: colors.primary }]}>│</Text> Recent Orders
               </Text>
               <TouchableOpacity onPress={() => navigateTo('Orders')}>
-                <Text style={styles.seeAllText}>See All →</Text>
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>See All →</Text>
               </TouchableOpacity>
             </View>
             {data.recent_orders.slice(0, 4).map((order: any) => (
@@ -318,13 +328,13 @@ export default function DashboardScreen({ navigation }: any) {
                         size="sm"
                       />
                       <View>
-                        <Text style={styles.recentOrderId}>Order #{order.id}</Text>
-                        <Text style={styles.recentOrderMeta}>
-                          ₹{order.total_amount} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <Text style={[styles.recentOrderId, { color: colors.textPrimary }]}>Order #{order.id}</Text>
+                        <Text style={[styles.recentOrderMeta, { color: colors.textMuted }]}>
+                          {formatPaise(order.total_amount)} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.recentOrderArrow}>›</Text>
+                    <Text style={[styles.recentOrderArrow, { color: colors.textMuted }]}>›</Text>
                   </View>
                 </GlassCard>
               </TouchableOpacity>
@@ -336,21 +346,21 @@ export default function DashboardScreen({ navigation }: any) {
         {data?.recent_notifications && data.recent_notifications.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>
-                <Text style={styles.sectionAccent}>│</Text> Notifications
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+                <Text style={[styles.sectionAccent, { color: colors.primary }]}>│</Text> Notifications
               </Text>
               <TouchableOpacity onPress={() => navigateTo('Notifications')}>
-                <Text style={styles.seeAllText}>See All →</Text>
+                <Text style={[styles.seeAllText, { color: colors.primary }]}>See All →</Text>
               </TouchableOpacity>
             </View>
             {data.recent_notifications.slice(0, 2).map((n: any) => (
               <TouchableOpacity key={n.id} activeOpacity={0.8}>
                 <GlassCard style={styles.notifCard} padding={14} borderRadius={16} intensity="medium">
                   <View style={styles.notifRow}>
-                    <View style={[styles.notifDot, !n.is_read && styles.notifUnread]} />
+                    <View style={[styles.notifDot, !n.is_read && { backgroundColor: colors.primary }, n.is_read && { backgroundColor: colors.textMuted }]} />
                     <View style={styles.notifContent}>
-                      <Text style={styles.notifTitle}>{n.title}</Text>
-                      <Text style={styles.notifMessage} numberOfLines={1}>{n.message}</Text>
+                      <Text style={[styles.notifTitle, { color: colors.textPrimary }]}>{n.title}</Text>
+                      <Text style={[styles.notifMessage, { color: colors.textSecondary }]} numberOfLines={1}>{n.message}</Text>
                     </View>
                   </View>
                 </GlassCard>
@@ -359,21 +369,22 @@ export default function DashboardScreen({ navigation }: any) {
           </View>
         )}
 
-        <View style={styles.bottomSpacer} />
+        <View style={[styles.bottomSpacer, { height: 100 }]} />
       </Animated.View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   centered: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
 
   header: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.huge + 20,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.lg,
+    paddingBottom: 36,
     paddingHorizontal: spacing.xl,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
@@ -408,7 +419,7 @@ const styles = StyleSheet.create({
   bellIcon: { fontSize: 18 },
   headerDate: { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
 
-  healthSection: { paddingHorizontal: spacing.lg, marginTop: -20, marginBottom: spacing.md },
+  healthSection: { paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.md },
   healthRow: { flexDirection: 'row', alignItems: 'center' },
   healthInfo: { flex: 1, marginLeft: 16 },
   healthTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
@@ -418,7 +429,7 @@ const styles = StyleSheet.create({
   healthStatValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   healthStatLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '500', marginTop: 2 },
 
-  statsGrid: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.md, marginBottom: spacing.md },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, gap: spacing.md, marginBottom: spacing.md },
 
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
@@ -441,7 +452,7 @@ const styles = StyleSheet.create({
   barLabel: { fontSize: 10, color: colors.textMuted, fontWeight: '600', marginTop: 4 },
 
   quickActionsRow: { gap: spacing.md, paddingRight: spacing.lg },
-  quickActionCard: { backgroundColor: colors.bgCard, borderRadius: 20, padding: spacing.lg, alignItems: 'center', width: 90, ...shadows.card },
+  quickActionCard: { backgroundColor: colors.bgCard, borderRadius: 20, paddingVertical: spacing.lg, paddingHorizontal: 12, alignItems: 'center', minWidth: 90, ...shadows.card },
   quickActionIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   quickActionEmoji: { fontSize: 22 },
   quickActionLabel: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },

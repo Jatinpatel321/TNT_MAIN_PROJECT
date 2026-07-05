@@ -16,15 +16,7 @@ interface StatusPillProps {
   outline?: boolean;
 }
 
-const variantColors: Record<string, { bg: string; text: string; dot: string }> = {
-  primary: { bg: colors.primaryPale, text: colors.primary, dot: colors.primary },
-  success: { bg: colors.successPale, text: colors.successDark, dot: colors.success },
-  warning: { bg: colors.warningPale, text: colors.warningDark, dot: colors.warning },
-  error: { bg: colors.errorPale, text: colors.errorDark, dot: colors.error },
-  info: { bg: colors.infoPale, text: colors.info, dot: colors.info },
-  neutral: { bg: colors.bgTertiary, text: colors.textSecondary, dot: colors.textMuted },
-  purple: { bg: colors.secondaryPale, text: colors.secondary, dot: colors.secondary },
-};
+import { useTheme } from '../../context/ThemeContext';
 
 export default function StatusPill({
   label,
@@ -35,6 +27,18 @@ export default function StatusPill({
   style,
   outline = false,
 }: StatusPillProps) {
+  const { colors } = useTheme();
+  
+  const variantColors: Record<string, { bg: string; text: string; dot: string }> = {
+    primary: { bg: colors.primaryPale, text: colors.primary, dot: colors.primary },
+    success: { bg: colors.successPale, text: colors.successDark, dot: colors.success },
+    warning: { bg: colors.warningPale, text: colors.warningDark, dot: colors.warning },
+    error: { bg: colors.errorPale, text: colors.errorDark, dot: colors.error },
+    info: { bg: colors.infoPale, text: colors.info, dot: colors.info },
+    neutral: { bg: colors.bgTertiary, text: colors.textSecondary, dot: colors.textMuted },
+    purple: { bg: colors.secondaryPale, text: colors.secondary, dot: colors.secondary },
+  };
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {

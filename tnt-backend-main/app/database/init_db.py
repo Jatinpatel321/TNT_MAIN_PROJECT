@@ -37,7 +37,27 @@ from app.database.session import engine
 
 
 def init_db():
+    from sqlalchemy import text
+    # Check if vendor_profiles has 'id' column
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SELECT id FROM vendor_profiles LIMIT 1"))
+        except Exception:
+            # Table doesn't have 'id' column or doesn't exist. Drop it CASCADE.
+            try:
+                conn.execute(text("DROP TABLE IF EXISTS vendor_profiles CASCADE"))
+                conn.commit()
+            except Exception:
+                pass
+
     Base.metadata.create_all(bind=engine)
+    # Ensure group_id column exists on orders table dynamically
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id)"))
+            conn.commit()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

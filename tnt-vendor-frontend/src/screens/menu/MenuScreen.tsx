@@ -11,13 +11,18 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { colors, shadows, spacing, borderRadius } from '../../design-system';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors as staticColors, shadows, spacing, borderRadius } from '../../design-system';
+const colors = staticColors;
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
 import apiClient from '../../services/apiClient';
-import { API_BASE_URL } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { formatPaise } from '../../utils/format';
+
+
 
 interface MenuItem {
   id: number;
@@ -38,7 +43,9 @@ const CATEGORIES = ['All', 'Breakfast', 'Beverages', 'Lunch', 'Snacks', 'Special
 
 export default function MenuScreen({ navigation }: any) {
   const { user } = useAuth();
-  const vendorId = user?.id;
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+  const vendorId = user?.vendor_id;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -57,19 +64,19 @@ export default function MenuScreen({ navigation }: any) {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     fetchData();
   }, [vendorId]);
-
+  
   const fetchData = async () => {
     if (!vendorId) return;
     setIsLoading(true);
     try {
       // 1. Fetch menu items
-      const itemsRes = await apiClient.get(`${API_BASE_URL}/v1/menu/items?vendor_id=${vendorId}`);
+      const itemsRes = await apiClient.get(`/v1/menu/items?vendor_id=${vendorId}`);
       const rawItems = itemsRes.data.items || [];
 
       // 2. Fetch inventory dashboard
       let inventoryMap: Record<number, { id: number; current_stock: number; low_stock_threshold: number }> = {};
       try {
-        const invRes = await apiClient.get(`${API_BASE_URL}/v1/vendors/inventory/dashboard`);
+        const invRes = await apiClient.get(`/v1/vendors/inventory/dashboard`);
         const invItems = invRes.data.items || [];
         invItems.forEach((inv: any) => {
           inventoryMap[inv.menu_item_id] = {
@@ -104,7 +111,7 @@ export default function MenuScreen({ navigation }: any) {
 
   const toggleAvailability = async (id: number, currentAvailable: boolean) => {
     try {
-      await apiClient.put(`${API_BASE_URL}/v1/menu/items/${id}/toggle`);
+      await apiClient.put(`/v1/menu/items/${id}/toggle`);
       setMenuItems(prev =>
         prev.map(item =>
           item.id === id ? { ...item, is_available: !currentAvailable } : item,
@@ -126,7 +133,7 @@ export default function MenuScreen({ navigation }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiClient.delete(`${API_BASE_URL}/v1/menu/items/${id}`);
+              await apiClient.delete(`/v1/menu/items/${id}`);
               fetchData();
             } catch (err) {
               Alert.alert('Error', 'Failed to delete menu item.');
@@ -158,7 +165,7 @@ export default function MenuScreen({ navigation }: any) {
         const formData = new FormData();
         formData.append('quantity', qty.toString());
         await apiClient.post(
-          `${API_BASE_URL}/v1/menu/inventory/${selectedRestockItem.inventory_id}/restock`,
+          `/v1/menu/inventory/${selectedRestockItem.inventory_id}/restock`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
@@ -169,7 +176,7 @@ export default function MenuScreen({ navigation }: any) {
         formData.append('current_stock', qty.toString());
         formData.append('low_stock_threshold', '10');
         formData.append('auto_disable', 'true');
-        await apiClient.post(`${API_BASE_URL}/v1/menu/inventory`, formData, {
+        await apiClient.post(`/v1/menu/inventory`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }
@@ -204,26 +211,26 @@ export default function MenuScreen({ navigation }: any) {
         {/* Info */}
         <View style={styles.menuInfo}>
           <View style={styles.menuHeaderRow}>
-            <Text style={styles.menuName}>{item.name}</Text>
+            <Text style={[styles.menuName, { color: colors.textPrimary }]}>{item.name}</Text>
             {item.is_low_stock && (
               <StatusPill label="Low Stock" variant="error" size="sm" />
             )}
           </View>
-          <Text style={styles.menuCategory}>{item.category?.toUpperCase()}</Text>
+          <Text style={[styles.menuCategory, { color: colors.textMuted }]}>{item.category?.toUpperCase()}</Text>
           <View style={styles.menuMeta}>
-            <Text style={styles.menuPrice}>₹{item.price}</Text>
+            <Text style={[styles.menuPrice, { color: colors.primary }]}>{formatPaise(item.price)}</Text>
             {item.prep_time_minutes && (
-              <Text style={styles.prepTime}>⏱️ {item.prep_time_minutes}m</Text>
+              <Text style={[styles.prepTime, { color: colors.textSecondary }]}>⏱️ {item.prep_time_minutes}m</Text>
             )}
           </View>
 
           {/* Stock Info */}
           <View style={styles.stockRow}>
-            <Text style={styles.stockLabel}>
+            <Text style={[styles.stockLabel, { color: colors.textSecondary }]}>
               Stock: {item.stock_level !== undefined ? item.stock_level : 'N/A'}
             </Text>
             <TouchableOpacity style={styles.restockBtn} onPress={() => openRestockModal(item)}>
-              <Text style={styles.restockBtnText}>+ Restock</Text>
+              <Text style={[styles.restockBtnText, { color: colors.primary }]}>+ Restock</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -232,10 +239,13 @@ export default function MenuScreen({ navigation }: any) {
         <View style={styles.actionsCol}>
           {/* Toggle */}
           <TouchableOpacity
-            style={[styles.toggleButton, item.is_available ? styles.toggleActive : styles.toggleInactive]}
+            style={[
+              styles.toggleButton,
+              item.is_available ? { backgroundColor: colors.successPale } : { backgroundColor: colors.bgTertiary }
+            ]}
             onPress={() => toggleAvailability(item.id, item.is_available)}
           >
-            <View style={[styles.toggleCircle, item.is_available && styles.toggleCircleActive]} />
+            <View style={[styles.toggleCircle, { backgroundColor: item.is_available ? colors.success : colors.textMuted }]} />
             <Text style={[styles.toggleLabel, { color: item.is_available ? colors.success : colors.textMuted }]}>
               {item.is_available ? 'ON' : 'OFF'}
             </Text>
@@ -243,16 +253,16 @@ export default function MenuScreen({ navigation }: any) {
 
           <View style={styles.btnRow}>
             <TouchableOpacity
-              style={styles.actionBtn}
+              style={[styles.actionBtn, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
               onPress={() => navigation.navigate('AddEditMenuItem', { item, onRefresh: fetchData })}
             >
-              <Text style={styles.actionBtnText}>✏️</Text>
+              <Text style={[styles.actionBtnText, { color: colors.textPrimary }]}>✏️</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.deleteBtn]}
+              style={[styles.actionBtn, { backgroundColor: colors.errorPale, borderColor: colors.errorPale }]}
               onPress={() => handleDelete(item.id)}
             >
-              <Text style={styles.actionBtnText}>🗑️</Text>
+              <Text style={[styles.actionBtnText, { color: colors.error }]}>🗑️</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -261,44 +271,45 @@ export default function MenuScreen({ navigation }: any) {
   );
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      {/* Header */}
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View>
-          <Text style={styles.headerTitle}>Menu Catalog</Text>
+          <Text style={[styles.headerTitle, { color: colors.textInverse }]}>Menu Catalog</Text>
           <Text style={styles.headerSubtitle}>
             {menuItems.filter(i => i.is_available).length} items active
           </Text>
         </View>
         <View style={styles.headerBtns}>
           <TouchableOpacity
-            style={styles.headerBtn}
+            style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
             onPress={() => navigation.navigate('AddEditMenuItem', { onRefresh: fetchData })}
           >
-            <Text style={styles.headerBtnText}>+ Add Item</Text>
+            <Text style={[styles.headerBtnText, { color: colors.textInverse }]}>+ Add Item</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.headerBtn, styles.stationeryBtn]}
+            style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
             onPress={() => navigation.navigate('StationeryServices')}
           >
-            <Text style={styles.headerBtnText}>✏️ Services</Text>
+            <Text style={[styles.headerBtnText, { color: colors.textInverse }]}>✏️ Services</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: colors.info }]}
             onPress={() => navigation.navigate('MenuBulkImport')}
           >
-            <Text style={styles.headerBtnText}>📥 CSV</Text>
+            <Text style={[styles.headerBtnText, { color: colors.textInverse }]}>📥 CSV</Text>
           </TouchableOpacity>
         </View>
       </View>
 
 
       {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+      <View style={[styles.searchContainer, { backgroundColor: colors.bgCard }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+          <Text style={[styles.searchIcon, { color: colors.textMuted }]}>🔍</Text>
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.textPrimary }]}
             placeholder="Search catalog items..."
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
@@ -306,14 +317,14 @@ export default function MenuScreen({ navigation }: any) {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearIcon}>✕</Text>
+              <Text style={[styles.clearIcon, { color: colors.textMuted }]}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {/* Category Chips */}
-      <View style={{ height: 50, marginTop: spacing.sm }}>
+      <View style={{ height: 70, marginTop: spacing.sm }}>
         <FlatList
           horizontal
           data={CATEGORIES}
@@ -322,10 +333,18 @@ export default function MenuScreen({ navigation }: any) {
           contentContainerStyle={styles.chipsContainer}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[styles.chip, selectedCategory === item && styles.chipActive]}
+              style={[
+                styles.chip,
+                { backgroundColor: colors.bgSecondary, borderColor: colors.border },
+                selectedCategory === item && [styles.chipActive, { backgroundColor: colors.primary, borderColor: colors.primary }]
+              ]}
               onPress={() => setSelectedCategory(item)}
             >
-              <Text style={[styles.chipText, selectedCategory === item && styles.chipTextActive]}>
+              <Text style={[
+                styles.chipText,
+                { color: colors.textMuted },
+                selectedCategory === item && [styles.chipTextActive, { color: colors.textInverse }]
+              ]} numberOfLines={1}>
                 {item}
               </Text>
             </TouchableOpacity>
@@ -341,7 +360,7 @@ export default function MenuScreen({ navigation }: any) {
           data={filteredItems}
           keyExtractor={item => item.id.toString()}
           renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
           refreshing={isLoading}
           onRefresh={fetchData}
@@ -357,15 +376,15 @@ export default function MenuScreen({ navigation }: any) {
 
       {/* Restock Modal */}
       <Modal visible={isRestockVisible} animationType="slide" transparent>
-        <View style={styles.modalBg}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Restock {selectedRestockItem?.name}</Text>
-            <Text style={styles.modalSub}>
+        <View style={[styles.modalBg, { backgroundColor: colors.bgOverlay || 'rgba(0,0,0,0.5)' }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.bgCard }]}>
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Restock {selectedRestockItem?.name}</Text>
+            <Text style={[styles.modalSub, { color: colors.textMuted }]}>
               Current Stock: {selectedRestockItem?.stock_level !== undefined ? selectedRestockItem.stock_level : 'N/A'}
             </Text>
 
             <TextInput
-              style={styles.qtyInput}
+              style={[styles.qtyInput, { backgroundColor: colors.bgSecondary, borderColor: colors.border, color: colors.textPrimary }]}
               placeholder="Enter Restock Quantity"
               placeholderTextColor={colors.textMuted}
               keyboardType="numeric"
@@ -375,35 +394,37 @@ export default function MenuScreen({ navigation }: any) {
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnCancel]}
+                style={[styles.modalBtn, styles.modalBtnCancel, { backgroundColor: colors.bgSecondary }]}
                 onPress={() => setIsRestockVisible(false)}
               >
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                <Text style={[styles.modalBtnCancelText, { color: colors.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnSave]}
+                style={[styles.modalBtn, styles.modalBtnSave, { backgroundColor: colors.primary }]}
                 onPress={handleRestock}
                 disabled={isRestockLoading}
               >
                 {isRestockLoading ? (
                   <ActivityIndicator color={colors.textInverse} size="small" />
                 ) : (
-                  <Text style={styles.modalBtnSaveText}>Update Stock</Text>
+                  <Text style={[styles.modalBtnSaveText, { color: colors.textInverse }]}>Update Stock</Text>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </Animated.View>
+      </Animated.View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+
+const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.huge + 20,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.xl,
     borderBottomLeftRadius: 28,
@@ -442,9 +463,9 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: colors.textPrimary, paddingVertical: 12 },
   clearIcon: { fontSize: 14, color: colors.textMuted, padding: 4 },
 
-  chipsContainer: { paddingHorizontal: spacing.lg, gap: 8, height: 40 },
+  chipsContainer: { paddingHorizontal: spacing.lg, gap: 8, height: 48 },
   chip: {
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
+    paddingHorizontal: 22, paddingVertical: 8, borderRadius: 20,
     backgroundColor: colors.bgCard, borderWidth: 1.5, borderColor: colors.border, marginRight: 8,
     height: 36, justifyContent: 'center',
   },

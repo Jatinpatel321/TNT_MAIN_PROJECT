@@ -82,7 +82,7 @@ def publish_order_status_change(
     eta_minutes: Optional[int] = None,
 ) -> bool:
     """Convenience wrapper for publishing a status change event."""
-    return publish_order_event(order_id, "status_change", {
+    ok = publish_order_event(order_id, "status_change", {
         "order_id": order_id,
         "previous_status": previous_status,
         "new_status": new_status,
@@ -91,6 +91,13 @@ def publish_order_status_change(
         "eta_minutes": eta_minutes,
         "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
     })
+    publish_order_event(order_id, "order_updated", {
+        "id": order_id,
+        "status": new_status,
+        "vendor_id": vendor_id,
+        "eta_minutes": eta_minutes,
+    })
+    return ok
 
 
 def publish_eta_update(order_id: int, eta_minutes: int, is_delayed: bool = False, vendor_id: int = 0) -> bool:

@@ -16,9 +16,12 @@ import {
   TextInput,
 } from 'react-native';
 import { businessSettingsApi } from '../../services/businessSettingsApi';
-import { colors, shadows, spacing } from '../../design-system';
+import { colors as staticColors, shadows, spacing } from '../../design-system';
+const colors = staticColors;
 import GlassCard from '../../design-system/components/GlassCard';
 import Button from '../../design-system/components/Button';
+import { useTheme } from '../../context/ThemeContext';
+
 
 interface Holiday {
   date: string;   // YYYY-MM-DD
@@ -50,8 +53,10 @@ function formatDisplay(dateStr: string): string {
 }
 
 export default function HolidaySettingsScreen({ navigation }: any) {
+  const { colors: themeColors } = useTheme();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
+
   const [month, setMonth] = useState(today.getMonth());
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,21 +163,21 @@ export default function HolidaySettingsScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading holidays…</Text>
+      <View style={[styles.container, { backgroundColor: themeColors.bg }, styles.centered]}>
+        <ActivityIndicator size="large" color={themeColors.primary} />
+        <Text style={[styles.loadingText, { color: themeColors.textMuted }]}>Loading holidays…</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: themeColors.primary }]}>
         <View style={styles.deco1} />
         <View style={styles.deco2} />
-        <Text style={styles.headerTitle}>Holiday Settings</Text>
-        <Text style={styles.headerSubtitle}>Tap a date to mark / edit a holiday</Text>
+        <Text style={[styles.headerTitle, { color: themeColors.textInverse }]}>Holiday Settings</Text>
+        <Text style={[styles.headerSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>Tap a date to mark / edit a holiday</Text>
       </View>
 
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
@@ -181,19 +186,19 @@ export default function HolidaySettingsScreen({ navigation }: any) {
           <GlassCard padding={16} borderRadius={20} style={{ margin: spacing.lg }}>
             {/* Month navigation */}
             <View style={styles.monthNav}>
-              <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
-                <Text style={styles.navArrow}>‹</Text>
+              <TouchableOpacity onPress={prevMonth} style={[styles.navBtn, { backgroundColor: themeColors.primaryPale }]}>
+                <Text style={[styles.navArrow, { color: themeColors.primary }]}>‹</Text>
               </TouchableOpacity>
-              <Text style={styles.monthLabel}>{MONTHS[month]} {year}</Text>
-              <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
-                <Text style={styles.navArrow}>›</Text>
+              <Text style={[styles.monthLabel, { color: themeColors.textPrimary }]}>{MONTHS[month]} {year}</Text>
+              <TouchableOpacity onPress={nextMonth} style={[styles.navBtn, { backgroundColor: themeColors.primaryPale }]}>
+                <Text style={[styles.navArrow, { color: themeColors.primary }]}>›</Text>
               </TouchableOpacity>
             </View>
 
             {/* Day-of-week headers */}
             <View style={styles.weekRow}>
               {DAYS_SHORT.map(d => (
-                <Text key={d} style={styles.weekDay}>{d}</Text>
+                <Text key={d} style={[styles.weekDay, { color: themeColors.textMuted }]}>{d}</Text>
               ))}
             </View>
 
@@ -214,20 +219,21 @@ export default function HolidaySettingsScreen({ navigation }: any) {
                     key={day}
                     style={[
                       styles.dayCell,
-                      isHoliday && styles.dayCellHoliday,
-                      isToday && !isHoliday && styles.dayCellToday,
+                      isHoliday && [styles.dayCellHoliday, { backgroundColor: themeColors.primary }],
+                      isToday && !isHoliday && [styles.dayCellToday, { backgroundColor: themeColors.warningPale }],
                     ]}
                     onPress={() => handleDayPress(day)}
                     activeOpacity={0.75}
                   >
                     <Text style={[
                       styles.dayText,
-                      isHoliday && styles.dayTextHoliday,
-                      isToday && !isHoliday && styles.dayTextToday,
+                      { color: themeColors.textPrimary },
+                      isHoliday && [styles.dayTextHoliday, { color: themeColors.textInverse }],
+                      isToday && !isHoliday && [styles.dayTextToday, { color: themeColors.warningDark }],
                     ]}>
                       {day}
                     </Text>
-                    {isHoliday && <View style={styles.holidayDot} />}
+                    {isHoliday && <View style={[styles.holidayDot, { backgroundColor: themeColors.textInverse }]} />}
                   </TouchableOpacity>
                 );
               })}
@@ -236,12 +242,12 @@ export default function HolidaySettingsScreen({ navigation }: any) {
             {/* Legend */}
             <View style={styles.legend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-                <Text style={styles.legendText}>Holiday</Text>
+                <View style={[styles.legendDot, { backgroundColor: themeColors.primary }]} />
+                <Text style={[styles.legendText, { color: themeColors.textMuted }]}>Holiday</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-                <Text style={styles.legendText}>Today</Text>
+                <View style={[styles.legendDot, { backgroundColor: themeColors.warning }]} />
+                <Text style={[styles.legendText, { color: themeColors.textMuted }]}>Today</Text>
               </View>
             </View>
           </GlassCard>
@@ -249,18 +255,18 @@ export default function HolidaySettingsScreen({ navigation }: any) {
           {/* Holiday list */}
           {holidays.length > 0 && (
             <View style={{ paddingHorizontal: spacing.lg }}>
-              <Text style={styles.listTitle}>📅 Configured Holidays ({holidays.length})</Text>
+              <Text style={[styles.listTitle, { color: themeColors.textPrimary }]}>📅 Configured Holidays ({holidays.length})</Text>
               {holidays
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map(h => (
                   <GlassCard key={h.id} padding={14} borderRadius={16} style={{ marginBottom: spacing.sm }}>
                     <View style={styles.holidayRow}>
                       <View style={styles.holidayInfo}>
-                        <Text style={styles.holidayDate}>{formatDisplay(h.date)}</Text>
-                        <Text style={styles.holidayReason}>{h.reason}</Text>
+                        <Text style={[styles.holidayDate, { color: themeColors.textPrimary }]}>{formatDisplay(h.date)}</Text>
+                        <Text style={[styles.holidayReason, { color: themeColors.textSecondary }]}>{h.reason}</Text>
                       </View>
                       <TouchableOpacity
-                        style={styles.removeBtn}
+                        style={[styles.removeBtn, { backgroundColor: themeColors.errorPale }]}
                         onPress={() => setHolidays(prev => prev.filter(x => x.id !== h.id))}
                       >
                         <Text style={styles.removeBtnText}>🗑️</Text>
@@ -287,35 +293,35 @@ export default function HolidaySettingsScreen({ navigation }: any) {
 
       {/* Add / Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+        <View style={[styles.modalOverlay, { backgroundColor: themeColors.bgOverlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.bgCard }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
                 {editingId ? 'Edit Holiday' : 'Add Holiday'}
               </Text>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Text style={[styles.modalClose, { color: themeColors.textMuted }]}>✕</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.modalBody}>
               {selectedDate && (
-                <Text style={styles.selectedDateText}>{formatDisplay(selectedDate)}</Text>
+                <Text style={[styles.selectedDateText, { color: themeColors.primary }]}>{formatDisplay(selectedDate)}</Text>
               )}
-              <Text style={styles.modalLabel}>Reason *</Text>
+              <Text style={[styles.modalLabel, { color: themeColors.textSecondary }]}>Reason *</Text>
               <TextInput
-                style={[styles.modalInput, styles.modalTextArea]}
+                style={[styles.modalInput, styles.modalTextArea, { backgroundColor: themeColors.bgSecondary, color: themeColors.textPrimary, borderColor: themeColors.border }]}
                 value={reason}
                 onChangeText={setReason}
                 placeholder="e.g. Diwali, National Holiday, Maintenance"
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={themeColors.textMuted}
                 multiline
                 numberOfLines={3}
               />
             </View>
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, { borderTopColor: themeColors.border }]}>
               {editingId && (
-                <TouchableOpacity style={styles.removeModalBtn} onPress={handleModalRemove}>
-                  <Text style={styles.removeModalBtnText}>Remove</Text>
+                <TouchableOpacity style={[styles.removeModalBtn, { backgroundColor: themeColors.errorPale }]} onPress={handleModalRemove}>
+                  <Text style={[styles.removeModalBtnText, { color: themeColors.error }]}>Remove</Text>
                 </TouchableOpacity>
               )}
               <Button title="Cancel" onPress={() => setShowModal(false)} variant="outline" size="md" style={{ flex: 1 }} />

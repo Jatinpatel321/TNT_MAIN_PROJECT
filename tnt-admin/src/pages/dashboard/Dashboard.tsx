@@ -382,7 +382,7 @@ export default function Dashboard() {
                     </td>
                     <td>
                       <span className="font-mono text-xs font-medium text-[#111827]">
-                        ₹{(order.total_amount / 100).toFixed(0)}
+                        {formatPaise(order.total_amount)}
                       </span>
                     </td>
                     <td>

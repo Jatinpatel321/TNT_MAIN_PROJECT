@@ -73,11 +73,16 @@ def confirm_pickup(qr_code: str, vendor_id: int, db: Session) -> bool:
     if order.status not in (OrderStatus.READY, OrderStatus.READY_FOR_PICKUP):
         return False
 
-    order.status = OrderStatus.PICKED
-    order.pickup_confirmed_at = utcnow_naive()
-    order.pickup_confirmed_by = vendor_id
-    db.commit()
-    return True
+    from app.modules.orders.service import update_order_status
+    try:
+        update_order_status(order, OrderStatus.PICKED, "vendor", db)
+        order.pickup_confirmed_at = utcnow_naive()
+        order.pickup_confirmed_by = vendor_id
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        return False
 
 
 def get_order_by_qr(qr_code: str, db: Session) -> Order:

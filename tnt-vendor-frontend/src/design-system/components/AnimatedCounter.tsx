@@ -3,7 +3,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Text, Animated, StyleSheet, View } from 'react-native';
-import colors from '../tokens/colors';
+import { useTheme } from '../../context/ThemeContext';
+import staticColors from '../tokens/colors';
 import typography from '../tokens/typography';
 
 interface AnimatedCounterProps {
@@ -25,11 +26,14 @@ export default function AnimatedCounter({
   suffix = '',
   fontSize = 32,
   fontWeight = '700',
-  color = colors.textPrimary,
+  color,
   decimal = 0,
   format = 'number',
 }: AnimatedCounterProps) {
+  const { colors: themeColors } = useTheme();
+  const activeColor = color || themeColors.textPrimary;
   const animatedValue = useRef(new Animated.Value(0)).current;
+
   const displayValue = useRef('0');
 
   useEffect(() => {
@@ -61,8 +65,8 @@ export default function AnimatedCounter({
 
     switch (fmt) {
       case 'currency':
-        formatted = `₹${current.toFixed(dec)}`;
-        break;
+        const cleanPrefix = prefix.includes('₹') ? '' : '₹';
+        return `${prefix}${cleanPrefix}${current.toFixed(dec)}${suffix}`;
       case 'percent':
         formatted = `${current.toFixed(dec)}%`;
         break;
@@ -83,7 +87,7 @@ export default function AnimatedCounter({
         {
           fontSize,
           fontWeight: fontWeight as any,
-          color,
+          color: activeColor,
           fontVariant: ['tabular-nums'],
         },
       ]}

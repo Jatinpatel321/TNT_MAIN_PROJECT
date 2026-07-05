@@ -13,7 +13,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { formatPaise, formatNumber } from '../../utils/format';
+import { formatPaise, formatNumber, formatRupees } from '../../utils/format';
 
 const DEPARTMENTS = [
   'Computer Science',
@@ -397,8 +397,8 @@ export function KPIDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               title="Total Revenue"
-              value={`₹${(bKpis?.revenue_inr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subtitle={`Refunded: ₹${(bKpis?.refunds_inr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+              value={formatRupees(bKpis?.revenue_inr || 0)}
+              subtitle={`Refunded: ${formatRupees(bKpis?.refunds_inr || 0)}`}
               icon={IndianRupee}
               accent="green"
             />

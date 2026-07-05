@@ -1,5 +1,4 @@
 import apiClient from './apiClient';
-import { API_BASE_URL } from '../config/api';
 
 export interface Slot {
   id: number;
@@ -86,50 +85,50 @@ export interface SlotRule {
 
 export const slotApi = {
   getSlots: (vendorId?: number) =>
-    apiClient.get<Slot[]>(`${API_BASE_URL}/v1/slots/`, { params: { vendor_id: vendorId } }),
+    apiClient.get<Slot[]>(`/v1/slots/`, { params: { vendor_id: vendorId } }),
 
   createSlot: (data: SlotCreate) =>
-    apiClient.post<Slot>(`${API_BASE_URL}/v1/slots/`, data),
+    apiClient.post<Slot>(`/v1/slots/`, data),
 
   updateSlot: (slotId: number, data: SlotUpdate) =>
-    apiClient.put<Slot>(`${API_BASE_URL}/v1/slots/${slotId}`, data),
+    apiClient.put<Slot>(`/v1/slots/${slotId}`, data),
 
   deleteSlot: (slotId: number) =>
-    apiClient.delete(`${API_BASE_URL}/v1/slots/${slotId}`),
+    apiClient.delete(`/v1/slots/${slotId}`),
 
   bulkCreateSlots: (data: BulkSlotCreate) =>
-    apiClient.post<Slot[]>(`${API_BASE_URL}/v1/slots/bulk-create`, data),
+    apiClient.post<Slot[]>(`/v1/slots/bulk-create`, data),
 
   lockSlot: (slotId: number) =>
-    apiClient.post(`${API_BASE_URL}/v1/slots/${slotId}/lock`),
+    apiClient.post(`/v1/slots/${slotId}/lock`),
 
   unlockSlot: (slotId: number) =>
-    apiClient.post(`${API_BASE_URL}/v1/slots/${slotId}/unlock`),
+    apiClient.post(`/v1/slots/${slotId}/unlock`),
 
   getAnalytics: () =>
-    apiClient.get<SlotAnalytics>(`${API_BASE_URL}/v1/slots/analytics`),
+    apiClient.get<SlotAnalytics>(`/v1/slots/analytics`),
 
   getCapacityRules: () =>
-    apiClient.get<CapacityRule[]>(`${API_BASE_URL}/v1/slots/capacity-rules`),
+    apiClient.get<CapacityRule[]>(`/v1/slots/capacity-rules`),
 
   createCapacityRule: (data: any) =>
-    apiClient.post<CapacityRule>(`${API_BASE_URL}/v1/slots/capacity-rules`, data),
+    apiClient.post<CapacityRule>(`/v1/slots/capacity-rules`, data),
 
   updateCapacityRule: (ruleId: number, data: any) =>
-    apiClient.put<CapacityRule>(`${API_BASE_URL}/v1/slots/capacity-rules/${ruleId}`, data),
+    apiClient.put<CapacityRule>(`/v1/slots/capacity-rules/${ruleId}`, data),
 
   deleteCapacityRule: (ruleId: number) =>
-    apiClient.delete(`${API_BASE_URL}/v1/slots/capacity-rules/${ruleId}`),
+    apiClient.delete(`/v1/slots/capacity-rules/${ruleId}`),
 
   getRules: () =>
-    apiClient.get<SlotRule[]>(`${API_BASE_URL}/v1/slots/rules`),
+    apiClient.get<SlotRule[]>(`/v1/slots/rules`),
 
   createRule: (data: any) =>
-    apiClient.post<SlotRule>(`${API_BASE_URL}/v1/slots/rules`, data),
+    apiClient.post<SlotRule>(`/v1/slots/rules`, data),
 
   updateRule: (ruleId: number, data: any) =>
-    apiClient.put<SlotRule>(`${API_BASE_URL}/v1/slots/rules/${ruleId}`, data),
+    apiClient.put<SlotRule>(`/v1/slots/rules/${ruleId}`, data),
 
   deleteRule: (ruleId: number) =>
-    apiClient.delete(`${API_BASE_URL}/v1/slots/rules/${ruleId}`),
+    apiClient.delete(`/v1/slots/rules/${ruleId}`),
 };

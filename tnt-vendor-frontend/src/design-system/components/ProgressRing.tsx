@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import colors from '../tokens/colors';
+import { useTheme } from '../../context/ThemeContext';
+import staticColors from '../tokens/colors';
 
 interface ProgressRingProps {
   progress: number; // 0-100
@@ -20,14 +21,19 @@ export default function ProgressRing({
   progress,
   size = 80,
   strokeWidth = 6,
-  color = colors.primary,
-  bgColor = colors.bgTertiary,
+  color,
+  bgColor,
   label,
   showPercentage = true,
   children,
 }: ProgressRingProps) {
+  const { colors: themeColors } = useTheme();
+  const activeColor = color || themeColors.primary;
+  const activeBgColor = bgColor || themeColors.bgTertiary;
+  
   const clampedProgress = Math.min(100, Math.max(0, progress));
   const radius = (size - strokeWidth) / 2;
+
   const circumference = 2 * Math.PI * radius;
   const progressOffset = circumference - (clampedProgress / 100) * circumference;
 
@@ -42,7 +48,7 @@ export default function ProgressRing({
             height: size,
             borderRadius: size / 2,
             borderWidth: strokeWidth,
-            borderColor: bgColor,
+            borderColor: activeBgColor,
           },
         ]}
       />
@@ -56,10 +62,10 @@ export default function ProgressRing({
             borderRadius: size / 2,
             borderWidth: strokeWidth,
             borderColor: 'transparent',
-            borderTopColor: color,
-            borderRightColor: clampedProgress > 25 ? color : 'transparent',
-            borderBottomColor: clampedProgress > 50 ? color : 'transparent',
-            borderLeftColor: clampedProgress > 75 ? color : 'transparent',
+            borderTopColor: activeColor,
+            borderRightColor: clampedProgress > 25 ? activeColor : 'transparent',
+            borderBottomColor: clampedProgress > 50 ? activeColor : 'transparent',
+            borderLeftColor: clampedProgress > 75 ? activeColor : 'transparent',
             transform: [{ rotate: '-45deg' }],
           },
         ]}
@@ -69,17 +75,20 @@ export default function ProgressRing({
         {children ? (
           children
         ) : showPercentage ? (
-          <Text style={[styles.percentage, { color, fontSize: size * 0.2 }]}>
+          <Text style={[styles.percentage, { color: activeColor, fontSize: size * 0.2 }]}>
             {Math.round(clampedProgress)}%
           </Text>
         ) : null}
         {label && (
-          <Text style={[styles.label, { fontSize: size * 0.1 }]}>{label}</Text>
+          <Text style={[styles.label, { fontSize: size * 0.1, color: themeColors.textMuted }]}>{label}</Text>
         )}
       </View>
     </View>
   );
 }
+
+const colors = staticColors;
+
 
 const styles = StyleSheet.create({
   container: {

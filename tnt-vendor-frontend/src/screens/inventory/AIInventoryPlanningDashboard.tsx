@@ -12,17 +12,23 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { vendorApi } from '../../services/vendorApi';
-import { colors, shadows, spacing } from '../../design-system';
+import { colors as staticColors, shadows, spacing } from '../../design-system';
+const colors = staticColors;
+import { formatRupees } from '../../utils/format';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatCard from '../../design-system/components/StatCard';
 import ForecastCard from '../../design-system/components/ForecastCard';
 import AICard from '../../design-system/components/AICard';
 import Badge from '../../design-system/components/Badge';
+import { useTheme } from '../../context/ThemeContext';
 
 type TabType = 'overview' | 'restock' | 'waste' | 'purchase';
 
 export default function AIInventoryPlanningDashboard() {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,21 +68,21 @@ export default function AIInventoryPlanningDashboard() {
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
+      <View style={[styles.container, { backgroundColor: colors.bg }, styles.centered]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Generating AI inventory plan...</Text>
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Generating AI inventory plan...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View style={styles.headerDeco1} />
         <View style={styles.headerDeco2} />
-        <Text style={styles.headerTitle}>Inventory AI</Text>
-        <Text style={styles.headerSubtitle}>Smart predictions for optimal stock management</Text>
+        <Text style={[styles.headerTitle, { color: colors.textInverse }]}>Inventory AI</Text>
+        <Text style={[styles.headerSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>Smart predictions for optimal stock management</Text>
       </View>
 
       {/* Tabs */}
@@ -84,11 +90,19 @@ export default function AIInventoryPlanningDashboard() {
         {tabs.map(tab => (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+            style={[
+              styles.tab,
+              { backgroundColor: colors.bgCard, borderColor: colors.border },
+              activeTab === tab.key && [styles.tabActive, { backgroundColor: colors.primary, borderColor: colors.primary }]
+            ]}
             onPress={() => setActiveTab(tab.key)}
           >
             <Text style={styles.tabIcon}>{tab.icon}</Text>
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+            <Text style={[
+              styles.tabText,
+              { color: colors.textSecondary },
+              activeTab === tab.key && [styles.tabTextActive, { color: colors.textInverse }]
+            ]} numberOfLines={1}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -109,14 +123,14 @@ export default function AIInventoryPlanningDashboard() {
       >
         {/* Summary Cards */}
         <View style={styles.statsRow}>
-          <StatCard value={summary.total_items || 0} label="Total Items" icon="📦" color={colors.primary} size="sm" style={{ flex: 1 }} />
-          <StatCard value={summary.low_stock || 0} label="Low Stock" icon="⚠️" color={(summary.low_stock || 0) > 0 ? colors.warning : colors.success} size="sm" style={{ flex: 1 }} />
-          <StatCard value={summary.out_of_stock || 0} label="Out of Stock" icon="🚫" color={(summary.out_of_stock || 0) > 0 ? colors.error : colors.success} size="sm" style={{ flex: 1 }} />
+          <StatCard value={summary.total_items || 0} label="Total Items" icon="📦" color={colors.primary} size="sm" style={{ flexBasis: '30%', flexGrow: 1 }} />
+          <StatCard value={summary.low_stock || 0} label="Low Stock" icon="⚠️" color={(summary.low_stock || 0) > 0 ? colors.warning : colors.success} size="sm" style={{ flexBasis: '30%', flexGrow: 1 }} />
+          <StatCard value={summary.out_of_stock || 0} label="Out of Stock" icon="🚫" color={(summary.out_of_stock || 0) > 0 ? colors.error : colors.success} size="sm" style={{ flexBasis: '30%', flexGrow: 1 }} />
         </View>
         <View style={styles.statsRow}>
-          <StatCard value={summary.items_with_waste_risk || 0} label="Waste Risk" icon="♻️" color={(summary.items_with_waste_risk || 0) > 0 ? colors.warning : colors.success} size="sm" style={{ flex: 1 }} />
-          <StatCard value={summary.items_to_restock || 0} label="To Restock" icon="🔄" color={(summary.items_to_restock || 0) > 0 ? colors.info : colors.success} size="sm" style={{ flex: 1 }} />
-          <StatCard value={summary.items_likely_to_finish || 0} label="At Risk" icon="⏰" color={(summary.items_likely_to_finish || 0) > 0 ? colors.error : colors.success} size="sm" style={{ flex: 1 }} />
+          <StatCard value={summary.items_with_waste_risk || 0} label="Waste Risk" icon="♻️" color={(summary.items_with_waste_risk || 0) > 0 ? colors.warning : colors.success} size="sm" style={{ flexBasis: '30%', flexGrow: 1 }} />
+          <StatCard value={summary.items_to_restock || 0} label="To Restock" icon="🔄" color={(summary.items_to_restock || 0) > 0 ? colors.info : colors.success} size="sm" style={{ flexBasis: '30%', flexGrow: 1 }} />
+          <StatCard value={summary.items_likely_to_finish || 0} label="At Risk" icon="⏰" color={(summary.items_likely_to_finish || 0) > 0 ? colors.error : colors.success} size="sm" style={{ flexBasis: '30%', flexGrow: 1 }} />
         </View>
 
         {/* Overview Tab */}
@@ -125,12 +139,12 @@ export default function AIInventoryPlanningDashboard() {
             {/* Items Likely to Finish */}
             {(plan?.items_likely_to_finish || []).length > 0 && (
               <GlassCard padding={16} borderRadius={20} style={{ marginBottom: spacing.md }}>
-                <Text style={styles.sectionTitle}>⏰ Items Likely to Finish</Text>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>⏰ Items Likely to Finish</Text>
                 {plan.items_likely_to_finish.slice(0, 5).map((item: any, i: number) => (
-                  <View key={i} style={styles.itemRow}>
+                  <View key={i} style={[styles.itemRow, { borderBottomColor: colors.borderLight }]}>
                     <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.item_name}</Text>
-                      <Text style={styles.itemDetail}>Stock: {item.current_stock} | Demand: {item.daily_demand}/day</Text>
+                      <Text style={[styles.itemName, { color: colors.textPrimary }]}>{item.item_name}</Text>
+                      <Text style={[styles.itemDetail, { color: colors.textSecondary }]}>Stock: {item.current_stock} | Demand: {item.daily_demand}/day</Text>
                     </View>
                     <View style={styles.itemRight}>
                       <Badge
@@ -150,11 +164,11 @@ export default function AIInventoryPlanningDashboard() {
             {/* Insights */}
             {insights.length > 0 && (
               <GlassCard padding={16} borderRadius={20} style={{ marginBottom: spacing.md }}>
-                <Text style={styles.sectionTitle}>💡 AI Insights</Text>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>💡 AI Insights</Text>
                 {insights.map((insight: string, i: number) => (
                   <View key={i} style={styles.insightRow}>
-                    <Text style={styles.bullet}>•</Text>
-                    <Text style={styles.insightText}>{insight}</Text>
+                    <Text style={[styles.bullet, { color: colors.primary }]}>•</Text>
+                    <Text style={[styles.insightText, { color: colors.textSecondary }]}>{insight}</Text>
                   </View>
                 ))}
               </GlassCard>
@@ -180,25 +194,25 @@ export default function AIInventoryPlanningDashboard() {
         {/* Restock Tab */}
         {activeTab === 'restock' && (
           <Animated.View style={{ opacity: fadeAnim }}>
-            <Text style={styles.sectionTitle}>Restock Suggestions</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Restock Suggestions</Text>
             {(plan?.restock_suggestions || []).length > 0 ? (
               plan.restock_suggestions.map((s: any, i: number) => (
                 <GlassCard key={i} padding={16} borderRadius={18} style={{ marginBottom: spacing.sm }}>
                   <View style={styles.suggestionHeader}>
-                    <Text style={styles.suggestionName}>{s.item_name}</Text>
+                    <Text style={[styles.suggestionName, { color: colors.textPrimary }]}>{s.item_name}</Text>
                     <Badge label={s.priority} variant={s.priority === 'critical' ? 'error' : s.priority === 'high' ? 'warning' : 'info'} size="sm" />
                   </View>
                   <View style={styles.suggestionDetails}>
-                    <Text style={styles.suggestionDetail}>Current Stock: {s.current_stock}</Text>
-                    <Text style={styles.suggestionDetail}>Suggested: {s.suggested_quantity} units</Text>
-                    {s.restock_by && <Text style={styles.suggestionDetail}>Restock By: {s.restock_by}</Text>}
+                    <Text style={[styles.suggestionDetail, { color: colors.textSecondary }]}>Current Stock: {s.current_stock}</Text>
+                    <Text style={[styles.suggestionDetail, { color: colors.textSecondary }]}>Suggested: {s.suggested_quantity} units</Text>
+                    {s.restock_by && <Text style={[styles.suggestionDetail, { color: colors.textSecondary }]}>Restock By: {s.restock_by}</Text>}
                   </View>
-                  <Text style={styles.suggestionReason}>{s.reason}</Text>
+                  <Text style={[styles.suggestionReason, { color: colors.warningDark }]}>{s.reason}</Text>
                 </GlassCard>
               ))
             ) : (
               <GlassCard padding={24} borderRadius={20}>
-                <Text style={styles.emptyText}>All items adequately stocked — no restock suggestions.</Text>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>All items adequately stocked — no restock suggestions.</Text>
               </GlassCard>
             )}
           </Animated.View>
@@ -207,7 +221,7 @@ export default function AIInventoryPlanningDashboard() {
         {/* Waste Tab */}
         {activeTab === 'waste' && (
           <Animated.View style={{ opacity: fadeAnim }}>
-            <Text style={styles.sectionTitle}>Waste Reduction</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Waste Reduction</Text>
             {(plan?.waste_reduction_suggestions || []).length > 0 ? (
               plan.waste_reduction_suggestions.map((s: any, i: number) => (
                 <AICard
@@ -222,7 +236,7 @@ export default function AIInventoryPlanningDashboard() {
               ))
             ) : (
               <GlassCard padding={24} borderRadius={20}>
-                <Text style={styles.emptyText}>No waste reduction suggestions available.</Text>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No waste reduction suggestions available.</Text>
               </GlassCard>
             )}
           </Animated.View>
@@ -233,16 +247,16 @@ export default function AIInventoryPlanningDashboard() {
           <Animated.View style={{ opacity: fadeAnim }}>
             {plan?.total_estimated_cost > 0 && (
               <GlassCard padding={20} borderRadius={20} style={{ marginBottom: spacing.md, alignItems: 'center' }}>
-                <Text style={styles.totalCostLabel}>Estimated Total Cost</Text>
-                <Text style={styles.totalCostValue}>₹{plan.total_estimated_cost}</Text>
+                <Text style={[styles.totalCostLabel, { color: colors.textMuted }]}>Estimated Total Cost</Text>
+                <Text style={[styles.totalCostValue, { color: colors.success }]}>{formatRupees(plan.total_estimated_cost)}</Text>
               </GlassCard>
             )}
-            <Text style={styles.sectionTitle}>Smart Purchase Plan</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Smart Purchase Plan</Text>
             {(plan?.smart_purchase_plan || []).length > 0 ? (
               plan.smart_purchase_plan.map((item: any, i: number) => (
                 <GlassCard key={i} padding={16} borderRadius={18} style={{ marginBottom: spacing.sm }}>
                   <View style={styles.suggestionHeader}>
-                    <Text style={styles.suggestionName}>{item.item_name}</Text>
+                    <Text style={[styles.suggestionName, { color: colors.textPrimary }]}>{item.item_name}</Text>
                     <Badge label={item.priority} variant={item.priority === 'critical' ? 'error' : item.priority === 'high' ? 'warning' : 'info'} size="sm" />
                   </View>
                   <View style={styles.purchaseDetails}>
@@ -253,37 +267,37 @@ export default function AIInventoryPlanningDashboard() {
                       ['Days to Cover', `${item.days_to_cover}d`],
                       ['Delivery Window', item.expected_delivery_window],
                     ].map(([label, value], idx) => (
-                      <View key={idx} style={styles.purchaseRow}>
-                        <Text style={styles.purchaseLabel}>{label}</Text>
-                        <Text style={[styles.purchaseValue, label === 'Optimal Qty' && { color: colors.success, fontWeight: '700' }]}>{value}</Text>
+                      <View key={idx} style={[styles.purchaseRow, { borderBottomColor: colors.borderLight }]}>
+                        <Text style={[styles.purchaseLabel, { color: colors.textSecondary }]}>{label}</Text>
+                        <Text style={[styles.purchaseValue, { color: colors.textPrimary }, label === 'Optimal Qty' && { color: colors.success, fontWeight: '700' }]}>{value}</Text>
                       </View>
                     ))}
                   </View>
                   {item.suggested_vendor && (
-                    <Text style={styles.vendorText}>🏪 {item.suggested_vendor}</Text>
+                    <Text style={[styles.vendorText, { color: colors.info }]}>🏪 {item.suggested_vendor}</Text>
                   )}
                 </GlassCard>
               ))
             ) : (
               <GlassCard padding={24} borderRadius={20}>
-                <Text style={styles.emptyText}>No purchase plan available.</Text>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No purchase plan available.</Text>
               </GlassCard>
             )}
           </Animated.View>
         )}
-        <View style={{ height: spacing.huge }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   centered: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
   header: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.huge + 20,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.xl,
     borderBottomLeftRadius: 28,
@@ -294,11 +308,11 @@ const styles = StyleSheet.create({
   headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
   headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
-  tabRow: { maxHeight: 52 },
-  tabContentPad: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.md },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  tabRow: { height: 75, maxHeight: 75, marginTop: 8, marginBottom: 4 },
+  tabContentPad: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: 12 },
+  scrollContent: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 24 },
   tab: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingVertical: 10,
     borderRadius: 14, backgroundColor: colors.bgCard, marginRight: 8, gap: 6,
     borderWidth: 1.5, borderColor: colors.border, ...shadows.sm,
   },
@@ -306,7 +320,7 @@ const styles = StyleSheet.create({
   tabIcon: { fontSize: 14 },
   tabText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   tabTextActive: { color: colors.textInverse },
-  statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 12 },
   errorBox: { margin: spacing.md, padding: 16, backgroundColor: colors.errorPale, borderRadius: 14, borderWidth: 1, borderColor: colors.error + '30', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   errorText: { color: colors.error, fontSize: 14, flex: 1 },

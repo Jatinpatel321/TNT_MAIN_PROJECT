@@ -25,3 +25,19 @@ class UnreadCountResponse(BaseModel):
 
 class MarkAllReadResponse(BaseModel):
     updated_count: int
+
+
+class DelayNotificationRequest(BaseModel):
+    order_id: int
+    delay_minutes: int
+    reason: Optional[str] = "Delayed due to high volume"
+
+
+class ReadyNotificationRequest(BaseModel):
+    order_id: int
+
+
+class CustomNotificationRequest(BaseModel):
+    order_id: int
+    message: str
+

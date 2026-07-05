@@ -1,5 +1,4 @@
 import apiClient from './apiClient';
-import { API_BASE_URL } from '../config/api';
 
 export interface BusinessHours {
   [key: string]: {
@@ -23,23 +22,23 @@ export interface BusinessSettings {
 
 export const businessSettingsApi = {
   getSettings: () =>
-    apiClient.get<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`),
+    apiClient.get<BusinessSettings>(`/v1/vendors/business-hours/`),
 
   updateBusinessHours: (hours: BusinessHours) =>
-    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
+    apiClient.put<BusinessSettings>(`/v1/vendors/business-hours/`, {
       business_hours: hours,
     }),
 
   updateHolidays: (holidays: Holiday[]) =>
-    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
+    apiClient.put<BusinessSettings>(`/v1/vendors/business-hours/holidays`, {
       holidays,
     }),
 
   updatePickupInstructions: (instructions: string) =>
-    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, {
+    apiClient.put<BusinessSettings>(`/v1/vendors/business-hours/pickup-instructions`, {
       pickup_instructions: instructions,
     }),
 
   updateAllSettings: (settings: Partial<BusinessSettings>) =>
-    apiClient.put<BusinessSettings>(`${API_BASE_URL}/v1/vendors/profile/`, settings),
+    apiClient.put<BusinessSettings>(`/v1/vendors/business-hours/`, settings),
 };

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, ToggleLeft, ToggleRight, Package, AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { menuApi, type MenuItem, type Inventory, type LowStockAlert, type PaginatedResponse } from '../../api/menu';
+import { formatCurrency } from '../../utils/format';
 
 export default function MenuDashboard() {
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -208,7 +209,7 @@ export default function MenuDashboard() {
                       </div>
                       <p className="text-sm text-[#6B7280] mt-1">{item.description || 'No description'}</p>
                       <div className="flex items-center gap-4 mt-2 text-xs text-[#6B7280]">
-                        <span>₹{(item.price / 100).toFixed(2)}</span>
+                        <span>{formatCurrency(item.price, { showDecimals: true })}</span>
                         {item.prep_time_minutes && <span>⏱️ {item.prep_time_minutes} min</span>}
                         {item.available_quantity !== null && <span>📦 {item.available_quantity} left</span>}
                       </div>

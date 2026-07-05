@@ -1,5 +1,4 @@
 import apiClient from './apiClient';
-import { API_BASE_URL } from '../config/api';
 
 export interface UploadResponse {
   url: string;
@@ -17,7 +16,7 @@ export const imageUploadApi = {
       name: 'logo.jpg',
     } as any);
 
-    return apiClient.post(`${API_BASE_URL}/v1/vendors/profile/upload/logo`, formData, {
+    return apiClient.post(`/v1/vendors/profile/upload/logo`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -38,7 +37,7 @@ export const imageUploadApi = {
       name: 'cover.jpg',
     } as any);
 
-    return apiClient.post(`${API_BASE_URL}/v1/vendors/profile/upload/cover`, formData, {
+    return apiClient.post(`/v1/vendors/profile/upload/cover`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -52,6 +51,6 @@ export const imageUploadApi = {
   },
 
   deleteImage: async (imageType: 'logo' | 'cover'): Promise<void> => {
-    await apiClient.delete(`${API_BASE_URL}/v1/vendors/profile/upload/${imageType}`);
+    await apiClient.delete(`/v1/vendors/profile/upload/${imageType}`);
   },
 };

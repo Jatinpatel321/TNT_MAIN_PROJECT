@@ -8,6 +8,9 @@ from app.modules.notifications.schemas import (
     MarkAllReadResponse,
     NotificationResponse,
     UnreadCountResponse,
+    DelayNotificationRequest,
+    ReadyNotificationRequest,
+    CustomNotificationRequest,
 )
 from app.modules.notifications.service import get_unread_count, mark_all_read, send_notification
 from app.modules.orders.model import Order
@@ -50,9 +53,7 @@ def get_vendor_notifications(
 
 @router.post("/vendor/notify-delay", summary="Send delay notification to user")
 def notify_delay(
-    order_id: int,
-    delay_minutes: int,
-    reason: str = "Delayed due to high volume",
+    payload: DelayNotificationRequest,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -61,7 +62,7 @@ def notify_delay(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    order = db.query(Order).filter(Order.id == order_id, Order.vendor_id == db_user.id).first()
+    order = db.query(Order).filter(Order.id == payload.order_id, Order.vendor_id == db_user.id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -75,20 +76,20 @@ def notify_delay(
             user_id=order.user_id,
             phone=student.phone,
             title="Order Delay",
-            message=f"Your order #{order_id} is delayed by {delay_minutes} minutes. {reason}",
+            message=f"Your order #{payload.order_id} is delayed by {payload.delay_minutes} minutes. {payload.reason}",
             db=db,
             send_sms_flag=True,
             notification_type=NotificationType.DELAY_ALERT,
-            reference_id=order_id,
+            reference_id=payload.order_id,
         )
-        return {"message": "Delay notification sent", "order_id": order_id}
+        return {"message": "Delay notification sent", "order_id": payload.order_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send notification: {str(e)}")
 
 
 @router.post("/vendor/notify-ready", summary="Send pickup ready notification to user")
 def notify_ready(
-    order_id: int,
+    payload: ReadyNotificationRequest,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -97,7 +98,7 @@ def notify_ready(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    order = db.query(Order).filter(Order.id == order_id, Order.vendor_id == db_user.id).first()
+    order = db.query(Order).filter(Order.id == payload.order_id, Order.vendor_id == db_user.id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -111,21 +112,20 @@ def notify_ready(
             user_id=order.user_id,
             phone=student.phone,
             title="Order Ready for Pickup!",
-            message=f"Your order #{order_id} is ready. Please collect it from the pickup counter.",
+            message=f"Your order #{payload.order_id} is ready. Please collect it from the pickup counter.",
             db=db,
             send_sms_flag=True,
             notification_type=NotificationType.ORDER_READY,
-            reference_id=order_id,
+            reference_id=payload.order_id,
         )
-        return {"message": "Ready notification sent", "order_id": order_id}
+        return {"message": "Ready notification sent", "order_id": payload.order_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send notification: {str(e)}")
 
 
 @router.post("/vendor/notify-custom", summary="Send custom message to user")
 def notify_custom(
-    order_id: int,
-    message: str,
+    payload: CustomNotificationRequest,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -134,7 +134,7 @@ def notify_custom(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    order = db.query(Order).filter(Order.id == order_id, Order.vendor_id == db_user.id).first()
+    order = db.query(Order).filter(Order.id == payload.order_id, Order.vendor_id == db_user.id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -148,15 +148,16 @@ def notify_custom(
             user_id=order.user_id,
             phone=student.phone,
             title="Message from Vendor",
-            message=message,
+            message=payload.message,
             db=db,
             send_sms_flag=False,
             notification_type=NotificationType.SYSTEM,
-            reference_id=order_id,
+            reference_id=payload.order_id,
         )
-        return {"message": "Custom notification sent", "order_id": order_id}
+        return {"message": "Custom notification sent", "order_id": payload.order_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send notification: {str(e)}")
+
 
 
 def _resolve_db_user(user: dict, db: Session):
@@ -256,6 +257,7 @@ def get_notifications_by_user_id(
     )
 
 
+@router.patch("/{notification_id}/read", response_model=NotificationResponse)
 @router.post("/{notification_id}/read", response_model=NotificationResponse)
 def mark_as_read(
     notification_id: int,
@@ -272,6 +274,24 @@ def mark_as_read(
     notification.is_read = True
     db.flush()
     return notification
+
+
+@router.delete("/{notification_id}", summary="Delete a notification")
+def delete_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    db_user = _resolve_db_user(user, db)
+    notification = db.query(Notification).filter(
+        Notification.id == notification_id,
+        Notification.user_id == db_user.id,
+    ).first()
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.delete(notification)
+    db.flush()
+    return {"message": "Notification deleted successfully"}
 
 
 @router.post("/mark-all-read", summary="Mark all notifications as read", response_model=MarkAllReadResponse)

@@ -34,6 +34,7 @@ import {
   type OrderEtaResponse,
 } from '../../services/orderService';
 import {getVendors} from '../../services/vendorService';
+import {formatCurrency} from '../../utils/format';
 import {getSlots} from '../../services/slotService';
 import {toApiError} from '../../services/apiClient';
 import {useOrderWebSocket} from '../../hooks/useOrderWebSocket';
@@ -469,7 +470,7 @@ export function OrderTrackingScreen({route, navigation}: Props) {
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Total</Text>
                       <Text style={styles.detailValueBold}>
-                        ₹{totalRupees.toFixed(2)}
+                        {formatCurrency(totalRupees, { inputType: 'rupees' })}
                       </Text>
                     </View>
                   )}
@@ -512,7 +513,7 @@ export function OrderTrackingScreen({route, navigation}: Props) {
                       <View key={`sj-${job.id}-${idx}`} style={styles.itemRow}>
                         <Text style={styles.itemName}>Service #{job.service_id}</Text>
                         <Text style={styles.itemMeta}>x{job.quantity}</Text>
-                        <Text style={styles.itemPrice}>₹{Number(job.amount).toFixed(2)}</Text>
+                        <Text style={styles.itemPrice}>{formatCurrency(job.amount, { inputType: 'rupees' })}</Text>
                       </View>
                     ))}
                     <View style={[styles.detailRow, {marginTop: 8}]}>

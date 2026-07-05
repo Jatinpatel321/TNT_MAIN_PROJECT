@@ -103,20 +103,3 @@ export async function getETAFactors(orderId: number): Promise<ETAFactorsResponse
   });
   return res.data as ETAFactorsResponse;
 }
-</write_to_file>
-<task_progress>
-- [x] Find existing ETA implementation
-- [x] Analyze current ETA engine
-- [x] Enhance ETA prediction with ML
-- [x] Add historical preparation times
-- [x] Add vendor workload analysis
-- [x] Add slot occupancy tracking
-- [x] Add menu complexity scoring
-- [x] Implement delay prediction
-- [x] Create preparation progress tracking
-- [x] Extend existing ETA APIs
-- [x] Build frontend ETA components
-- [x] Create frontend service
-- [x] Create documentation
-</task_progress>
-</write_to_file>

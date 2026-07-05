@@ -6,6 +6,8 @@ import { View, StyleSheet, ViewStyle } from 'react-native';
 import colors from '../tokens/colors';
 import shadows from '../tokens/shadows';
 
+import { useTheme } from '../../context/ThemeContext';
+
 interface GlassCardProps {
   children: React.ReactNode;
   style?: ViewStyle;
@@ -22,10 +24,12 @@ export default function GlassCard({
   padding = 20,
   borderRadius = 20,
 }: GlassCardProps) {
+  const { colors, isDark } = useTheme();
+  
   const opacityMap = {
-    light: 0.7,
-    medium: 0.8,
-    heavy: 0.9,
+    light: isDark ? 0.45 : 0.7,
+    medium: isDark ? 0.65 : 0.8,
+    heavy: isDark ? 0.85 : 0.9,
   };
 
   return (
@@ -35,7 +39,10 @@ export default function GlassCard({
         {
           padding,
           borderRadius,
-          backgroundColor: `rgba(255, 255, 255, ${opacityMap[intensity]})`,
+          backgroundColor: isDark
+            ? `rgba(26, 26, 46, ${opacityMap[intensity]})`
+            : `rgba(255, 255, 255, ${opacityMap[intensity]})`,
+          borderColor: colors.glassBorder,
         },
         shadows.glass,
         style,
@@ -48,6 +55,7 @@ export default function GlassCard({
           {
             borderRadius,
             opacity: intensity === 'heavy' ? 0.15 : 0.08,
+            backgroundColor: isDark ? '#1A1A2E' : '#FFFFFF',
           },
         ]}
       />
@@ -59,12 +67,10 @@ export default function GlassCard({
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: colors.glassBorder,
     overflow: 'hidden',
   },
   frost: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
   },
 });
 

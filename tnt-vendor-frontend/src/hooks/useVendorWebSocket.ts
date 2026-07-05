@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+ import { useEffect, useRef, useCallback, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { WS_BASE_URL } from '../config/api';
 
@@ -75,8 +75,8 @@ export function useVendorWebSocket(
     }
 
     const url = useVendorCh
-      ? `${WS_BASE_URL}/ws/vendor/orders`
-      : `${WS_BASE_URL}/ws/orders/${orderIds[0]}`;
+      ? `${WS_BASE_URL}/v1/ws/vendor/orders`
+      : `${WS_BASE_URL}/v1/ws/orders/${orderIds[0]}`;
 
     try {
       const ws = new WebSocket(url);
@@ -120,6 +120,14 @@ export function useVendorWebSocket(
         wsRef.current = null;
 
         if (!isMountedRef.current || event.code === 1000) return;
+
+        // Stop reconnect loops on auth/forbidden failures
+        if (event.code === 4001 || event.code === 4003) {
+          console.warn(`Vendor WS auth/validation failed (code: ${event.code}) — stopping reconnect`);
+          setReconnectsFailed(true);
+          options?.onDisconnected?.();
+          return;
+        }
 
         if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
           const delay = Math.min(

@@ -144,6 +144,29 @@ def finalize_payment(payment: Payment, order: Order, db: Session) -> None:
             db=db,
         )
 
+    # Publish payment confirmation to WebSocket channel
+    try:
+        from app.core.order_events import publish_order_event
+        publish_order_event(
+            order_id=order.id,
+            event="payment_confirmed",
+            data={
+                "order_id": order.id,
+                "vendor_id": order.vendor_id,
+                "amount": float(payment.amount or 0) / 100,  # rupees
+                "timestamp": utcnow_naive().isoformat(),
+                "description": f"Order #{order.id} payment confirmed",
+                "payment_method": "online",
+                "is_online": True,
+                "type": "online_payment",
+                "fee": round((float(payment.amount or 0) / 100) * 0.02, 2),
+                "net_amount": round((float(payment.amount or 0) / 100) * 0.98, 2),
+            }
+        )
+    except Exception as e:
+        observability.record_exception(e)
+
+
 
 @transactional
 def verify_payment(
@@ -228,7 +251,11 @@ def refund_payment(payment_id: int, user: dict, db):
     if payment.order_id is not None:
         order = db.query(Order).filter(Order.id == payment.order_id).first()
         if order:
-            order.status = OrderStatus.CANCELLED
+            from app.modules.orders.service import update_order_status
+            try:
+                update_order_status(order, OrderStatus.CANCELLED, "system", db, note="Refund issued")
+            except Exception:
+                order.status = OrderStatus.CANCELLED
 
         add_ledger_entry(
             order_id=payment.order_id,

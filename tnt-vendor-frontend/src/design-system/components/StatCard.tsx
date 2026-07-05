@@ -7,6 +7,9 @@ import colors from '../tokens/colors';
 import shadows from '../tokens/shadows';
 import AnimatedCounter from './AnimatedCounter';
 
+import { useTheme } from '../../context/ThemeContext';
+
+
 interface StatCardProps {
   value: number;
   label: string;
@@ -17,6 +20,7 @@ interface StatCardProps {
   trend?: { value: number; isUp: boolean };
   format?: 'number' | 'currency' | 'percent';
   size?: 'sm' | 'md' | 'lg';
+  decimal?: number;
   style?: ViewStyle;
   onPress?: () => void;
 }
@@ -27,12 +31,15 @@ export default function StatCard({
   prefix = '',
   suffix = '',
   icon,
-  color = colors.primary,
+  color,
   trend,
   format = 'number',
   size = 'md',
+  decimal = 0,
   style,
 }: StatCardProps) {
+  const { colors } = useTheme();
+  const activeColor = color || colors.primary;
   const isSmall = size === 'sm';
   const isLarge = size === 'lg';
 
@@ -40,16 +47,17 @@ export default function StatCard({
     <View
       style={[
         styles.card,
+        { backgroundColor: colors.bgCard },
         isSmall && styles.small,
         isLarge && styles.large,
         style,
       ]}
     >
       {/* Colored top accent bar */}
-      <View style={[styles.accentBar, { backgroundColor: color }]} />
+      <View style={[styles.accentBar, { backgroundColor: activeColor }]} />
 
       {icon && (
-        <View style={[styles.iconCircle, { backgroundColor: color + '15' }]}>
+        <View style={[styles.iconCircle, { backgroundColor: activeColor + '15' }]}>
           <Text style={[styles.icon, isSmall && styles.smallIcon]}>{icon}</Text>
         </View>
       )}
@@ -59,11 +67,12 @@ export default function StatCard({
         prefix={prefix}
         suffix={suffix}
         fontSize={isSmall ? 24 : isLarge ? 36 : 32}
-        color={color}
+        color={activeColor}
         format={format}
+        decimal={decimal}
       />
 
-      <Text style={[styles.label, isSmall && styles.smallLabel]}>{label}</Text>
+      <Text style={[styles.label, { color: colors.textMuted }, isSmall && styles.smallLabel]}>{label}</Text>
 
       {trend && (
         <View style={styles.trendRow}>

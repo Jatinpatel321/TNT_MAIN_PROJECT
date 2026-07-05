@@ -52,40 +52,81 @@ def get_current_user(
     db: Session = Depends(get_db),
 ):
     token = credentials.credentials
+    payload = None
+    is_vendor_token = False
+    
+    # Try standard user SECRET_KEY first
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        phone = payload.get("phone")
-        role = payload.get("role")
-
-        if user_id is None or role is None:
-            try:
-                from app.core import security_monitor
-                from app.core.rate_limit import _client_ip
-                security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="Invalid token payload")
-            except Exception:
-                pass
-            raise HTTPException(status_code=401, detail="Invalid token payload")
-
-        try:
-            user_id = int(user_id)
-        except (TypeError, ValueError):
-            try:
-                from app.core import security_monitor
-                from app.core.rate_limit import _client_ip
-                security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="Invalid token subject")
-            except Exception:
-                pass
-            raise HTTPException(status_code=401, detail="Invalid token subject")
-
     except JWTError:
+        # Fallback to vendor SECRET_KEY
+        try:
+            from app.modules.vendors.auth_service import VENDOR_JWT_SECRET_KEY, VENDOR_JWT_ALGORITHM
+            payload = jwt.decode(token, VENDOR_JWT_SECRET_KEY, algorithms=[VENDOR_JWT_ALGORITHM])
+            is_vendor_token = True
+        except JWTError:
+            try:
+                from app.core import security_monitor
+                from app.core.rate_limit import _client_ip
+                security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="JWTError")
+            except Exception:
+                pass
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+    if is_vendor_token:
+        vendor_id_str = payload.get("sub")
+        role = payload.get("role")  # "vendor_owner" or "vendor_staff"
+        token_type = payload.get("type")
+        if token_type != "vendor_access" or not vendor_id_str:
+            raise HTTPException(status_code=401, detail="Invalid vendor token payload")
+        
+        from app.modules.vendors.model import Vendor
+        from app.modules.users.model import User
+        
+        vendor = db.query(Vendor).filter(Vendor.vendor_id == int(vendor_id_str)).first()
+        if not vendor:
+            raise HTTPException(status_code=401, detail="Vendor not found")
+            
+        user = db.query(User).filter(User.id == vendor.owner_id).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Vendor owner user not found")
+            
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Vendor owner user account is inactive")
+            
+        return {
+            "id": user.id,
+            "phone": user.phone,
+            "role": "vendor",
+            "is_active": user.is_active,
+            "vendor_id": vendor.vendor_id,
+            "vendor_role": role,
+            "staff_id": payload.get("staff_id"),
+        }
+
+    user_id = payload.get("sub")
+    phone = payload.get("phone")
+    role = payload.get("role")
+
+    if user_id is None or role is None:
         try:
             from app.core import security_monitor
             from app.core.rate_limit import _client_ip
-            security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="JWTError")
+            security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="Invalid token payload")
         except Exception:
             pass
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        try:
+            from app.core import security_monitor
+            from app.core.rate_limit import _client_ip
+            security_monitor.record_jwt_failure(ip=_client_ip(request), token_preview=token[:15] if token else "", reason="Invalid token subject")
+        except Exception:
+            pass
+        raise HTTPException(status_code=401, detail="Invalid token subject")
 
     # --- Active-user guard: re-check is_active on every request -----------
     # Import here to avoid a circular import at module load time.

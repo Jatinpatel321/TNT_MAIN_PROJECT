@@ -10,7 +10,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 
 import { adminApi } from '../../api/admin';
-import { formatDate, formatRupees, formatTimeAgo } from '../../utils/format';
+import { formatDate, formatRupees, formatTimeAgo, formatCurrency } from '../../utils/format';
 import type { Vendor, MenuItem, TimeSlot } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -83,7 +83,7 @@ export default function VendorDetail() {
       accessorKey: 'price',
       header: 'Price',
       cell: ({ row }) => (
-        <span className="font-mono text-sm font-medium">₹{(row.original.price / 100).toFixed(2)}</span>
+        <span className="font-mono text-sm font-medium">{formatCurrency(row.original.price, { showDecimals: true })}</span>
       ),
     },
     {

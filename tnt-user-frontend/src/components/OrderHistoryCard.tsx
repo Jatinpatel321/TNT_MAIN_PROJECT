@@ -10,6 +10,7 @@ import {
 } from '../services/orderService';
 import {VENDOR_IMAGES} from '../assets/images';
 import {toAbsoluteUrl} from '../utils/url';
+import {formatCurrency} from '../utils/format';
 
 export function OrderHistoryCard(props: {
   order: Order;
@@ -73,9 +74,7 @@ export function OrderHistoryCard(props: {
           </View>
           {typeof totalAmount === 'number' ? (
             <Text style={styles.total}>
-              {totalAmount < 100
-                ? `₹${Number(totalAmount).toFixed(2)}`
-                : `₹${(Number(totalAmount) / 100).toFixed(2)}`}
+              {formatCurrency(totalAmount, { inputType: totalAmount < 100 ? 'rupees' : 'paise' })}
             </Text>
           ) : null}
         </View>

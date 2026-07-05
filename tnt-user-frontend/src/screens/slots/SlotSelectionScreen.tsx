@@ -29,7 +29,7 @@ import { toApiError } from '../../services/apiClient';
 import { checkout, type CheckoutResponse } from '../../services/cartService';
 import { useCart } from '../../context/CartContext';
 import { getPoints } from '../../services/rewardsService';
-import { formatTimeRange } from '../../utils/format';
+import { formatTimeRange, formatCurrency } from '../../utils/format';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SlotSelection' | 'Checkout'>;
 
@@ -250,7 +250,7 @@ export function SlotSelectionScreen({ route, navigation }: Props) {
             <View style={styles.toggleInfo}>
               <MaterialCommunityIcons name="star-circle-outline" size={20} color="#D97706" />
               <Text style={styles.toggleLabel}>
-                Redeem {Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10))} points for ₹{(Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10)) * 0.1).toFixed(2)} discount
+                Redeem {Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10))} points for {formatCurrency(Math.floor(Math.min(userPoints, (cart?.total_amount || 0) / 10)) * 0.1, { inputType: 'rupees' })} discount
               </Text>
             </View>
             <Switch

@@ -310,7 +310,7 @@ export function GroupDetailScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: `Pay ₹${rupees.toFixed(2)}`,
+          text: `Pay ${formatMoneyPaise(amountPaise)}`,
           onPress: async () => {
             try {
               const result = await mockPayment(orderId, 'UPI', amountPaise);

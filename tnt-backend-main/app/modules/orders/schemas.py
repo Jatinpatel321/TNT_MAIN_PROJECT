@@ -55,5 +55,7 @@ class OrderResponse(BaseModel):
     stationery_jobs: Optional[list[StationeryJobSummary]] = None
     fraud_flag: Optional[bool] = None
     fraud_reason: Optional[str] = None
+    group_id: Optional[int] = None
+    is_group: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)

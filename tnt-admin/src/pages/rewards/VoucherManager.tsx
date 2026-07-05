@@ -9,8 +9,7 @@ import toast from 'react-hot-toast';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { rewardsApi } from '../../api/rewards';
-import { formatDate } from '../../utils/format';
-import { generateVoucherCode } from '../../utils/format';
+import { formatDate, generateVoucherCode, formatRupees } from '../../utils/format';
 import type { Voucher } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -116,7 +115,7 @@ export default function VoucherManager() {
       cell: ({ row }) => (
         <span className="font-mono text-sm text-[#111827]">
           {row.original.discount_type === 'flat'
-            ? `₹${row.original.discount_value}`
+            ? formatRupees(row.original.discount_value)
             : `${row.original.discount_value}%`}
           <span className="text-xs text-[#6B7280] ml-1">
             ({row.original.discount_type})

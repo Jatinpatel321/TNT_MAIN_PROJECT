@@ -41,23 +41,77 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include only vendor auth router + health
+# Include all vendor-related routers
 from fastapi import APIRouter as APIRouterCls
 from app.modules.vendors.auth_router import router as vendor_auth_router
 from app.modules.vendors.router import router as vendors_router
 from app.modules.auth.router import router as auth_router
+from app.modules.vendors.ai_router import router as vendor_ai_router
+from app.modules.vendors.retention_router import router as vendor_retention_router
+from app.modules.vendors.analytics_router import router as vendor_analytics_router
+from app.modules.vendors.settlement_router import router as vendor_settlement_router
+from app.modules.vendors.profile_router import router as vendor_profile_router
+from app.modules.vendors.dashboard_router import router as vendor_dashboard_router
+from app.modules.vendors.business_hours_router import router as vendor_business_hours_router
+from app.modules.vendors.demand_dashboard_router import router as vendor_demand_dashboard_router
+from app.modules.vendors.inventory_router import router as vendor_inventory_router
+from app.modules.vendors.promotion_router import router as vendor_promotion_router
+from app.modules.vendors.historical_learning_router import router as vendor_history_router
+from app.modules.vendors.enhanced_forecasting_router import router as vendor_forecast_router
+from app.modules.vendors.confidence_router import router as vendor_confidence_router
+from app.modules.vendors.performance_router import router as vendor_performance_router
+from app.modules.vendors.ai_inventory_router import router as vendor_ai_inventory_router
+from app.modules.vendors.peak_hour_router import router as vendor_peak_hour_router
+from app.modules.vendors.validation_router import router as vendor_validation_router
+from app.modules.orders.vendor_ws_router import router as vendor_ws_router
 
 # Wrap all routes under /v1 prefix to match frontend expectations
 v1_router = APIRouterCls(prefix="/v1")
 v1_router.include_router(vendor_auth_router)
 v1_router.include_router(vendors_router)
 v1_router.include_router(auth_router)
+v1_router.include_router(vendor_ai_router)
+v1_router.include_router(vendor_retention_router)
+v1_router.include_router(vendor_analytics_router)
+v1_router.include_router(vendor_settlement_router)
+v1_router.include_router(vendor_profile_router)
+v1_router.include_router(vendor_dashboard_router)
+v1_router.include_router(vendor_business_hours_router)
+v1_router.include_router(vendor_demand_dashboard_router)
+v1_router.include_router(vendor_inventory_router)
+v1_router.include_router(vendor_promotion_router)
+v1_router.include_router(vendor_history_router)
+v1_router.include_router(vendor_forecast_router)
+v1_router.include_router(vendor_confidence_router)
+v1_router.include_router(vendor_performance_router)
+v1_router.include_router(vendor_ai_inventory_router)
+v1_router.include_router(vendor_peak_hour_router)
+v1_router.include_router(vendor_validation_router)
+v1_router.include_router(vendor_ws_router)
 app.include_router(v1_router)
 
 # Also keep direct routes for backward compat
 app.include_router(vendor_auth_router)
 app.include_router(vendors_router)
 app.include_router(auth_router)
+app.include_router(vendor_ai_router)
+app.include_router(vendor_retention_router)
+app.include_router(vendor_analytics_router)
+app.include_router(vendor_settlement_router)
+app.include_router(vendor_profile_router)
+app.include_router(vendor_dashboard_router)
+app.include_router(vendor_business_hours_router)
+app.include_router(vendor_demand_dashboard_router)
+app.include_router(vendor_inventory_router)
+app.include_router(vendor_promotion_router)
+app.include_router(vendor_history_router)
+app.include_router(vendor_forecast_router)
+app.include_router(vendor_confidence_router)
+app.include_router(vendor_performance_router)
+app.include_router(vendor_ai_inventory_router)
+app.include_router(vendor_peak_hour_router)
+app.include_router(vendor_validation_router)
+app.include_router(vendor_ws_router)
 
 @app.get("/health")
 def health():

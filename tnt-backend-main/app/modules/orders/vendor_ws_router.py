@@ -65,7 +65,55 @@ def _decode_token(token: str) -> Optional[dict]:
             return None
         return {"id": int(user_id), "role": role}
     except (JWTError, ValueError, TypeError):
-        return None
+        try:
+            from app.modules.vendors.auth_service import VENDOR_JWT_SECRET_KEY, VENDOR_JWT_ALGORITHM
+            payload = jwt.decode(token, VENDOR_JWT_SECRET_KEY, algorithms=[VENDOR_JWT_ALGORITHM])
+            vendor_id_str = payload.get("sub")
+            role = payload.get("role")
+            if not vendor_id_str:
+                return None
+            
+            from app.modules.vendors.model import Vendor
+            db = SessionLocal()
+            try:
+                vendor = db.query(Vendor).filter(Vendor.vendor_id == int(vendor_id_str)).first()
+                if not vendor:
+                    return None
+                return {"id": vendor.owner_id, "role": "vendor"}
+            finally:
+                db.close()
+        except Exception:
+            return None
+
+
+def _enrich_order(o: Order, db) -> dict:
+    from app.modules.orders.model import OrderItem
+    from app.modules.menu.model import MenuItem
+    item_rows = db.query(OrderItem).filter(OrderItem.order_id == o.id).all()
+    items = []
+    for oi in item_rows:
+        mi = db.query(MenuItem).filter(MenuItem.id == oi.menu_item_id).first()
+        items.append({
+            "menu_item_id": oi.menu_item_id,
+            "name": mi.name if mi else "Unknown Item",
+            "quantity": oi.quantity,
+            "price_at_time": oi.price_at_time,
+        })
+    return {
+        "id": o.id,
+        "user_id": o.user_id,
+        "slot_id": o.slot_id,
+        "vendor_id": o.vendor_id,
+        "status": o.status.value if hasattr(o.status, "value") else str(o.status),
+        "total_amount": o.total_amount,
+        "created_at": o.created_at.isoformat() if o.created_at else None,
+        "eta_minutes": o.eta_minutes,
+        "qr_code": o.qr_code is not None,
+        "items": items,
+        "group_id": o.group_id,
+        "is_group": o.is_group,
+        "booking_type": o.booking_type,
+    }
 
 
 def _fetch_active_orders(vendor_id: int) -> list[dict]:
@@ -86,18 +134,7 @@ def _fetch_active_orders(vendor_id: int) -> list[dict]:
             .limit(50)
             .all()
         )
-        return [
-            {
-                "id": o.id,
-                "user_id": o.user_id,
-                "status": o.status.value if hasattr(o.status, "value") else str(o.status),
-                "total_amount": o.total_amount,
-                "created_at": o.created_at.isoformat() if o.created_at else None,
-                "eta_minutes": o.eta_minutes,
-                "qr_code": o.qr_code is not None,
-            }
-            for o in orders
-        ]
+        return [_enrich_order(o, db) for o in orders]
     finally:
         db.close()
 

@@ -99,20 +99,3 @@ export async function rankCustomItems(
   );
   return res.data;
 }
-</write_to_file>
-<task_progress>
-- [x] Analyze existing recommendation system
-- [x] Create recommendation ranking service
-- [x] Implement weighted scoring system
-- [x] Calculate trending score
-- [x] Calculate popularity score
-- [x] Calculate personal affinity score
-- [x] Calculate recency score
-- [x] Calculate recommendation confidence
-- [x] Generate recommendation reasons
-- [x] Update recommendation APIs
-- [x] Create frontend service
-- [ ] Display recommendation reasons in UI
-- [ ] Create documentation
-</task_progress>
-</write_to_file>

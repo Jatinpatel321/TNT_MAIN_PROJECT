@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin';
-import { formatDate } from '../../utils/format';
+import { formatDate, formatCurrency } from '../../utils/format';
 import type { FraudAlertDetailResponse } from '../../types';
 
 const SEVERITY_TEXT_COLORS = {
@@ -321,7 +321,7 @@ export default function FraudDetail() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#6B7280]">Total Value:</span>
-                  <span className="font-semibold text-[#111827]">₹{(order.total_amount / 100).toFixed(2)}</span>
+                  <span className="font-semibold text-[#111827]">{formatCurrency(order.total_amount, { showDecimals: true })}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#6B7280]">Order Status:</span>

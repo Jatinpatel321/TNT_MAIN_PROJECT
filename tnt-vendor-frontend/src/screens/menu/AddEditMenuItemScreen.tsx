@@ -9,17 +9,20 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { colors, spacing, borderRadius, shadows } from '../../design-system';
+import { colors as staticColors, spacing, borderRadius, shadows } from '../../design-system';
+const colors = staticColors;
 import ImagePicker from '../../components/ImagePicker';
 import apiClient from '../../services/apiClient';
-import { API_BASE_URL } from '../../config/api';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function AddEditMenuItemScreen({ route, navigation }: any) {
+  const { colors: themeColors } = useTheme();
   const item = route.params?.item;
+
   const isEdit = !!item;
 
   const [name, setName] = useState(item?.name || '');
-  const [price, setPrice] = useState(item?.price?.toString() || '');
+  const [price, setPrice] = useState(item?.price !== undefined ? (item.price / 100).toString() : '');
   const [description, setDescription] = useState(item?.description || '');
   const [category, setCategory] = useState(item?.category || 'food');
   const [prepTime, setPrepTime] = useState(item?.prep_time_minutes?.toString() || '');
@@ -32,17 +35,18 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
       Alert.alert('Validation Error', 'Item name is required.');
       return;
     }
-    const priceNum = parseInt(price, 10);
+    const priceNum = parseFloat(price);
     if (isNaN(priceNum) || priceNum <= 0) {
       Alert.alert('Validation Error', 'Please enter a valid positive price.');
       return;
     }
+    const pricePaise = Math.round(priceNum * 100);
 
     setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append('name', name.trim());
-      formData.append('price', priceNum.toString());
+      formData.append('price', pricePaise.toString());
       formData.append('description', description.trim());
       formData.append('category', category);
       
@@ -61,13 +65,13 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
       }
 
       if (isEdit) {
-        await apiClient.put(`${API_BASE_URL}/v1/menu/items/${item.id}`, formData, {
+        await apiClient.put(`/v1/menu/items/${item.id}`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
       } else {
-        await apiClient.post(`${API_BASE_URL}/v1/menu/items`, formData, {
+        await apiClient.post(`/v1/menu/items`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -88,15 +92,15 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{isEdit ? 'Edit Menu Item' : 'New Menu Item'}</Text>
+    <ScrollView style={[styles.container, { backgroundColor: themeColors.bg }]} contentContainerStyle={styles.content}>
+      <Text style={[styles.title, { color: themeColors.textPrimary }]}>{isEdit ? 'Edit Menu Item' : 'New Menu Item'}</Text>
 
       {/* Image Section */}
       <View style={styles.imageSection}>
-        <Text style={styles.label}>Item Image</Text>
+        <Text style={[styles.label, { color: themeColors.textSecondary }]}>Item Image</Text>
         <ImagePicker onImageSelected={setImageUri} />
         {imageUri && (
-          <Text style={styles.imageSelectedText} numberOfLines={1}>
+          <Text style={[styles.imageSelectedText, { color: themeColors.textSecondary }]} numberOfLines={1}>
             Selected: {imageUri.substring(imageUri.lastIndexOf('/') + 1)}
           </Text>
         )}
@@ -104,22 +108,22 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
 
       {/* Basic Info */}
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Name *</Text>
+        <Text style={[styles.label, { color: themeColors.textSecondary }]}>Name *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: themeColors.bgCard, color: themeColors.textPrimary, borderColor: themeColors.border }]}
           placeholder="e.g. Masala Dosa"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={themeColors.textMuted}
           value={name}
           onChangeText={setName}
         />
       </View>
 
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Price (₹) *</Text>
+        <Text style={[styles.label, { color: themeColors.textSecondary }]}>Price (₹) *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: themeColors.bgCard, color: themeColors.textPrimary, borderColor: themeColors.border }]}
           placeholder="e.g. 80"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={themeColors.textMuted}
           keyboardType="numeric"
           value={price}
           onChangeText={setPrice}
@@ -127,11 +131,11 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
       </View>
 
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Description</Text>
+        <Text style={[styles.label, { color: themeColors.textSecondary }]}>Description</Text>
         <TextInput
-          style={[styles.input, styles.multilineInput]}
+          style={[styles.input, styles.multilineInput, { backgroundColor: themeColors.bgCard, color: themeColors.textPrimary, borderColor: themeColors.border }]}
           placeholder="Describe the taste, ingredients, or size..."
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={themeColors.textMuted}
           multiline
           numberOfLines={3}
           value={description}
@@ -141,21 +145,37 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
 
       {/* Category Chips */}
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>Category</Text>
+        <Text style={[styles.label, { color: themeColors.textSecondary }]}>Category</Text>
         <View style={styles.chipRow}>
           <TouchableOpacity
-            style={[styles.chip, category === 'food' && styles.chipActive]}
+            style={[
+              styles.chip,
+              { backgroundColor: themeColors.bgCard, borderColor: themeColors.border },
+              category === 'food' && [styles.chipActive, { backgroundColor: themeColors.primary, borderColor: themeColors.primary }]
+            ]}
             onPress={() => setCategory('food')}
           >
-            <Text style={[styles.chipText, category === 'food' && styles.chipTextActive]}>
+            <Text style={[
+              styles.chipText,
+              { color: themeColors.textSecondary },
+              category === 'food' && [styles.chipTextActive, { color: themeColors.textInverse }]
+            ]}>
               Food
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.chip, category === 'stationery' && styles.chipActive]}
+            style={[
+              styles.chip,
+              { backgroundColor: themeColors.bgCard, borderColor: themeColors.border },
+              category === 'stationery' && [styles.chipActive, { backgroundColor: themeColors.primary, borderColor: themeColors.primary }]
+            ]}
             onPress={() => setCategory('stationery')}
           >
-            <Text style={[styles.chipText, category === 'stationery' && styles.chipTextActive]}>
+            <Text style={[
+              styles.chipText,
+              { color: themeColors.textSecondary },
+              category === 'stationery' && [styles.chipTextActive, { color: themeColors.textInverse }]
+            ]}>
               Stationery
             </Text>
           </TouchableOpacity>
@@ -165,11 +185,11 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
       {/* Extra settings based on category */}
       {category === 'food' ? (
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Prep Time (Minutes)</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Prep Time (Minutes)</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: themeColors.bgCard, color: themeColors.textPrimary, borderColor: themeColors.border }]}
             placeholder="e.g. 15"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={themeColors.textMuted}
             keyboardType="numeric"
             value={prepTime}
             onChangeText={setPrepTime}
@@ -177,11 +197,11 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
         </View>
       ) : (
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Available Quantity</Text>
+          <Text style={[styles.label, { color: themeColors.textSecondary }]}>Available Quantity</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: themeColors.bgCard, color: themeColors.textPrimary, borderColor: themeColors.border }]}
             placeholder="e.g. 50"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={themeColors.textMuted}
             keyboardType="numeric"
             value={quantity}
             onChangeText={setQuantity}
@@ -191,14 +211,14 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
 
       {/* Save Button */}
       <TouchableOpacity
-        style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+        style={[styles.saveButton, { backgroundColor: themeColors.primary }, isLoading && styles.saveButtonDisabled]}
         onPress={handleSave}
         disabled={isLoading}
       >
         {isLoading ? (
-          <ActivityIndicator color={colors.textInverse} size="small" />
+          <ActivityIndicator color={themeColors.textInverse} size="small" />
         ) : (
-          <Text style={styles.saveButtonText}>Save Item</Text>
+          <Text style={[styles.saveButtonText, { color: themeColors.textInverse }]}>Save Item</Text>
         )}
       </TouchableOpacity>
     </ScrollView>

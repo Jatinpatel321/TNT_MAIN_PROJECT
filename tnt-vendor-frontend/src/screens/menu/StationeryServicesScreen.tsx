@@ -15,8 +15,8 @@ import { colors, spacing, borderRadius, shadows } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import apiClient from '../../services/apiClient';
-import { API_BASE_URL } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
+import { formatPaise } from '../../utils/format';
 
 interface StationeryService {
   id: number;
@@ -31,7 +31,7 @@ interface StationeryService {
 
 export default function StationeryServicesScreen({ navigation }: any) {
   const { user } = useAuth();
-  const vendorId = user?.id;
+  const vendorId = user?.vendor_id;
 
   const [services, setServices] = useState<StationeryService[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,7 +53,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
     if (!vendorId) return;
     setIsLoading(true);
     try {
-      const res = await apiClient.get(`${API_BASE_URL}/v1/menu/stationery?vendor_id=${vendorId}`);
+      const res = await apiClient.get(`/v1/menu/stationery?vendor_id=${vendorId}`);
       // Backend returns PaginatedResponse: { items: [], total: int, ... }
       setServices(res.data.items || []);
     } catch (err: any) {
@@ -78,7 +78,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
     setEditingService(service);
     setName(service.name);
     setDescription(service.description || '');
-    setPrice(service.price_per_page.toString());
+    setPrice((service.price_per_page / 100).toString());
     setMaxCapacity(service.max_capacity?.toString() || '');
     setServiceType(service.service_type);
     setIsModalVisible(true);
@@ -89,29 +89,30 @@ export default function StationeryServicesScreen({ navigation }: any) {
       Alert.alert('Validation Error', 'Service name is required.');
       return;
     }
-    const priceVal = parseInt(price, 10);
+    const priceVal = parseFloat(price);
     if (isNaN(priceVal) || priceVal <= 0) {
       Alert.alert('Validation Error', 'Price per page must be a positive number.');
       return;
     }
+    const pricePaise = Math.round(priceVal * 100);
     const capVal = maxCapacity ? parseInt(maxCapacity, 10) : null;
 
     try {
       const formData = new FormData();
       formData.append('name', name.trim());
       formData.append('description', description.trim());
-      formData.append('price_per_page', priceVal.toString());
+      formData.append('price_per_page', pricePaise.toString());
       if (capVal !== null) {
         formData.append('max_capacity', capVal.toString());
       }
       formData.append('service_type', serviceType);
 
       if (editingService) {
-        await apiClient.put(`${API_BASE_URL}/v1/menu/stationery/${editingService.id}`, formData, {
+        await apiClient.put(`/v1/menu/stationery/${editingService.id}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        await apiClient.post(`${API_BASE_URL}/v1/menu/stationery`, formData, {
+        await apiClient.post(`/v1/menu/stationery`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }
@@ -136,7 +137,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiClient.delete(`${API_BASE_URL}/v1/menu/stationery/${id}`);
+              await apiClient.delete(`/v1/menu/stationery/${id}`);
               fetchServices();
             } catch (err) {
               Alert.alert('Error', 'Failed to delete service.');
@@ -151,7 +152,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
     try {
       const formData = new FormData();
       formData.append('is_available', (!service.is_available).toString());
-      await apiClient.put(`${API_BASE_URL}/v1/menu/stationery/${service.id}`, formData, {
+      await apiClient.put(`/v1/menu/stationery/${service.id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       fetchServices();
@@ -185,7 +186,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
         </Text>
 
         <View style={styles.metaRow}>
-          <Text style={styles.price}>₹{item.price_per_page}/page</Text>
+          <Text style={styles.price}>{formatPaise(item.price_per_page)}/page</Text>
           <View style={styles.capacityRow}>
             <Text style={styles.capacityText}>
               Load: {item.current_load}/{item.max_capacity || '∞'}

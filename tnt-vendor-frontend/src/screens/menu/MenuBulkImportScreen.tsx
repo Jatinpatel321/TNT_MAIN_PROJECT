@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../services/apiClient';
-import { API_BASE_URL } from '../../config/api';
 import { colors, spacing, shadows } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import Button from '../../design-system/components/Button';
@@ -115,9 +114,9 @@ export default function MenuBulkImportScreen({ navigation }: any) {
     let failed = 0;
     for (const row of validRows) {
       try {
-        await apiClient.post(`${API_BASE_URL}/v1/menu/items`, {
+        await apiClient.post(`/v1/menu/items`, {
           name: row.name,
-          price: Number(row.price),
+          price: Math.round(Number(row.price) * 100),
           category: row.category,
           description: row.description || undefined,
           prep_time_minutes: row.prep_time ? Number(row.prep_time) : undefined,
@@ -138,11 +137,11 @@ export default function MenuBulkImportScreen({ navigation }: any) {
   };
 
   const handleExport = async () => {
-    const vendorId = user?.id;
+    const vendorId = user?.vendor_id;
     if (!vendorId) return;
     setExporting(true);
     try {
-      const res = await apiClient.get(`${API_BASE_URL}/v1/menu/items?vendor_id=${vendorId}`);
+      const res = await apiClient.get(`/v1/menu/items?vendor_id=${vendorId}`);
       const items: any[] = res.data.items || [];
       if (items.length === 0) {
         Alert.alert('No Items', 'Your menu has no items to export.');
@@ -153,7 +152,7 @@ export default function MenuBulkImportScreen({ navigation }: any) {
       const rows = items.map(i =>
         [
           `"${(i.name || '').replace(/"/g, '""')}"`,
-          i.price ?? 0,
+          i.price !== undefined ? i.price / 100 : 0,
           `"${(i.category || '').replace(/"/g, '""')}"`,
           `"${(i.description || '').replace(/"/g, '""')}"`,
           i.prep_time_minutes ?? '',

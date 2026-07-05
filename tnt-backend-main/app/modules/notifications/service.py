@@ -239,6 +239,71 @@ def get_notification_history(
 send_notification = notify_user
 
 
+def send_vendor_push(
+    vendor_id: int,
+    title: str,
+    message: str,
+    data: dict | None = None,
+) -> bool:
+    """Send a push notification directly to a vendor.
+
+    Looks up the vendor's User record (the vendor's User is the user whose
+    ``device_token`` is set via the vendor app's FCM registration) and
+    dispatches the push via ``send_push()``.
+
+    Args:
+        vendor_id: The User.id of the vendor.
+        title: Notification title.
+        message: Notification body.
+        data: Optional extra payload (e.g. ``{"type": "new_order", "order_id": 123}``).
+
+    Returns:
+        True if the push was sent successfully, False otherwise.
+    """
+    from app.modules.users.model import User
+
+    try:
+        vendor = None
+        # Try resolving via User.id first (most common path)
+        vendor = _resolve_user(vendor_id)
+        if not vendor:
+            logger.warning("vendor_push_no_user vendor_id=%s", vendor_id)
+            return False
+
+        if not vendor.device_token:
+            logger.info("vendor_push_no_token vendor_id=%s", vendor_id)
+            return False
+
+        from app.core.fcm import send_push
+
+        sent = send_push(
+            device_token=vendor.device_token,
+            title=title,
+            body=message,
+            data=data or {},
+        )
+        if sent:
+            logger.info("vendor_push_sent vendor_id=%s title=%s", vendor_id, title)
+        else:
+            logger.warning("vendor_push_failed vendor_id=%s title=%s", vendor_id, title)
+        return sent
+    except Exception:
+        logger.exception("vendor_push_error vendor_id=%s", vendor_id)
+        return False
+
+
+def _resolve_user(user_id: int):
+    """Resolve a User by id using a short-lived session."""
+    from app.database.session import SessionLocal
+    from app.modules.users.model import User
+
+    db = SessionLocal()
+    try:
+        return db.query(User).filter(User.id == user_id).first()
+    finally:
+        db.close()
+
+
 def get_notification_preferences(user_id: int, db: Session) -> dict:
     """Return push notification preferences for the user.
 

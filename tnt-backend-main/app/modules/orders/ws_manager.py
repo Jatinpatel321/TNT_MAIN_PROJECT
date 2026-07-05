@@ -16,6 +16,7 @@ import logging
 from typing import Optional
 
 from fastapi import WebSocket
+from starlette.websockets import WebSocketState
 
 logger = logging.getLogger("tnt.ws.manager")
 
@@ -39,7 +40,8 @@ class OrderWSManager:
 
     async def connect(self, order_id: int, ws: WebSocket) -> None:
         """Accept a WebSocket and register it."""
-        await ws.accept()
+        if ws.client_state != WebSocketState.CONNECTED:
+            await ws.accept()
         self._active.setdefault(order_id, []).append(ws)
         logger.info("ws_connect order_id=%s total=%s", order_id, len(self._active[order_id]))
 
@@ -59,7 +61,8 @@ class OrderWSManager:
 
     async def connect_vendor(self, vendor_id: int, ws: WebSocket) -> None:
         """Accept a WebSocket for a vendor dashboard connection."""
-        await ws.accept()
+        if ws.client_state != WebSocketState.CONNECTED:
+            await ws.accept()
         self._vendor_connections.setdefault(vendor_id, []).append(ws)
         logger.info("vendor_ws_connect vendor_id=%s total=%s", vendor_id, len(self._vendor_connections[vendor_id]))
 

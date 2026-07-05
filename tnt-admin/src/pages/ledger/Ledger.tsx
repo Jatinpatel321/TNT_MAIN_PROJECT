@@ -118,7 +118,7 @@ export default function Ledger() {
           'font-mono font-bold text-sm',
           row.original.type === 'credit' ? 'text-green-500' : 'text-red-500'
         )}>
-          {row.original.type === 'credit' ? '+' : '-'}₹{(row.original.amount / 100).toFixed(2)}
+          {row.original.type === 'credit' ? '+' : '-'}{formatCurrency(row.original.amount, { showDecimals: true })}
         </span>
       ),
     },

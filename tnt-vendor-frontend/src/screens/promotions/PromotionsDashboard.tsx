@@ -12,14 +12,18 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { retentionApi } from '../../services/retentionApi';
-import { colors, shadows, spacing } from '../../design-system';
+import { colors as staticColors, shadows, spacing } from '../../design-system';
+const colors = staticColors;
+import { formatPaise } from '../../utils/format';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatCard from '../../design-system/components/StatCard';
 import ForecastCard from '../../design-system/components/ForecastCard';
 import AICard from '../../design-system/components/AICard';
 import Badge from '../../design-system/components/Badge';
+import { useTheme } from '../../context/ThemeContext';
 
 type TabType = 'overview' | 'offers' | 'campaigns' | 'customers' | 'ai';
 
@@ -32,10 +36,14 @@ const segmentColors: Record<string, string> = {
 };
 
 export default function PromotionsDashboard({ navigation }: any) {
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<any>(null);
+  const [showCreateOffer, setShowCreateOffer] = useState(false);
+  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
   const { user } = useAuth();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -89,7 +97,7 @@ export default function PromotionsDashboard({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerDeco1} />
@@ -107,7 +115,7 @@ export default function PromotionsDashboard({ navigation }: any) {
             onPress={() => setActiveTab(tab.key)}
           >
             <Text style={styles.tabIcon}>{tab.icon}</Text>
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]} numberOfLines={1}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -163,7 +171,7 @@ export default function PromotionsDashboard({ navigation }: any) {
         {/* Offers */}
         {activeTab === 'offers' && (
           <Animated.View style={{ opacity: fadeAnim }}>
-            <TouchableOpacity style={styles.createButton}>
+            <TouchableOpacity style={styles.createButton} onPress={() => setShowCreateOffer(true)}>
               <Text style={styles.createButtonText}>+ Create New Offer</Text>
             </TouchableOpacity>
             {(data?.offers || []).length > 0 ? data.offers.map((offer: any, i: number) => (
@@ -174,7 +182,9 @@ export default function PromotionsDashboard({ navigation }: any) {
                 </View>
                 <Text style={styles.offerType}>{offer.discount_type?.replace(/_/g, ' ')}</Text>
                 <View style={styles.offerMeta}>
-                  <Text style={styles.offerDiscount}>{offer.discount_value}% OFF</Text>
+                  <Text style={styles.offerDiscount}>
+                    {offer.discount_type === 'fixed' ? `${formatPaise(offer.discount_value)} OFF` : `${offer.discount_value}% OFF`}
+                  </Text>
                   <Text style={styles.offerRedeemed}>{offer.times_redeemed} redeemed</Text>
                 </View>
                 {offer.is_dynamic && (
@@ -192,7 +202,7 @@ export default function PromotionsDashboard({ navigation }: any) {
         {/* Campaigns */}
         {activeTab === 'campaigns' && (
           <Animated.View style={{ opacity: fadeAnim }}>
-            <TouchableOpacity style={styles.createButton}>
+            <TouchableOpacity style={styles.createButton} onPress={() => setShowCreateCampaign(true)}>
               <Text style={styles.createButtonText}>+ Create New Campaign</Text>
             </TouchableOpacity>
             {(data?.campaigns || []).length > 0 ? data.campaigns.map((campaign: any, i: number) => (
@@ -203,7 +213,9 @@ export default function PromotionsDashboard({ navigation }: any) {
                 </View>
                 <Text style={styles.offerType}>{campaign.offer_type?.replace(/_/g, ' ')}</Text>
                 <View style={styles.offerMeta}>
-                  <Text style={styles.offerDiscount}>{campaign.discount_value}% OFF</Text>
+                  <Text style={styles.offerDiscount}>
+                    {campaign.offer_type === 'discount_fixed' ? `${formatPaise(campaign.discount_value)} OFF` : `${campaign.discount_value}% OFF`}
+                  </Text>
                   <Text style={styles.offerRedeemed}>{campaign.times_used} used</Text>
                 </View>
                 {campaign.is_combo && <Badge label="Combo Deal" variant="premium" size="sm" icon="📦" style={{ marginTop: 6 }} />}
@@ -229,7 +241,7 @@ export default function PromotionsDashboard({ navigation }: any) {
                   <View style={styles.rankBadge}><Text style={styles.rankText}>#{i + 1}</Text></View>
                   <View style={styles.customerInfo}>
                     <Text style={styles.customerName}>{c.name}</Text>
-                    <Text style={styles.customerMeta}>{c.total_orders} orders · ₹{c.total_spent}</Text>
+                    <Text style={styles.customerMeta}>{c.total_orders} orders · {formatPaise(c.total_spent)}</Text>
                   </View>
                   <Badge label={c.segment} variant={c.segment === 'loyal' ? 'success' : c.segment === 'repeat' ? 'primary' : 'neutral'} size="sm" />
                 </View>
@@ -261,17 +273,17 @@ export default function PromotionsDashboard({ navigation }: any) {
         )}
         <View style={{ height: spacing.huge }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   centered: { justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: colors.textMuted, fontWeight: '600' },
   header: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.huge + 20,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.xl,
     borderBottomLeftRadius: 28,
@@ -282,11 +294,11 @@ const styles = StyleSheet.create({
   headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
   headerTitle: { fontSize: 28, fontWeight: '700', color: colors.textInverse, letterSpacing: -0.3 },
   headerSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: '500' },
-  tabRow: { maxHeight: 52 },
-  tabContentPad: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.md },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  tabRow: { height: 75, maxHeight: 75, marginTop: 8, marginBottom: 4 },
+  tabContentPad: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: 12 },
+  scrollContent: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 24 },
   tab: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 22, paddingVertical: 10,
     borderRadius: 14, backgroundColor: colors.bgCard, marginRight: 8, gap: 6,
     borderWidth: 1.5, borderColor: colors.border, ...shadows.sm,
   },

@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import colors from '../tokens/colors';
+import { useTheme } from '../../context/ThemeContext';
+import staticColors from '../tokens/colors';
 import shadows from '../tokens/shadows';
 import AnimatedCounter from './AnimatedCounter';
 
@@ -31,27 +32,29 @@ export default function RevenueCard({
   data,
   trend,
   format = 'currency',
-  color = colors.primary,
+  color,
   style,
   icon = '💰',
 }: RevenueCardProps) {
+  const { colors: themeColors } = useTheme();
+  const activeColor = color || themeColors.primary;
   const maxValue = data ? Math.max(...data.map(d => d.value), 1) : 1;
 
   return (
-    <View style={[styles.card, style]}>
-      <View style={[styles.accentBar, { backgroundColor: color }]} />
+    <View style={[styles.card, { backgroundColor: themeColors.bgCard }, style]}>
+      <View style={[styles.accentBar, { backgroundColor: activeColor }]} />
       <View style={styles.header}>
         <Text style={styles.icon}>{icon}</Text>
         <View style={styles.headerText}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+          <Text style={[styles.title, { color: themeColors.textSecondary }]}>{title}</Text>
+          {subtitle && <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>{subtitle}</Text>}
         </View>
         {trend && (
-          <View style={[styles.trendBadge, { backgroundColor: trend.isUp ? colors.successPale : colors.errorPale }]}>
-            <Text style={[styles.trendArrow, { color: trend.isUp ? colors.success : colors.error }]}>
+          <View style={[styles.trendBadge, { backgroundColor: trend.isUp ? themeColors.successPale : themeColors.errorPale }]}>
+            <Text style={[styles.trendArrow, { color: trend.isUp ? themeColors.success : themeColors.error }]}>
               {trend.isUp ? '↑' : '↓'}
             </Text>
-            <Text style={[styles.trendValue, { color: trend.isUp ? colors.success : colors.error }]}>
+            <Text style={[styles.trendValue, { color: trend.isUp ? themeColors.success : themeColors.error }]}>
               {Math.abs(trend.value)}%
             </Text>
           </View>
@@ -62,12 +65,12 @@ export default function RevenueCard({
         value={amount}
         prefix="₹"
         fontSize={32}
-        color={color}
+        color={activeColor}
         format={format}
       />
 
       {data && data.length > 0 && (
-        <View style={styles.chartContainer}>
+        <View style={[styles.chartContainer, { borderTopColor: themeColors.borderLight }]}>
           <View style={styles.chart}>
             {data.map((point, index) => {
               const height = (point.value / maxValue) * 60;
@@ -80,14 +83,14 @@ export default function RevenueCard({
                         styles.bar,
                         {
                           height: Math.max(height, 4),
-                          backgroundColor: isLast ? color : `${color}50`,
+                          backgroundColor: isLast ? activeColor : `${activeColor}50`,
                           borderTopLeftRadius: index === 0 ? 6 : 3,
                           borderTopRightRadius: index === data.length - 1 ? 6 : 3,
                         },
                       ]}
                     />
                   </View>
-                  <Text style={[styles.barLabel, isLast && { color, fontWeight: '700' }]}>
+                  <Text style={[styles.barLabel, { color: themeColors.textMuted }, isLast && { color: activeColor, fontWeight: '700' }]}>
                     {point.label}
                   </Text>
                 </View>
@@ -100,9 +103,10 @@ export default function RevenueCard({
   );
 }
 
+const colors = staticColors;
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
     borderRadius: 24,
     padding: 20,
     overflow: 'hidden',
@@ -126,11 +130,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.textSecondary,
   },
   subtitle: {
     fontSize: 12,
-    color: colors.textMuted,
     marginTop: 2,
   },
   trendBadge: {
@@ -147,7 +149,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
   },
   chart: {
     flexDirection: 'row',
@@ -174,8 +175,8 @@ const styles = StyleSheet.create({
   },
   barLabel: {
     fontSize: 9,
-    color: colors.textMuted,
     fontWeight: '600',
     marginTop: 4,
   },
 });
+

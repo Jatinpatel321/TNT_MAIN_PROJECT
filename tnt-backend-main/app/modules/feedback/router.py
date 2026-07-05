@@ -67,6 +67,22 @@ def submit_feedback(
     db.commit()
     db.refresh(feedback)
 
+    # Recalculate and update the vendor's profile rating in DB
+    try:
+        from app.modules.vendors.profile_models import VendorProfile
+        res = (
+            db.query(func.avg(Feedback.overall_rating))
+            .filter(Feedback.vendor_id == feedback.vendor_id)
+            .scalar()
+        )
+        if res is not None:
+            profile = db.query(VendorProfile).filter(VendorProfile.vendor_id == feedback.vendor_id).first()
+            if profile:
+                profile.rating = round(float(res), 2)
+                db.commit()
+    except Exception:
+        pass
+
     return _feedback_to_response(feedback)
 
 

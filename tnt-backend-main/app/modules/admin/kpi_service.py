@@ -65,6 +65,23 @@ class KPIService:
             query = query.join(User, Order.user_id == User.id).filter(User.department == department)
         return query
 
+    def _apply_job_filters(
+        self, query, date_from_dt: Optional[datetime], date_to_dt: Optional[datetime],
+        department: Optional[str], vendor_id: Optional[int]
+    ):
+        """Apply date, department, and vendor filters to a Payment/StationeryJob query."""
+        from app.modules.payments.model import Payment
+        from app.modules.stationery.job_model import StationeryJob
+        if date_from_dt:
+            query = query.filter(Payment.created_at >= date_from_dt)
+        if date_to_dt:
+            query = query.filter(Payment.created_at <= date_to_dt)
+        if vendor_id:
+            query = query.filter(StationeryJob.vendor_id == vendor_id)
+        if department:
+            query = query.join(User, StationeryJob.user_id == User.id).filter(User.department == department)
+        return query
+
     def get_aggregated_kpis(
         self,
         date_from: Optional[str] = None,
@@ -91,6 +108,10 @@ class KPIService:
         stat_query = self.db.query(func.count(Order.id)).filter(Order.booking_type == "stationery")
         stat_query = self._apply_order_filters(stat_query, date_from_dt, date_to_dt, department, vendor_id)
         stationery_orders = stat_query.scalar() or 0
+
+        comb_query = self.db.query(func.count(Order.id)).filter(Order.booking_type == "combined")
+        comb_query = self._apply_order_filters(comb_query, date_from_dt, date_to_dt, department, vendor_id)
+        combined_orders = comb_query.scalar() or 0
 
         # Check database dialect (SQLite vs PostgreSQL)
         is_sqlite = self.db.bind.dialect.name == "sqlite"
@@ -143,7 +164,7 @@ class KPIService:
             monthly_rows = monthly_query.group_by(func.date_trunc(text("'month'"), Order.created_at)).order_by(func.date_trunc(text("'month'"), Order.created_at)).all()
             monthly_orders = [{"date": str(r.month.date() if hasattr(r.month, 'date') else r.month), "count": r.count} for r in monthly_rows]
 
-        total_orders = food_orders + stationery_orders
+        total_orders = food_orders + stationery_orders + combined_orders
 
         # ── OPERATIONAL KPIs ──────────────────────────────────────────────────
         # Avg Waiting Time (actual completion time)
@@ -260,15 +281,28 @@ class KPIService:
 
         # ── BUSINESS KPIs ────────────────────────────────────────────────────
         # Revenue (successful payment sums in paise, returned in INR)
-        rev_query = self.db.query(func.sum(Payment.amount)).join(Order, Payment.order_id == Order.id).filter(Payment.status == PaymentStatus.SUCCESS)
-        rev_query = self._apply_order_filters(rev_query, date_from_dt, date_to_dt, department, vendor_id)
-        revenue_paise = rev_query.scalar() or 0
+        rev_order_query = self.db.query(func.sum(Payment.amount)).join(Order, Payment.order_id == Order.id).filter(Payment.status == PaymentStatus.SUCCESS)
+        rev_order_query = self._apply_order_filters(rev_order_query, date_from_dt, date_to_dt, department, vendor_id)
+        revenue_order_paise = rev_order_query.scalar() or 0
+
+        from app.modules.stationery.job_model import StationeryJob
+        rev_job_query = self.db.query(func.sum(Payment.amount)).join(StationeryJob, Payment.stationery_job_id == StationeryJob.id).filter(Payment.status == PaymentStatus.SUCCESS)
+        rev_job_query = self._apply_job_filters(rev_job_query, date_from_dt, date_to_dt, department, vendor_id)
+        revenue_job_paise = rev_job_query.scalar() or 0
+
+        revenue_paise = revenue_order_paise + revenue_job_paise
         revenue = float(revenue_paise) / 100.0
 
         # Refunds
-        ref_query = self.db.query(func.sum(Payment.amount)).join(Order, Payment.order_id == Order.id).filter(Payment.status == PaymentStatus.REFUNDED)
-        ref_query = self._apply_order_filters(ref_query, date_from_dt, date_to_dt, department, vendor_id)
-        refunds_paise = ref_query.scalar() or 0
+        ref_order_query = self.db.query(func.sum(Payment.amount)).join(Order, Payment.order_id == Order.id).filter(Payment.status == PaymentStatus.REFUNDED)
+        ref_order_query = self._apply_order_filters(ref_order_query, date_from_dt, date_to_dt, department, vendor_id)
+        refunds_order_paise = ref_order_query.scalar() or 0
+
+        ref_job_query = self.db.query(func.sum(Payment.amount)).join(StationeryJob, Payment.stationery_job_id == StationeryJob.id).filter(Payment.status == PaymentStatus.REFUNDED)
+        ref_job_query = self._apply_job_filters(ref_job_query, date_from_dt, date_to_dt, department, vendor_id)
+        refunds_job_paise = ref_job_query.scalar() or 0
+
+        refunds_paise = refunds_order_paise + refunds_job_paise
         refunds = float(refunds_paise) / 100.0
 
         # Cancellation Rate

@@ -6,24 +6,35 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
 import { API_BASE_URL, STORAGE_KEYS } from '../config/api';
+import apiClient from '../services/apiClient';
 import { onAuthEvent, AUTH_EVENTS } from '../services/apiClient';
 import { registerFCMToken } from '../services/pushRegistrationService';
 
+// Matches backend VendorProfileResponse + derived fields from JWT
 interface User {
-  id: number;
   vendor_id: number;
   vendor_name: string;
-  phone: string;
+  category: string | null;
+  owner_id: number;
+  owner_name: string | null;
+  /** Normalized from backend's owner_phone field */
+  phone: string | null;
+  status: string;
+  /** Derived from JWT: 'vendor_owner' | 'vendor_staff' */
   role: string;
+  /** Staff-only: staff record id from JWT staff_id claim */
+  staff_id: number | null;
+  /** Staff permissions dict — loaded from login response or secure store */
+  staff_permissions?: Record<string, boolean> | null;
 }
 
-// Payload embedded in the JWT (depends on your backend)
+// Payload embedded in the JWT
 interface JwtPayload {
   sub?: string;
   exp?: number;
   iat?: number;
   role?: string;
-  vendor_id?: number;
+  staff_id?: number | null;
   [key: string]: unknown;
 }
 
@@ -143,18 +154,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     accountType: 'owner' | 'staff' = 'owner',
   ) => {
-    const loginPayload =
-      accountType === 'staff'
-        ? { staff_phone: identifier, password }
-        : { vendor_id: Number(identifier), password };
+    const ownerPayload = { vendor_id: Number(identifier), password };
+    const staffPayload = { staff_phone: identifier, password };
+    const loginPayload = accountType === 'staff' ? staffPayload : ownerPayload;
 
-    if (accountType === 'owner' && !Number.isFinite(loginPayload.vendor_id)) {
+    if (accountType === 'owner' && !Number.isFinite(ownerPayload.vendor_id)) {
       throw new Error('Vendor ID must be a number');
     }
 
     let response;
     try {
-      response = await axios.post(`${API_BASE_URL}/vendor/login`, loginPayload);
+      response = await axios.post(`${API_BASE_URL}/v1/vendors/auth/login`, loginPayload);
     } catch (error: any) {
       const backendMessage = error?.response?.data?.detail;
       throw new Error(backendMessage || error?.message || 'Login failed');
@@ -166,16 +176,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Check token expiry at login time
+    const payload = decodeJwt(access_token);
     if (isJwtExpired(access_token)) {
       throw new Error('Server returned an expired token');
     }
 
+    // Build normalized user — role comes from JWT, phone from owner_phone
+    const userData: User = {
+      vendor_id: vendor.vendor_id,
+      vendor_name: vendor.vendor_name,
+      category: vendor.category ?? null,
+      owner_id: vendor.owner_id,
+      owner_name: vendor.owner_name ?? null,
+      phone: vendor.owner_phone ?? null,
+      status: vendor.status ?? 'active',
+      role: payload?.role ?? 'vendor_owner',
+      staff_id: payload?.staff_id ?? null,
+      // Include staff permissions if the vendor object has them (staff login response includes permissions dict)
+      staff_permissions: vendor.staff_permissions ?? null,
+    };
+
     // Store securely
     await SecureStore.setItemAsync(STORAGE_KEYS.AUTH_TOKEN, access_token);
-    await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(vendor));
+    await SecureStore.setItemAsync(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
 
     setToken(access_token);
-    setUser(vendor);
+    setUser(userData);
     setIsTokenExpired(false);
 
     // Register push notifications in background
@@ -183,6 +209,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const performLogout = useCallback(async () => {
+    try {
+      // Notify backend to invalidate refresh token
+      const currentToken = token;
+      if (currentToken) {
+        await apiClient.post(`/v1/vendors/auth/logout`, null, {
+          headers: { Authorization: `Bearer ${currentToken}` },
+        }).catch(() => {
+          // Ignore network errors — still clear local state
+        });
+      }
+    } catch {
+      // Ignore
+    }
+
     setUser(null);
     setToken(null);
     setIsTokenExpired(false);
@@ -192,7 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore cleanup errors
     }
-  }, []);
+  }, [token]);
 
   const logout = useCallback(async () => {
     await performLogout();

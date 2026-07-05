@@ -196,7 +196,7 @@ export default function NotificationsScreen({ navigation }: any) {
             style={[styles.filterChip, activeFilter === item.key && styles.filterChipActive]}
             onPress={() => setActiveFilter(item.key)}
           >
-            <Text style={[styles.filterText, activeFilter === item.key && styles.filterTextActive]}>
+            <Text style={[styles.filterText, activeFilter === item.key && styles.filterTextActive]} numberOfLines={1}>
               {item.label}
             </Text>
           </TouchableOpacity>

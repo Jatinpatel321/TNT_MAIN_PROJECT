@@ -207,3 +207,67 @@ def escalate_complaint(
     db.commit()
 
     return {"message": "Complaint escalated", "complaint_id": complaint.id, "status": complaint.status.value}
+
+
+@router.get("/vendor")
+def get_vendor_assigned_complaints(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    db_user = db.query(User).filter(User.phone == user["phone"]).first()
+    if not db_user or (db_user.role.value or "").lower() != "vendor":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    rows = (
+        db.query(Complaint)
+        .filter(
+            (Complaint.assigned_to_vendor_id == db_user.id) |
+            (Complaint.vendor_id == db_user.id)
+        )
+        .order_by(Complaint.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": row.id,
+            "user_id": row.user_id,
+            "order_id": row.order_id,
+            "vendor_id": row.vendor_id,
+            "assigned_to_vendor_id": row.assigned_to_vendor_id,
+            "category": row.category.value,
+            "status": row.status.value,
+            "title": row.title,
+            "description": row.description,
+            "created_at": row.created_at.isoformat(),
+        }
+        for row in rows
+    ]
+
+
+@router.post("/vendor/{complaint_id}/resolve")
+def resolve_vendor_assigned_complaint(
+    complaint_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    db_user = db.query(User).filter(User.phone == user["phone"]).first()
+    if not db_user or (db_user.role.value or "").lower() != "vendor":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    complaint = (
+        db.query(Complaint)
+        .filter(
+            Complaint.id == complaint_id,
+            (Complaint.assigned_to_vendor_id == db_user.id) |
+            (Complaint.vendor_id == db_user.id)
+        )
+        .first()
+    )
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+
+    complaint.status = ComplaintStatus.RESOLVED
+    db.commit()
+
+    return {"message": "Complaint resolved", "complaint_id": complaint.id, "status": complaint.status.value}

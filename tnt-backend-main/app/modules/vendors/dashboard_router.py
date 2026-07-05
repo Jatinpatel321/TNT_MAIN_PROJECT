@@ -65,15 +65,24 @@ def get_dashboard_metrics(
         func.date(Order.created_at) == today,
     ).count()
 
-    # Revenue Today (from successful payments)
-    revenue_today = db.query(func.sum(Payment.amount)).join(
+    # Revenue Today (from successful payments for orders and stationery jobs)
+    from app.modules.stationery.job_model import StationeryJob
+    order_rev = db.query(func.sum(Payment.amount)).join(
         Order, Order.id == Payment.order_id
     ).filter(
         Order.vendor_id == vendor_id,
         func.date(Payment.created_at) == today,
         Payment.status == PaymentStatus.SUCCESS,
     ).scalar() or 0
-    revenue_today_rupees = revenue_today / 100  # Convert paise to rupees
+    job_rev = db.query(func.sum(Payment.amount)).join(
+        StationeryJob, StationeryJob.id == Payment.stationery_job_id
+    ).filter(
+        StationeryJob.vendor_id == vendor_id,
+        func.date(Payment.created_at) == today,
+        Payment.status == PaymentStatus.SUCCESS,
+    ).scalar() or 0
+    revenue_today = order_rev + job_rev
+    revenue_today_rupees = float(revenue_today) / 100.0  # Convert paise to rupees
 
     # Pending Orders (PLACED + CONFIRMED + PREPARING)
     pending_orders = db.query(Order).filter(
@@ -264,14 +273,23 @@ def get_revenue_chart(
         day_start = datetime.combine(day, datetime.min.time())
         day_end = datetime.combine(day, datetime.max.time())
 
-        # Online payments
-        online = db.query(func.sum(Payment.amount)).join(
+        # Online payments (orders + stationery jobs)
+        from app.modules.stationery.job_model import StationeryJob
+        online_order = db.query(func.sum(Payment.amount)).join(
             Order, Order.id == Payment.order_id
         ).filter(
             Order.vendor_id == vendor_id,
             Payment.status == PaymentStatus.SUCCESS,
             Payment.created_at.between(day_start, day_end),
         ).scalar() or 0
+        online_job = db.query(func.sum(Payment.amount)).join(
+            StationeryJob, StationeryJob.id == Payment.stationery_job_id
+        ).filter(
+            StationeryJob.vendor_id == vendor_id,
+            Payment.status == PaymentStatus.SUCCESS,
+            Payment.created_at.between(day_start, day_end),
+        ).scalar() or 0
+        online = online_order + online_job
 
         # Cash orders (orders without payment)
         cash = db.query(func.sum(Order.total_amount)).filter(
@@ -283,14 +301,22 @@ def get_revenue_chart(
             Order.created_at.between(day_start, day_end),
         ).scalar() or 0
 
-        # Refunds
-        refunds = db.query(func.sum(Payment.amount)).filter(
+        # Refunds (orders + stationery jobs)
+        refunds_order = db.query(func.sum(Payment.amount)).filter(
             Payment.order_id.in_(
                 db.query(Order.id).filter(Order.vendor_id == vendor_id)
             ),
             Payment.status == PaymentStatus.REFUNDED,
             Payment.created_at.between(day_start, day_end),
         ).scalar() or 0
+        refunds_job = db.query(func.sum(Payment.amount)).join(
+            StationeryJob, StationeryJob.id == Payment.stationery_job_id
+        ).filter(
+            StationeryJob.vendor_id == vendor_id,
+            Payment.status == PaymentStatus.REFUNDED,
+            Payment.created_at.between(day_start, day_end),
+        ).scalar() or 0
+        refunds = refunds_order + refunds_job
 
         order_count = db.query(func.count(Order.id)).filter(
             Order.vendor_id == vendor_id,
@@ -301,7 +327,7 @@ def get_revenue_chart(
             "date": day.isoformat(),
             "day_name": day.strftime("%a"),
             "online": round(float(online) / 100, 2),
-            "cash": round(float(cash), 2),
+            "cash": round(float(cash) / 100, 2),  # FIX: divide by 100
             "refunds": round(float(refunds) / 100, 2),
             "net": round(float(online + cash - refunds) / 100, 2),
             "orders": order_count,

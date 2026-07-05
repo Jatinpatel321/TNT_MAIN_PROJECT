@@ -1,7 +1,7 @@
 // ─── More Screen ────────────────────────────────────────────────────
 // Premium secondary navigation hub — all non-primary features
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,15 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionsContext';
 import { useTheme, ThemeMode } from '../../context/ThemeContext';
-import { colors, shadows, spacing } from '../../design-system';
+import { colors as staticColors, shadows, spacing } from '../../design-system';
+const colors = staticColors;
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
+import { profileApi } from '../../services/profileApi';
 
 interface MoreItem {
   icon: string;
@@ -44,6 +47,7 @@ const MORE_SECTIONS: { title: string; items: MoreItem[] }[] = [
       { icon: '📦', label: 'Inventory AI', screen: 'InventoryPlanning', description: 'AI-powered stock planning', color: colors.aiPrimary, permission: 'inventory' },
       { icon: '🕐', label: 'Business Hours', screen: 'BusinessHours', description: 'Set operating hours', color: colors.warning, permission: 'business_hours' },
       { icon: '📅', label: 'Holiday Settings', screen: 'HolidaySettings', description: 'Manage holidays', color: colors.error, permission: 'business_hours' },
+      { icon: '💬', label: 'Complaints', screen: 'Complaints', description: 'Track & resolve support queries', color: colors.error || '#EF4444' },
     ],
   },
   {
@@ -58,38 +62,54 @@ const MORE_SECTIONS: { title: string; items: MoreItem[] }[] = [
 export default function MoreScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
-  const { mode: themeMode, isDark, setMode: setThemeMode } = useTheme();
+  const { mode: themeMode, isDark, setMode: setThemeMode, colors } = useTheme();
+  const styles = getStyles(colors);
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await profileApi.getProfile();
+      setProfile(res.data);
+    } catch (err) {
+      console.log('Failed to fetch profile in MoreScreen:', err);
+    }
+  };
 
   const handleNavigate = (screen: string) => {
     navigation.navigate(screen);
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.headerTitle}>More</Text>
-            <Text style={styles.headerSubtitle}>Everything else at your fingertips</Text>
-          </View>
-          <TouchableOpacity style={styles.profileCircle} onPress={() => handleNavigate('Profile')}>
-            <Text style={styles.profileInitial}>
-              {user?.vendor_name?.charAt(0) || 'V'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Quick Status */}
-      <View style={styles.statusSection}>
-        <GlassCard intensity="light" padding={16} borderRadius={20}>
-          <View style={styles.statusRow}>
-            <View style={styles.statusItem}>
-              <Text style={styles.statusValue}>
-                {user?.vendor_name || 'Vendor'}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerTitle}>More</Text>
+              <Text style={styles.headerSubtitle}>Everything else at your fingertips</Text>
+            </View>
+            <TouchableOpacity style={styles.profileCircle} onPress={() => handleNavigate('Profile')}>
+              <Text style={styles.profileInitial}>
+                {profile?.vendor_name?.charAt(0) || user?.vendor_name?.charAt(0) || 'V'}
               </Text>
-              <View style={styles.statusBadgeRow}>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Quick Status */}
+        <View style={styles.statusSection}>
+          <GlassCard intensity="light" padding={16} borderRadius={20}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusItem}>
+                <Text style={styles.statusValue}>
+                  {profile?.vendor_name || user?.vendor_name || 'Vendor'}
+                </Text>
+                <View style={styles.statusBadgeRow}>
                 <StatusPill label={user?.role || 'Staff'} variant="primary" size="sm" />
               </View>
             </View>
@@ -137,7 +157,7 @@ export default function MoreScreen({ navigation }: any) {
           </Text>
           {section.items.map((item, itemIndex) => {
             // Skip if permission required and not granted
-            if (item.permission && !hasPermission(item.permission) && user?.role !== 'owner') {
+            if (item.permission && !hasPermission(item.permission) && user?.role !== 'vendor_owner') {
               return null;
             }
 
@@ -163,11 +183,12 @@ export default function MoreScreen({ navigation }: any) {
       ))}
 
       <View style={styles.bottomSpacer} />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -175,7 +196,7 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.huge + 20,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
     paddingHorizontal: spacing.xl,
     borderBottomLeftRadius: 28,
@@ -214,7 +235,7 @@ const styles = StyleSheet.create({
 
   statusSection: {
     paddingHorizontal: spacing.lg,
-    marginTop: -16,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
   statusRow: {

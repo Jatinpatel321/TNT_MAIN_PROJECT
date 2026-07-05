@@ -53,6 +53,13 @@ class Order(Base):
     # Booking type discriminator: food / stationery / combined
     booking_type = Column(String(20), nullable=False, server_default="food")
 
+    # Group cart reference
+    group_id = Column(Integer, ForeignKey("groups.id"), nullable=True)
+
+    @property
+    def is_group(self) -> bool:
+        return self.group_id is not None
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"

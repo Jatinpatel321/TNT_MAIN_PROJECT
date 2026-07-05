@@ -190,130 +190,14 @@ def get_vendors(
     }
 
 
-@router.get("/{vendor_id}", response_model=VendorResponse)
-def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
-    """
-    Get single vendor details
-    """
-    vendor = db.query(User).filter(
-        User.id == vendor_id,
-        User.role == UserRole.VENDOR,
-        User.is_approved == True,
-    ).first()
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-
-    return _build_vendor_response(vendor, db, "food")
-
-
-@router.get("/{vendor_id}/menu", response_model=list[VendorMenuItemResponse])
-def get_vendor_menu(vendor_id: int, db: Session = Depends(get_db)):
-    """
-    Get vendor menu items
-    """
-    vendor = db.query(User).filter(
-        User.id == vendor_id,
-        User.role == UserRole.VENDOR,
-        User.is_approved == True,
-    ).first()
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-
-    menu_items = db.query(MenuItem).filter(
-        MenuItem.vendor_id == vendor_id,
-        MenuItem.is_available == True,
-    ).all()
-
-    payload: list[dict[str, Any]] = []
-    dirty_items: list[MenuItem] = []
-
-    for item in menu_items:
-        img_url = item.image_url
-        if not img_url:
-            img_url = menu_image_for(item.name, vendor.vendor_type or "food")
-            item.image_url = img_url
-            dirty_items.append(item)
-
-        payload.append(
-            {
-                "id": item.id,
-                "vendor_id": item.vendor_id,
-                "name": item.name,
-                "description": item.description or f"Delicious {item.name}",
-                "price": item.price,
-                "image_url": img_url,
-                "is_available": item.is_available,
-            }
-        )
-
-    if dirty_items:
-        db.commit()
-
-    return payload
-
-
-@router.get("/{vendor_id}/slots", response_model=VendorSlotListResponse)
-def get_vendor_slots(vendor_id: int, db: Session = Depends(get_db)):
-    """Get vendor pickup slots with AI recommendation data."""
-    vendor = db.query(User).filter(
-        User.id == vendor_id,
-        User.role == UserRole.VENDOR,
-        User.is_approved == True,
-    ).first()
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
-
-    vendor_type = "food"
-    is_stationery = db.query(StationeryService).filter(StationeryService.vendor_id == vendor_id).first() is not None
-    if is_stationery:
-        vendor_type = "stationery"
-        generate_stationery_slots(vendor_id, db)
-
-    slots = db.query(Slot).filter(Slot.vendor_id == vendor_id).order_by(Slot.start_time).all()
-
-    # Compute queue size and estimated wait per slot
-    prep_time = 1 if vendor_type == "stationery" else 3  # minutes per order
-    slot_scores: list[tuple[Slot, float, int, int]] = []
-    for slot in slots:
-        queue_size = db.query(Order).filter(Order.slot_id == slot.id).count()
-        estimated_wait = queue_size * prep_time
-        slot_score = estimated_wait + (queue_size * 0.5)
-        slot_scores.append((slot, slot_score, queue_size, estimated_wait))
-
-    # Mark best score
-    best_score = None if not slot_scores else min(s[1] for s in slot_scores)
-
-    slot_payloads: list[VendorSlotResponse] = []
-    for slot, score, queue_size, estimated_wait in slot_scores:
-        slot_payloads.append(
-            VendorSlotResponse(
-                id=slot.id,
-                vendor_id=slot.vendor_id,
-                start_time=slot.start_time,
-                end_time=slot.end_time,
-                is_available=slot.status != SlotStatus.FULL and slot.current_orders < slot.max_orders,
-                max_orders=slot.max_orders,
-                current_orders=slot.current_orders,
-                load_label=get_load_label(slot.current_orders, slot.max_orders),
-                express_pickup_eligible=is_express_pickup_eligible(slot.current_orders, slot.max_orders),
-                estimated_ready_time="5 minutes" if vendor_type == "stationery" else None,
-                queue_size=queue_size,
-                estimated_wait=estimated_wait,
-                is_ai_recommended=best_score is not None and score == best_score,
-            )
-        )
-
-    return VendorSlotListResponse(
-        estimated_ready_time="5 minutes" if vendor_type == "stationery" else None,
-        slots=slot_payloads,
-    )
-
-
 # ── Vendor Order Management ─────────────────────────────────────────────────
 
 
 @router.get("/orders", tags=["Vendor Orders"])
 def get_vendor_orders(
+    vendor_id: int | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -322,30 +206,29 @@ def get_vendor_orders(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    orders = db.query(Order).filter(Order.vendor_id == db_user.id).order_by(Order.created_at.desc()).all()
+    effective_vendor_id = db_user.id
+    if vendor_id is not None and db_user.role.value in ("admin", "superadmin"):
+        effective_vendor_id = vendor_id
 
-    # Calculate metrics
+    query = db.query(Order).filter(Order.vendor_id == effective_vendor_id).order_by(Order.created_at.desc())
+
+    all_orders = query.all()
     today = datetime.utcnow().date()
-    orders_today = sum(1 for o in orders if o.created_at.date() == today)
-    pending = sum(1 for o in orders if o.status == OrderStatus.PLACED)
-    preparing = sum(1 for o in orders if o.status == OrderStatus.PREPARING)
-    ready = sum(1 for o in orders if o.status == OrderStatus.READY)
-    completed = sum(1 for o in orders if o.status in (OrderStatus.PICKED, OrderStatus.COMPLETED))
-    cancelled = sum(1 for o in orders if o.status == OrderStatus.CANCELLED)
+    orders_today = sum(1 for o in all_orders if o.created_at.date() == today)
+    pending = sum(1 for o in all_orders if o.status == OrderStatus.PLACED)
+    preparing = sum(1 for o in all_orders if o.status == OrderStatus.PREPARING)
+    ready = sum(1 for o in all_orders if o.status == OrderStatus.READY)
+    completed = sum(1 for o in all_orders if o.status in (OrderStatus.PICKED, OrderStatus.COMPLETED))
+    cancelled = sum(1 for o in all_orders if o.status == OrderStatus.CANCELLED)
+
+    paginated_orders = query.offset(offset).limit(limit).all()
+
+    from app.modules.orders.vendor_ws_router import _enrich_order
 
     return {
         "orders": [
-            {
-                "id": o.id,
-                "user_id": o.user_id,
-                "slot_id": o.slot_id,
-                "status": o.status.value,
-                "total_amount": o.total_amount,
-                "created_at": o.created_at.isoformat(),
-                "qr_code": o.qr_code,
-                "fraud_flag": o.fraud_flag,
-            }
-            for o in orders
+            _enrich_order(o, db)
+            for o in paginated_orders
         ],
         "metrics": {
             "orders_today": orders_today,
@@ -586,3 +469,124 @@ def complete_order(
         pass
 
     return {"message": "Order completed", "order_id": order.id, "status": order.status.value}
+
+
+@router.get("/{vendor_id}", response_model=VendorResponse)
+def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
+    """
+    Get single vendor details
+    """
+    vendor = db.query(User).filter(
+        User.id == vendor_id,
+        User.role == UserRole.VENDOR,
+        User.is_approved == True,
+    ).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    return _build_vendor_response(vendor, db, "food")
+
+
+@router.get("/{vendor_id}/menu", response_model=list[VendorMenuItemResponse])
+def get_vendor_menu(vendor_id: int, db: Session = Depends(get_db)):
+    """
+    Get vendor menu items
+    """
+    vendor = db.query(User).filter(
+        User.id == vendor_id,
+        User.role == UserRole.VENDOR,
+        User.is_approved == True,
+    ).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    menu_items = db.query(MenuItem).filter(
+        MenuItem.vendor_id == vendor_id,
+        MenuItem.is_available == True,
+    ).all()
+
+    payload: list[dict[str, Any]] = []
+    dirty_items: list[MenuItem] = []
+
+    for item in menu_items:
+        img_url = item.image_url
+        if not img_url:
+            img_url = menu_image_for(item.name, vendor.vendor_type or "food")
+            item.image_url = img_url
+            dirty_items.append(item)
+
+        payload.append(
+            {
+                "id": item.id,
+                "vendor_id": item.vendor_id,
+                "name": item.name,
+                "description": item.description or f"Delicious {item.name}",
+                "price": item.price,
+                "image_url": img_url,
+                "is_available": item.is_available,
+            }
+        )
+
+    if dirty_items:
+        db.commit()
+
+    return payload
+
+
+@router.get("/{vendor_id}/slots", response_model=VendorSlotListResponse)
+def get_vendor_slots(vendor_id: int, db: Session = Depends(get_db)):
+    """Get vendor pickup slots with AI recommendation data."""
+    vendor = db.query(User).filter(
+        User.id == vendor_id,
+        User.role == UserRole.VENDOR,
+        User.is_approved == True,
+    ).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    vendor_type = "food"
+    is_stationery = db.query(StationeryService).filter(StationeryService.vendor_id == vendor_id).first() is not None
+    if is_stationery:
+        vendor_type = "stationery"
+        generate_stationery_slots(vendor_id, db)
+
+    slots = db.query(Slot).filter(Slot.vendor_id == vendor_id).order_by(Slot.start_time).all()
+
+    # Compute queue size and estimated wait per slot
+    prep_time = 1 if vendor_type == "stationery" else 3  # minutes per order
+    slot_scores: list[tuple[Slot, float, int, int]] = []
+    for slot in slots:
+        queue_size = db.query(Order).filter(Order.slot_id == slot.id).count()
+        estimated_wait = queue_size * prep_time
+        slot_score = estimated_wait + (queue_size * 0.5)
+        slot_scores.append((slot, slot_score, queue_size, estimated_wait))
+
+    # Mark best score
+    best_score = None if not slot_scores else min(s[1] for s in slot_scores)
+
+    slot_payloads: list[VendorSlotResponse] = []
+    for slot, score, queue_size, estimated_wait in slot_scores:
+        slot_payloads.append(
+            VendorSlotResponse(
+                id=slot.id,
+                vendor_id=slot.vendor_id,
+                start_time=slot.start_time,
+                end_time=slot.end_time,
+                is_available=slot.status != SlotStatus.FULL and slot.current_orders < slot.max_orders,
+                max_orders=slot.max_orders,
+                current_orders=slot.current_orders,
+                load_label=get_load_label(slot.current_orders, slot.max_orders),
+                express_pickup_eligible=is_express_pickup_eligible(slot.current_orders, slot.max_orders),
+                estimated_ready_time="5 minutes" if vendor_type == "stationery" else None,
+                queue_size=queue_size,
+                estimated_wait=estimated_wait,
+                is_ai_recommended=best_score is not None and score == best_score,
+            )
+        )
+
+    return VendorSlotListResponse(
+        estimated_ready_time="5 minutes" if vendor_type == "stationery" else None,
+        slots=slot_payloads,
+    )
+
+

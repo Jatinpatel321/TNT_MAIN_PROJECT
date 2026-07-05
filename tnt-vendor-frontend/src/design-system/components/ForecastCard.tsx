@@ -3,8 +3,10 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import colors from '../tokens/colors';
+import { useTheme } from '../../context/ThemeContext';
+import staticColors from '../tokens/colors';
 import shadows from '../tokens/shadows';
+
 
 interface ForecastData {
   label: string;
@@ -23,38 +25,41 @@ interface ForecastCardProps {
   children?: React.ReactNode;
 }
 
-const trendConfig = {
-  up: { symbol: '↑', color: colors.success },
-  down: { symbol: '↓', color: colors.error },
-  stable: { symbol: '→', color: colors.textMuted },
-};
-
 export default function ForecastCard({
   title,
   icon,
   data,
-  color = colors.primary,
+  color,
   style,
   children,
 }: ForecastCardProps) {
+  const { colors: themeColors } = useTheme();
+  const activeColor = color || themeColors.primary;
+
+  const trendConfig = {
+    up: { symbol: '↑', color: themeColors.success },
+    down: { symbol: '↓', color: themeColors.error },
+    stable: { symbol: '→', color: themeColors.textMuted },
+  };
+
   return (
-    <View style={[styles.card, style]}>
-      <View style={[styles.accentBar, { backgroundColor: color }]} />
+    <View style={[styles.card, { backgroundColor: themeColors.bgCard }, style]}>
+      <View style={[styles.accentBar, { backgroundColor: activeColor }]} />
       <View style={styles.header}>
         <Text style={styles.icon}>{icon}</Text>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { color: themeColors.textPrimary }]}>{title}</Text>
       </View>
       <View style={styles.dataGrid}>
         {data.map((item, index) => {
           const trend = item.trend ? trendConfig[item.trend] : null;
           return (
-            <View key={index} style={styles.dataItem}>
-              <Text style={styles.dataValue}>
+            <View key={index} style={[styles.dataItem, { borderBottomColor: themeColors.borderLight }]}>
+              <Text style={[styles.dataValue, { color: themeColors.textPrimary }]}>
                 {item.value}
-                {item.unit && <Text style={styles.dataUnit}> {item.unit}</Text>}
+                {item.unit && <Text style={[styles.dataUnit, { color: themeColors.textMuted }]}> {item.unit}</Text>}
               </Text>
               <View style={styles.dataMeta}>
-                <Text style={styles.dataLabel}>{item.label}</Text>
+                <Text style={[styles.dataLabel, { color: themeColors.textSecondary }]}>{item.label}</Text>
                 {trend && (
                   <Text style={[styles.dataTrend, { color: trend.color }]}>
                     {trend.symbol}
@@ -63,18 +68,18 @@ export default function ForecastCard({
               </View>
               {item.confidence !== undefined && (
                 <View style={styles.confidenceRow}>
-                  <View style={styles.confidenceTrack}>
+                  <View style={[styles.confidenceTrack, { backgroundColor: themeColors.bgTertiary }]}>
                     <View
                       style={[
                         styles.confidenceFill,
                         {
                           width: `${item.confidence * 100}%`,
-                          backgroundColor: color,
+                          backgroundColor: activeColor,
                         },
                       ]}
                     />
                   </View>
-                  <Text style={styles.confidenceLabel}>
+                  <Text style={[styles.confidenceLabel, { color: themeColors.textMuted }]}>
                     {Math.round(item.confidence * 100)}%
                   </Text>
                 </View>
@@ -88,9 +93,10 @@ export default function ForecastCard({
   );
 }
 
+const colors = staticColors;
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgCard,
     borderRadius: 20,
     padding: 18,
     overflow: 'hidden',
@@ -113,25 +119,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textPrimary,
     flex: 1,
   },
   dataGrid: { gap: 12 },
   dataItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
   },
   dataValue: {
     fontSize: 22,
     fontWeight: '700',
-    color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
   dataUnit: {
     fontSize: 13,
     fontWeight: '500',
-    color: colors.textMuted,
   },
   dataMeta: {
     flexDirection: 'row',
@@ -141,7 +143,6 @@ const styles = StyleSheet.create({
   },
   dataLabel: {
     fontSize: 12,
-    color: colors.textSecondary,
     fontWeight: '500',
   },
   dataTrend: {
@@ -157,7 +158,6 @@ const styles = StyleSheet.create({
   confidenceTrack: {
     flex: 1,
     height: 4,
-    backgroundColor: colors.bgTertiary,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -167,9 +167,9 @@ const styles = StyleSheet.create({
   },
   confidenceLabel: {
     fontSize: 10,
-    color: colors.textMuted,
     fontWeight: '600',
     width: 32,
     textAlign: 'right',
   },
 });
+

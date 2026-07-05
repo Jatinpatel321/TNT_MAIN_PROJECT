@@ -1,5 +1,6 @@
 // ─── Premium Edit Staff Screen ────────────────────────────────────
-// Edit staff member with premium design system (#635BFF, GlassCard)
+// Edit staff member — aligned with backend VendorStaffUpdate schema:
+//   { name?, phone?, role?, is_active?, permissions? }
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -10,99 +11,92 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Animated,
 } from 'react-native';
-import { staffApi } from '../../services/staffApi';
+import { staffApi, type StaffMember } from '../../services/staffApi';
 import { colors, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import Button from '../../design-system/components/Button';
 
-interface Permission {
-  module: string;
-  actions: string[];
-  description: string;
+// Same permission list as AddStaffScreen — no API fetch needed
+const AVAILABLE_PERMISSIONS = [
+  { key: 'orders', label: 'Orders', icon: '📋', description: 'View and manage customer orders' },
+  { key: 'menu', label: 'Menu', icon: '🍽️', description: 'Edit menu items and availability' },
+  { key: 'inventory', label: 'Inventory', icon: '📦', description: 'Manage stock and inventory' },
+  { key: 'analytics', label: 'Analytics', icon: '📊', description: 'View sales and analytics data' },
+  { key: 'slots', label: 'Slots', icon: '⏰', description: 'Configure time slots and capacity' },
+  { key: 'staff', label: 'Staff', icon: '👥', description: 'Manage team members (manager only)' },
+  { key: 'settlements', label: 'Settlements', icon: '💰', description: 'View payout and settlement data' },
+  { key: 'promotions', label: 'Promotions', icon: '🎯', description: 'Create and manage promotions' },
+];
+
+/** Convert the staff permissions dict (Record<string, any>) to a boolean map for the UI */
+function permDictToMap(perms: StaffMember['permissions']): Record<string, boolean> {
+  if (!perms) return {};
+  return Object.fromEntries(Object.keys(perms).map(k => [k, true]));
 }
 
 export default function EditStaffScreen({ route, navigation }: any) {
-  const { staff } = route.params;
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const { staff } = route.params as { staff: StaffMember };
   const [loading, setLoading] = useState(false);
-  const [loadingPermissions, setLoadingPermissions] = useState(true);
   const [formData, setFormData] = useState({
     name: staff.name,
     phone: staff.phone,
-    email: staff.email || '',
-    role: staff.role,
-    permissions: [...(staff.permissions || [])],
+    role: staff.role as 'manager' | 'staff',
+    permissions: permDictToMap(staff.permissions),
     is_active: staff.is_active !== false,
   });
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    fetchPermissions();
   }, []);
 
-  const fetchPermissions = async () => {
-    try {
-      setLoadingPermissions(true);
-      const response = await staffApi.getPermissions();
-      setPermissions(response.data.permissions || []);
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to load permissions');
-    } finally {
-      setLoadingPermissions(false);
-    }
-  };
-
-  const handleUpdateStaff = async () => {
-    if (!formData.name || !formData.phone) {
+  const handleUpdate = async () => {
+    if (!formData.name.trim() || !formData.phone.trim()) {
       Alert.alert('Error', 'Name and Phone are required');
       return;
     }
     try {
       setLoading(true);
+      // Build permissions dict from boolean map
+      const permissionsDict: Record<string, boolean> = {};
+      Object.entries(formData.permissions).forEach(([key, enabled]) => {
+        if (enabled) permissionsDict[key] = true;
+      });
+
       await staffApi.updateStaff(staff.id, {
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email || undefined,
-        role: formData.role as any,
-        permissions: formData.permissions,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        role: formData.role,
+        permissions: permissionsDict,
         is_active: formData.is_active,
       });
-      Alert.alert('Success', 'Staff member updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+      Alert.alert('Success', 'Staff member updated', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update staff');
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to update staff';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const togglePermission = (perm: string) => {
+  const togglePermission = (key: string) => {
     setFormData(prev => ({
       ...prev,
-      permissions: prev.permissions.includes(perm)
-        ? prev.permissions.filter(p => p !== perm)
-        : [...prev.permissions, perm],
+      permissions: { ...prev.permissions, [key]: !prev.permissions[key] },
     }));
   };
 
-  const handleRoleSelect = (role: string) => {
-    const roleDefaults: Record<string, string[]> = {
-      owner: permissions.flatMap(p => p.actions),
-      manager: ['orders:read', 'orders:write', 'menu:read', 'menu:write', 'analytics:read', 'inventory:read'],
-      staff: ['orders:read', 'menu:read'],
-    };
-    setFormData(prev => ({ ...prev, role, permissions: roleDefaults[role] || [] }));
-  };
-
-  const roles = [
-    { key: 'owner', label: 'Owner', icon: '👑' },
+  const roles: { key: 'manager' | 'staff'; label: string; icon: string }[] = [
     { key: 'manager', label: 'Manager', icon: '👔' },
     { key: 'staff', label: 'Staff', icon: '👤' },
   ];
+
+  const selectedPermCount = Object.values(formData.permissions).filter(Boolean).length;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -115,19 +109,37 @@ export default function EditStaffScreen({ route, navigation }: any) {
       <Animated.View style={{ opacity: fadeAnim }}>
         <View style={styles.formSection}>
           {/* Basic Info */}
+          <Text style={styles.sectionTitle}><Text style={styles.sectionAccent}>│</Text> Basic Information</Text>
           <GlassCard padding={18} borderRadius={20}>
-            <FormField label="Full Name *" value={formData.name} onChange={t => setFormData(p => ({ ...p, name: t }))} placeholder="John Doe" />
-            <FormField label="Phone *" value={formData.phone} onChange={t => setFormData(p => ({ ...p, phone: t }))} placeholder="+91XXXXXXXXXX" keyboard="phone-pad" />
-            <FormField label="Email" value={formData.email} onChange={t => setFormData(p => ({ ...p, email: t }))} placeholder="john@example.com" keyboard="email-address" />
+            <FormField
+              label="Full Name *"
+              value={formData.name}
+              onChange={t => setFormData(p => ({ ...p, name: t }))}
+              placeholder="Staff name"
+            />
+            <FormField
+              label="Phone *"
+              value={formData.phone}
+              onChange={t => setFormData(p => ({ ...p, phone: t }))}
+              placeholder="+91XXXXXXXXXX"
+              keyboard="phone-pad"
+            />
           </GlassCard>
 
           {/* Status Toggle */}
-          <TouchableOpacity style={styles.statusToggle} onPress={() => setFormData(p => ({ ...p, is_active: !p.is_active }))}>
-            <StatusPill label={formData.is_active ? 'Active' : 'Inactive'} variant={formData.is_active ? 'success' : 'neutral'} size="sm" />
-            <Text style={styles.statusText}>Tap to toggle status</Text>
+          <TouchableOpacity
+            style={styles.statusToggle}
+            onPress={() => setFormData(p => ({ ...p, is_active: !p.is_active }))}
+          >
+            <StatusPill
+              label={formData.is_active ? 'Active' : 'Inactive'}
+              variant={formData.is_active ? 'success' : 'neutral'}
+              size="sm"
+            />
+            <Text style={styles.statusText}>Tap to toggle active status</Text>
           </TouchableOpacity>
 
-          {/* Role */}
+          {/* Role Selection */}
           <Text style={styles.sectionTitle}><Text style={styles.sectionAccent}>│</Text> Role</Text>
           <GlassCard padding={14} borderRadius={18}>
             <View style={styles.roleRow}>
@@ -135,37 +147,43 @@ export default function EditStaffScreen({ route, navigation }: any) {
                 <TouchableOpacity
                   key={r.key}
                   style={[styles.roleBtn, formData.role === r.key && styles.roleBtnActive]}
-                  onPress={() => handleRoleSelect(r.key)}
+                  onPress={() => setFormData(p => ({ ...p, role: r.key }))}
                 >
                   <Text style={styles.roleIcon}>{r.icon}</Text>
-                  <Text style={[styles.roleLabel, formData.role === r.key && styles.roleLabelActive]}>{r.label}</Text>
+                  <Text style={[styles.roleLabel, formData.role === r.key && styles.roleLabelActive]}>
+                    {r.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </GlassCard>
 
           {/* Permissions */}
-          <Text style={styles.sectionTitle}><Text style={styles.sectionAccent}>│</Text> Permissions ({formData.permissions.length})</Text>
-          {loadingPermissions ? (
-            <View style={styles.permLoading}><ActivityIndicator size="small" color={colors.primary} /></View>
-          ) : (
-            permissions.map(p => (
-              <TouchableOpacity key={p.module} onPress={() => togglePermission(p.module)}>
+          <Text style={styles.sectionTitle}>
+            <Text style={styles.sectionAccent}>│</Text> Permissions ({selectedPermCount} selected)
+          </Text>
+          {AVAILABLE_PERMISSIONS.map(p => {
+            const isEnabled = !!formData.permissions[p.key];
+            return (
+              <TouchableOpacity key={p.key} onPress={() => togglePermission(p.key)} activeOpacity={0.7}>
                 <GlassCard padding={14} borderRadius={16} style={{ marginBottom: 6 }}>
-                  <View style={styles.permHeader}>
-                    <Text style={styles.permModule}>{p.module.toUpperCase()}</Text>
-                    <View style={[styles.checkbox, formData.permissions.includes(p.module) && styles.checkboxChecked]}>
-                      {formData.permissions.includes(p.module) && <Text style={styles.checkmark}>✓</Text>}
+                  <View style={styles.permRow}>
+                    <Text style={styles.permIcon}>{p.icon}</Text>
+                    <View style={styles.permContent}>
+                      <Text style={styles.permLabel}>{p.label}</Text>
+                      <Text style={styles.permDesc}>{p.description}</Text>
+                    </View>
+                    <View style={[styles.checkbox, isEnabled && styles.checkboxChecked]}>
+                      {isEnabled && <Text style={styles.checkmark}>✓</Text>}
                     </View>
                   </View>
-                  <Text style={styles.permDesc}>{p.description}</Text>
                 </GlassCard>
               </TouchableOpacity>
-            ))
-          )}
+            );
+          })}
 
           <View style={styles.submitSection}>
-            <Button title="Update Staff" onPress={handleUpdateStaff} loading={loading} variant="primary" size="lg" fullWidth />
+            <Button title="Update Staff Member" onPress={handleUpdate} loading={loading} variant="primary" size="lg" fullWidth />
           </View>
         </View>
         <View style={{ height: spacing.huge }} />
@@ -174,11 +192,23 @@ export default function EditStaffScreen({ route, navigation }: any) {
   );
 }
 
-function FormField({ label, value, onChange, placeholder, keyboard }: { label: string; value: string; onChange: (t: string) => void; placeholder: string; keyboard?: any }) {
+function FormField({
+  label, value, onChange, placeholder, keyboard,
+}: {
+  label: string; value: string; onChange: (t: string) => void; placeholder: string; keyboard?: any;
+}) {
   return (
     <View style={fieldStyles.group}>
       <Text style={fieldStyles.label}>{label}</Text>
-      <TextInput style={fieldStyles.input} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.textMuted} keyboardType={keyboard} autoCapitalize="none" />
+      <TextInput
+        style={fieldStyles.input}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        keyboardType={keyboard}
+        autoCapitalize="none"
+      />
     </View>
   );
 }
@@ -186,14 +216,27 @@ function FormField({ label, value, onChange, placeholder, keyboard }: { label: s
 const fieldStyles = StyleSheet.create({
   group: { marginBottom: 14 },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 6 },
-  input: { backgroundColor: colors.bgSecondary, borderRadius: 12, padding: 14, fontSize: 16, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
+  input: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
   },
   headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
   headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
@@ -210,11 +253,12 @@ const styles = StyleSheet.create({
   roleIcon: { fontSize: 20, marginBottom: 4 },
   roleLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   roleLabelActive: { color: colors.primary },
-  permLoading: { padding: 20, alignItems: 'center' },
-  permHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  permModule: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  permDesc: { fontSize: 12, color: colors.textMuted },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  permRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  permIcon: { fontSize: 20, width: 28, textAlign: 'center' },
+  permContent: { flex: 1 },
+  permLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  permDesc: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   checkmark: { color: colors.textInverse, fontSize: 14, fontWeight: '700' },
   submitSection: { marginTop: spacing.xxl },

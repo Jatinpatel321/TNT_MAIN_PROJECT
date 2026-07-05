@@ -316,6 +316,7 @@ class GroupCartService:
                     slot_id=slot.id,
                     vendor_id=slot.vendor_id,
                     status=OrderStatus.PENDING,
+                    group_id=group_id,
                 )
                 self.db.add(order)
                 self.db.flush()
@@ -379,6 +380,19 @@ class GroupCartService:
                 title="Group Order Placed",
                 message=f"Group order placed successfully. Total amount: ₹{int(total_amount)}.",
             )
+
+            # Broadcast new_order event via WebSocket for each created order in the group
+            for order_result in orders:
+                oid = order_result["order_id"]
+                order_obj = self.db.query(Order).filter(Order.id == oid).first()
+                if order_obj:
+                    try:
+                        from app.core.order_events import publish_order_event
+                        from app.modules.orders.vendor_ws_router import _enrich_order
+                        payload = _enrich_order(order_obj, self.db)
+                        publish_order_event(order_obj.id, "new_order", payload)
+                    except Exception:
+                        pass
 
             users = self.db.query(User).filter(User.id.in_(payable_by_user.keys())).all()
             users_by_id = {user.id: user for user in users}

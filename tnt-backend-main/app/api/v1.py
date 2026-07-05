@@ -65,6 +65,7 @@ from app.modules.vendors.performance_router import router as vendor_performance_
 from app.modules.vendors.ai_inventory_router import router as vendor_ai_inventory_router
 from app.modules.vendors.peak_hour_router import router as vendor_peak_hour_router
 from app.modules.vendors.validation_router import router as vendor_validation_router
+from app.modules.vendors.notification_router import router as vendor_notification_router
 from app.modules.orders.ws_router import router as orders_ws_router
 from app.modules.orders.vendor_ws_router import router as vendor_ws_router
 from app.modules.recommendations.router import router as recommendations_router
@@ -121,6 +122,7 @@ api_v1_router.include_router(vendor_performance_router)
 api_v1_router.include_router(vendor_ai_inventory_router)
 api_v1_router.include_router(vendor_peak_hour_router)
 api_v1_router.include_router(vendor_validation_router)
+api_v1_router.include_router(vendor_notification_router)
 api_v1_router.include_router(ledger_router)
 api_v1_router.include_router(feedback_router)
 api_v1_router.include_router(complaints_router)

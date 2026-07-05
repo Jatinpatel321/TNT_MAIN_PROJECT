@@ -123,13 +123,3 @@ export async function updateETAWithSpeed(orderId: number): Promise<UpdateETAResp
   });
   return res.data as UpdateETAResponse;
 }
-</write_to_file>
-<task_progress>
-- [x] Create vendor_speed_service backend
-- [x] Create vendor speed API endpoints
-- [x] Create frontend service
-- [ ] Display vendor speed in UI
-- [ ] Integrate with existing order APIs
-- [ ] Create documentation
-</task_progress>
-</write_to_file>

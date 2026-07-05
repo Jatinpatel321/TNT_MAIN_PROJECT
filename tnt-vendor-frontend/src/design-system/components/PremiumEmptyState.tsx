@@ -3,8 +3,10 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
-import colors from '../tokens/colors';
+import { useTheme } from '../../context/ThemeContext';
+import staticColors from '../tokens/colors';
 import shadows from '../tokens/shadows';
+
 
 interface PremiumEmptyStateProps {
   icon: string;
@@ -25,33 +27,37 @@ export default function PremiumEmptyState({
   secondaryAction,
   style,
 }: PremiumEmptyStateProps) {
+  const { colors } = useTheme();
+
   return (
     <View style={[styles.container, style]}>
       {/* Icon with decorative background */}
       <View style={styles.iconWrapper}>
-        <View style={styles.iconBg} />
-        <View style={styles.iconCircle}>
+        <View style={[styles.iconBg, { backgroundColor: colors.primaryPale }]} />
+        <View style={[styles.iconCircle, { backgroundColor: colors.bgCard }]}>
           <Text style={styles.icon}>{icon}</Text>
         </View>
       </View>
 
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.description}>{description}</Text>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+      <Text style={[styles.description, { color: colors.textSecondary }]}>{description}</Text>
 
       {actionLabel && onAction && (
-        <TouchableOpacity style={styles.actionButton} onPress={onAction}>
-          <Text style={styles.actionText}>{actionLabel}</Text>
+        <TouchableOpacity style={[styles.actionButton, { backgroundColor: colors.primary }]} onPress={onAction}>
+          <Text style={[styles.actionText, { color: colors.textInverse }]}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
 
       {secondaryAction && (
         <TouchableOpacity style={styles.secondaryButton} onPress={secondaryAction.onPress}>
-          <Text style={styles.secondaryText}>{secondaryAction.label}</Text>
+          <Text style={[styles.secondaryText, { color: colors.textSecondary }]}>{secondaryAction.label}</Text>
         </TouchableOpacity>
       )}
     </View>
   );
 }
+
+const colors = staticColors;
 
 const styles = StyleSheet.create({
   container: {
@@ -69,7 +75,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.primaryPale,
     top: -10,
     left: -10,
   },
@@ -77,7 +82,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 24,
-    backgroundColor: colors.bgCard,
     justifyContent: 'center',
     alignItems: 'center',
     ...shadows.lg,
@@ -88,26 +92,22 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
   },
   description: {
     fontSize: 14,
-    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
   },
   actionButton: {
-    backgroundColor: colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 14,
     ...shadows.button,
   },
   actionText: {
-    color: colors.textInverse,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -116,8 +116,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   secondaryText: {
-    color: colors.textLink,
     fontSize: 14,
     fontWeight: '600',
   },
 });
+

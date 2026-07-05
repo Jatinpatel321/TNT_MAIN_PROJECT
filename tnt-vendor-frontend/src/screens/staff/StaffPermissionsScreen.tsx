@@ -1,7 +1,8 @@
 // ─── Premium Staff Permissions Screen ────────────────────────────
-// Manage staff permissions with premium design system
+// Manage staff permissions — uses static permission module list
+// (no /permissions endpoint on backend — permissions are a dict on StaffMember)
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,61 +10,75 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Animated,
 } from 'react-native';
-import { staffApi } from '../../services/staffApi';
+import { staffApi, type StaffMember } from '../../services/staffApi';
 import { colors, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import Button from '../../design-system/components/Button';
 
-interface Permission {
-  module: string;
-  actions: string[];
-  description: string;
+// Static list — same set used in Add/Edit Staff screens
+const AVAILABLE_PERMISSIONS = [
+  { key: 'orders', label: 'Orders', icon: '📋', description: 'View and manage customer orders' },
+  { key: 'menu', label: 'Menu', icon: '🍽️', description: 'Edit menu items and availability' },
+  { key: 'inventory', label: 'Inventory', icon: '📦', description: 'Manage stock and inventory' },
+  { key: 'analytics', label: 'Analytics', icon: '📊', description: 'View sales and analytics data' },
+  { key: 'slots', label: 'Slots', icon: '⏰', description: 'Configure time slots and capacity' },
+  { key: 'staff', label: 'Staff', icon: '👥', description: 'Manage team members (manager only)' },
+  { key: 'settlements', label: 'Settlements', icon: '💰', description: 'View payout and settlement data' },
+  { key: 'promotions', label: 'Promotions', icon: '🎯', description: 'Create and manage promotions' },
+];
+
+const ROLE_DEFAULTS: Record<string, string[]> = {
+  manager: ['orders', 'menu', 'analytics', 'inventory', 'slots'],
+  staff: ['orders', 'menu'],
+};
+
+/** Convert permissions dict to a set of enabled keys */
+function permDictToSet(perms: StaffMember['permissions']): Set<string> {
+  if (!perms) return new Set();
+  return new Set(Object.keys(perms).filter(k => perms[k]));
 }
 
 export default function StaffPermissionsScreen({ route, navigation }: any) {
-  const { staff } = route.params;
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const { staff } = route.params as { staff: StaffMember };
   const [loading, setLoading] = useState(false);
-  const [loadingPerms, setLoadingPerms] = useState(true);
-  const [selected, setSelected] = useState<string[]>([...(staff.permissions || [])]);
+  const [selected, setSelected] = useState<Set<string>>(permDictToSet(staff.permissions));
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
+  useState(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    (async () => {
-      try {
-        const res = await staffApi.getPermissions();
-        setPermissions(res.data.permissions || []);
-      } catch { }
-      finally { setLoadingPerms(false); }
-    })();
-  }, []);
+  });
 
-  const toggle = (perm: string) => {
-    setSelected(prev => prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]);
+  const toggle = (key: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
+      return next;
+    });
   };
+
+  const selectAll = () => setSelected(new Set(AVAILABLE_PERMISSIONS.map(p => p.key)));
+  const selectNone = () => setSelected(new Set());
+  const selectDefaults = () => setSelected(new Set(ROLE_DEFAULTS[staff.role] || []));
 
   const handleSave = async () => {
     try {
       setLoading(true);
-      await staffApi.updateStaff(staff.id, { permissions: selected });
-      Alert.alert('Success', 'Permissions updated', [{ text: 'OK', onPress: () => navigation.goBack() }]);
-    } catch (err: any) { Alert.alert('Error', err.message); }
-    finally { setLoading(false); }
-  };
+      // Build permissions dict from selected set
+      const permissionsDict: Record<string, boolean> = {};
+      selected.forEach(key => { permissionsDict[key] = true; });
 
-  const selectAll = () => { setSelected(permissions.flatMap(p => p.actions)); };
-  const selectNone = () => { setSelected([]); };
-  const selectDefaults = () => {
-    const defaults: Record<string, string[]> = {
-      owner: permissions.flatMap(p => p.actions),
-      manager: ['orders:read', 'orders:write', 'menu:read', 'menu:write', 'analytics:read', 'inventory:read'],
-      staff: ['orders:read', 'menu:read'],
-    };
-    setSelected(defaults[staff.role] || []);
+      await staffApi.updateStaff(staff.id, { permissions: permissionsDict });
+      Alert.alert('Success', 'Permissions updated successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to update permissions';
+      Alert.alert('Error', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -88,41 +103,42 @@ export default function StaffPermissionsScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.selectedCount}>{selected.length} permissions selected</Text>
+        <Text style={styles.selectedCount}>{selected.size} permissions granted</Text>
 
-        {/* Permissions List */}
-        {loadingPerms ? (
-          <View style={styles.loadingWrap}><ActivityIndicator size="large" color={colors.primary} /></View>
-        ) : (
-          permissions.map(p => (
-            <TouchableOpacity key={p.module} onPress={() => toggle(p.module)}>
-              <GlassCard padding={14} borderRadius={16} style={{ marginHorizontal: spacing.lg, marginBottom: 6 }}>
-                <View style={styles.permHeader}>
+        {/* Permission Toggles */}
+        {AVAILABLE_PERMISSIONS.map(p => {
+          const isSelected = selected.has(p.key);
+          return (
+            <TouchableOpacity key={p.key} onPress={() => toggle(p.key)} activeOpacity={0.7}>
+              <GlassCard
+                padding={14}
+                borderRadius={16}
+                style={{ marginHorizontal: spacing.lg, marginBottom: 6 }}
+              >
+                <View style={styles.permRow}>
+                  <Text style={styles.permIcon}>{p.icon}</Text>
                   <View style={styles.permInfo}>
-                    <Text style={styles.permModule}>{p.module.toUpperCase()}</Text>
+                    <Text style={styles.permLabel}>{p.label}</Text>
                     <Text style={styles.permDesc}>{p.description}</Text>
                   </View>
-                  <View style={[styles.checkbox, selected.includes(p.module) && styles.checkboxChecked]}>
-                    {selected.includes(p.module) && <Text style={styles.checkmark}>✓</Text>}
+                  <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
+                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                </View>
-                <View style={styles.actionChips}>
-                  {p.actions.map(a => {
-                    const isSel = selected.includes(a);
-                    return (
-                      <TouchableOpacity key={a} style={[styles.chip, isSel && styles.chipActive]} onPress={() => toggle(a)}>
-                        <Text style={[styles.chipText, isSel && styles.chipTextActive]}>{a}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
                 </View>
               </GlassCard>
             </TouchableOpacity>
-          ))
-        )}
+          );
+        })}
 
         <View style={styles.saveSection}>
-          <Button title="Save Permissions" onPress={handleSave} loading={loading} variant="primary" size="lg" fullWidth />
+          <Button
+            title="Save Permissions"
+            onPress={handleSave}
+            loading={loading}
+            variant="primary"
+            size="lg"
+            fullWidth
+          />
         </View>
         <View style={{ height: spacing.huge }} />
       </Animated.View>
@@ -133,8 +149,13 @@ export default function StaffPermissionsScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
-    backgroundColor: colors.primary, paddingTop: spacing.huge + 20, paddingBottom: spacing.xxl, paddingHorizontal: spacing.xl,
-    borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden',
+    backgroundColor: colors.primary,
+    paddingTop: spacing.huge + 20,
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
   },
   headerDeco1: { position: 'absolute', top: -40, right: -30, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.08)' },
   headerDeco2: { position: 'absolute', bottom: -30, left: -60, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.05)' },
@@ -144,18 +165,13 @@ const styles = StyleSheet.create({
   quickBtn: { flex: 1, backgroundColor: colors.bgCard, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   quickText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   selectedCount: { fontSize: 13, color: colors.textMuted, fontWeight: '500', paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
-  loadingWrap: { padding: 40, alignItems: 'center' },
-  permHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  permRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  permIcon: { fontSize: 22, width: 30, textAlign: 'center' },
   permInfo: { flex: 1 },
-  permModule: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
-  permDesc: { fontSize: 12, color: colors.textMuted },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  permLabel: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+  permDesc: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   checkmark: { color: colors.textInverse, fontSize: 14, fontWeight: '700' },
-  actionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
-  chip: { backgroundColor: colors.bgSecondary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  chipActive: { backgroundColor: colors.primaryPale, borderColor: colors.primary },
-  chipText: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
-  chipTextActive: { color: colors.primary, fontWeight: '600' },
   saveSection: { paddingHorizontal: spacing.lg, marginTop: spacing.xxl },
 });
