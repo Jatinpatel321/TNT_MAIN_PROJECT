@@ -291,7 +291,7 @@ class KPIService:
         revenue_job_paise = rev_job_query.scalar() or 0
 
         revenue_paise = revenue_order_paise + revenue_job_paise
-        revenue = float(revenue_paise) / 100.0
+        revenue = float(revenue_paise)
 
         # Refunds
         ref_order_query = self.db.query(func.sum(Payment.amount)).join(Order, Payment.order_id == Order.id).filter(Payment.status == PaymentStatus.REFUNDED)
@@ -303,7 +303,7 @@ class KPIService:
         refunds_job_paise = ref_job_query.scalar() or 0
 
         refunds_paise = refunds_order_paise + refunds_job_paise
-        refunds = float(refunds_paise) / 100.0
+        refunds = float(refunds_paise)
 
         # Cancellation Rate
         canc_query = self.db.query(func.count(Order.id)).filter(Order.status == OrderStatus.CANCELLED)
@@ -420,7 +420,7 @@ class KPIService:
                 "department": r.department or "Other/Unknown",
                 "order_count": r.order_count,
                 "active_users": r.active_users,
-                "revenue_inr": float(r.revenue_paise) / 100.0
+                "revenue_inr": float(r.revenue_paise)
             }
             for r in dept_res
         ]
@@ -455,16 +455,16 @@ class KPIService:
             food_trends.append({
                 "date": day_str,
                 "orders": int(r.food_orders or 0),
-                "revenue_inr": float(r.food_revenue_paise or 0) / 100.0
+                "revenue_inr": float(r.food_revenue_paise or 0)
             })
             stationery_trends.append({
                 "date": day_str,
                 "orders": int(r.stat_orders or 0),
-                "revenue_inr": float(r.stat_revenue_paise or 0) / 100.0
+                "revenue_inr": float(r.stat_revenue_paise or 0)
             })
             revenue_trends.append({
                 "date": day_str,
-                "revenue_inr": float(r.total_revenue_paise or 0) / 100.0
+                "revenue_inr": float(r.total_revenue_paise or 0)
             })
 
         # ── PEAK HOUR ANALYSIS ────────────────────────────────────────────────

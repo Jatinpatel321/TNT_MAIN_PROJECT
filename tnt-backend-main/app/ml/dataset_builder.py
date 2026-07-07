@@ -256,7 +256,7 @@ class DatasetBuilder:
                 "vendor_id": o.vendor_id,
                 "slot_id": o.slot_id or 0,
                 "vendor_type": 0 if vendor_type == "food" else 1,  # encode
-                "order_amount": float(o.total_amount or 0) / 100,  # convert paise to rupees
+                "order_amount": float(o.total_amount or 0),  # already rupees
                 "item_count": item_count,
                 "day_of_week": int(o.day_of_week or 0),
                 "hour_of_day": int(o.hour_of_day or 12),
@@ -519,8 +519,8 @@ class DatasetBuilder:
                 avg_error = sum(errors) / len(errors) if errors else 0
                 eta_accuracy = max(0, 1 - avg_error / 30)
 
-            # Revenue per order
-            revenue_per_order = (total_revenue / 100) / max(total_orders, 1)
+            # Revenue per order (total_revenue already in rupees)
+            revenue_per_order = float(total_revenue) / max(total_orders, 1)
 
             # Composite performance score
             performance_score = (
@@ -544,7 +544,7 @@ class DatasetBuilder:
                 "avg_rating": avg_rating,
                 "avg_quality_rating": avg_quality,
                 "avg_time_rating": avg_time,
-                "total_revenue_rs": float(total_revenue) / 100,
+                "total_revenue_rs": float(total_revenue),
                 "revenue_per_order_rs": revenue_per_order,
                 "repeat_customers": repeat_customers,
                 "total_customers": total_customers,

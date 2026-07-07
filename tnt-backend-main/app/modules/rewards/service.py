@@ -185,8 +185,8 @@ def process_order_completion_rewards(order_id: int, db: Session):
     if not rule:
         return
 
-    # Calculate points (amount in rupees / 100 since amount is in paise)
-    order_amount_rupees = order.total_amount / 100
+    # order.total_amount is already in rupees.
+    order_amount_rupees = float(order.total_amount or 0)
     points_earned = order_amount_rupees * rule.points_per_rupee
 
     award_points(

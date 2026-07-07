@@ -632,7 +632,7 @@ class ForecastValidationService:
                 "period_label": str(row.order_date),
                 "period_start": str(row.order_date),
                 "actual_orders": row.order_count,
-                "actual_revenue": float(row.total_revenue or 0) / 100.0,  # Convert cents
+                "actual_revenue": float(row.total_revenue or 0),  # already rupees
             })
         
         # Build actuals map for quick lookup

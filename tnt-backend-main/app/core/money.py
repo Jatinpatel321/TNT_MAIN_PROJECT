@@ -30,3 +30,14 @@ def to_paise(rupees: Any) -> int:
 def from_paise(paise: Any) -> Decimal:
     """Integer paise (from Razorpay) → rupee ``Decimal``."""
     return (Decimal(str(paise or 0)) / 100).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+
+
+def json_default(o: Any):
+    """``json.dumps(default=...)`` helper so Decimal money serializes as a number.
+
+    Used by the Redis pub/sub publishers whose payloads now carry Decimal
+    amounts (``Numeric`` columns).
+    """
+    if isinstance(o, Decimal):
+        return float(o)
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")

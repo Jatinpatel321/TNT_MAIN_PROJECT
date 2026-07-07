@@ -110,7 +110,7 @@ class FraudDetectionService:
             count = len(duplicates) + 1
             desc = (
                 f"Duplicate Orders: user placed {count} identical orders of "
-                f"₹{order.total_amount / 100:.2f} with same vendor in 2 mins."
+                f"₹{float(order.total_amount):.2f} with same vendor in 2 mins."
             )
             return check_and_create_alert(
                 db=db,

@@ -77,6 +77,12 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
+# Money amounts are Decimal (Numeric rupees). Serialize them as JSON numbers
+# (not strings) across every response so clients receive numeric ₹ values.
+from decimal import Decimal as _Decimal
+from fastapi.encoders import ENCODERS_BY_TYPE as _ENCODERS_BY_TYPE
+_ENCODERS_BY_TYPE[_Decimal] = float
+
 app = FastAPI(title="TNT – Tap N Take", lifespan=lifespan)
 
 # CORS: reads from settings.CORS_ORIGINS (env var CORS_ORIGINS).

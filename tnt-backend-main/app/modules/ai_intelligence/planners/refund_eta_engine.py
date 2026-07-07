@@ -93,7 +93,7 @@ class RefundETAEngine:
             method = "historical"
         else:
             # Larger refunds skew slightly slower toward the card window.
-            amount_rupees = (payment.amount or 0) / 100.0
+            amount_rupees = float(payment.amount or 0)  # already rupees
             eta_hours = float(_UPI_HOURS if amount_rupees <= 2000 else _CARD_HOURS)
             confidence = 0.7
             method = "heuristic"
