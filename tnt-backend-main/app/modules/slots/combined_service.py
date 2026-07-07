@@ -22,13 +22,13 @@ from app.modules.users.model import User
 from app.modules.menu.model import MenuItem
 
 
-def _calculate_food_total(user_id: int, food_items: list[dict], db: Session) -> tuple[int, list[dict]]:
+def _calculate_food_total(user_id: int, food_items: list[dict], db: Session) -> tuple[float, list[dict]]:
     """Validate food items, calculate total, and return enriched items.
 
     Returns:
-        Tuple of (total_amount_paise, enriched_items_list)
+        Tuple of (total_amount_rupees, enriched_items_list)
     """
-    total = 0
+    total = 0.0
     enriched = []
     for item in food_items:
         menu_item_id = item["menu_item_id"]
@@ -41,7 +41,7 @@ def _calculate_food_total(user_id: int, food_items: list[dict], db: Session) -> 
         if menu_item.available_quantity is not None and menu_item.available_quantity < quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for '{menu_item.name}'")
 
-        line_total = int(menu_item.price) * quantity
+        line_total = float(menu_item.price) * quantity
         total += line_total
         enriched.append({
             "menu_item_id": menu_item_id,
@@ -57,14 +57,14 @@ def _calculate_stationery_total(
     vendor_id: int,
     stationery_items: list[dict],
     db: Session,
-) -> tuple[list[StationeryJob], int]:
+) -> tuple[list[StationeryJob], float]:
     """Validate stationery items, create (uncommitted) StationeryJob rows, return total.
 
     The jobs are added to the session but NOT committed — the caller's
     ``@transactional`` decorator will commit everything atomically.
     """
     jobs: list[StationeryJob] = []
-    total = 0
+    total = 0.0
     for item in stationery_items:
         service_id = item["service_id"]
         quantity = item["quantity"]
@@ -77,7 +77,7 @@ def _calculate_stationery_total(
 
         # Use price_per_unit if available, else price_per_page * quantity heuristic
         unit_price = service.price_per_unit or service.price_per_page or 0
-        line_total = int(unit_price) * quantity
+        line_total = float(unit_price) * quantity
         total += line_total
 
         job = StationeryJob(

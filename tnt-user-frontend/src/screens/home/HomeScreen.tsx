@@ -37,7 +37,7 @@ import type {
   PersonalizedOffer,
 } from '../../services/recommendationService';
 import { toAbsoluteUrl } from '../../utils/url';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -210,7 +210,7 @@ export function HomeScreen() {
                   offer.discount_type === 'discount_percentage'
                     ? `${Math.round(offer.discount_value)}% OFF`
                     : offer.discount_type === 'discount_fixed'
-                    ? `${formatMoneyPaise(offer.discount_value * 100)} OFF`
+                    ? `${formatMoney(offer.discount_value)} OFF`
                     : 'OFFER';
                 return (
                   <TouchableOpacity
@@ -337,7 +337,7 @@ export function HomeScreen() {
                     )}
                     <Text style={styles.recoName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.recoMeta} numberOfLines={1}>
-                      {item.vendor_id ? vendorMap[item.vendor_id] || `Vendor #${item.vendor_id}` : ''} · {formatMoneyPaise(item.price || 0)}
+                      {item.vendor_id ? vendorMap[item.vendor_id] || `Vendor #${item.vendor_id}` : ''} · {formatMoney(item.price || 0)}
                     </Text>
                     <Text style={styles.recoReason} numberOfLines={1}>{item.reason}</Text>
                   </TouchableOpacity>
@@ -376,7 +376,7 @@ export function HomeScreen() {
                     )}
                     <Text style={styles.recoName} numberOfLines={1}>{item.item_name}</Text>
                     <Text style={styles.recoMeta} numberOfLines={1}>
-                      {item.vendor_name} · {formatMoneyPaise(item.price_paise)}
+                      {item.vendor_name} · {formatMoney(item.price)}
                     </Text>
                     <Text style={styles.recoReason} numberOfLines={1}>{item.reason}</Text>
                   </TouchableOpacity>
@@ -412,7 +412,7 @@ export function HomeScreen() {
                     )}
                     <Text style={styles.recoName} numberOfLines={1}>{item.item_name}</Text>
                     <Text style={styles.recoMeta} numberOfLines={1}>
-                      {item.vendor_name} · {formatMoneyPaise(item.price_paise)}
+                      {item.vendor_name} · {formatMoney(item.price)}
                     </Text>
                     <Text style={styles.recoReasonTrending} numberOfLines={1}>{item.reason}</Text>
                   </TouchableOpacity>
@@ -448,7 +448,7 @@ export function HomeScreen() {
                     )}
                     <Text style={styles.recoName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.recoMeta} numberOfLines={1}>
-                      {item.vendor_id ? vendorMap[item.vendor_id] || `Vendor #${item.vendor_id}` : ''} · {formatMoneyPaise(item.price || 0)}
+                      {item.vendor_id ? vendorMap[item.vendor_id] || `Vendor #${item.vendor_id}` : ''} · {formatMoney(item.price || 0)}
                     </Text>
                     <Text style={[styles.recoReason, styles.becauseReason]} numberOfLines={1}>{item.reason}</Text>
                   </TouchableOpacity>

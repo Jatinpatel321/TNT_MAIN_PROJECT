@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin';
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 
 interface Printer {
   id: number;
@@ -26,7 +26,7 @@ interface Printer {
 interface Summary { total: number; online: number; offline: number; critical: number; total_queue: number; }
 interface CostEntry {
   id: number; vendor_id: number | null; vendor_name: string;
-  print_type: string; paper_size: string; duplex: boolean; price_per_page_paise: number;
+  print_type: string; paper_size: string; duplex: boolean; price_per_page: number;
 }
 
 const healthColor: Record<string, string> = {
@@ -121,7 +121,7 @@ export default function PrinterMonitoring() {
     const rupees = parseFloat(cprice);
     if (!rupees || rupees < 0) { toast.error('Enter a price'); return; }
     try {
-      await adminApi.upsertPrintCost({ print_type: ct, paper_size: cs, duplex: cd, price_per_page_paise: Math.round(rupees * 100) });
+      await adminApi.upsertPrintCost({ print_type: ct, paper_size: cs, duplex: cd, price_per_page: rupees });
       toast.success('Price saved'); setCprice(''); await load();
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Failed'); }
   };
@@ -276,7 +276,7 @@ export default function PrinterMonitoring() {
                     <td className="py-2 px-3 uppercase">{c.print_type}</td>
                     <td className="py-2 px-3">{c.paper_size}</td>
                     <td className="py-2 px-3">{c.duplex ? 'Yes' : 'No'}</td>
-                    <td className="py-2 px-3 font-mono font-semibold">{formatPaise(c.price_per_page_paise)}</td>
+                    <td className="py-2 px-3 font-mono font-semibold">{formatRupees(c.price_per_page)}</td>
                     <td className="py-2 px-3">
                       <button onClick={() => removeCost(c.id)} aria-label="Delete price" className="btn-ghost btn-sm text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                     </td>

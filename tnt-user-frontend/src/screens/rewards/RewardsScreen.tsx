@@ -233,7 +233,7 @@ export function RewardsScreen({ navigation }: Props) {
                   <Text style={styles.voucherValueText}>
                     {v.discount_type === 'percentage'
                       ? `${v.discount_value}%`
-                      : `Rs ${v.discount_value / 100}`}
+                      : `Rs ${v.discount_value}`}
                   </Text>
                 </View>
               </View>

@@ -20,7 +20,7 @@ import PremiumEmptyState from '../../design-system/components/PremiumEmptyState'
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 
 
 
@@ -218,7 +218,7 @@ export default function MenuScreen({ navigation }: any) {
           </View>
           <Text style={[styles.menuCategory, { color: colors.textMuted }]}>{item.category?.toUpperCase()}</Text>
           <View style={styles.menuMeta}>
-            <Text style={[styles.menuPrice, { color: colors.primary }]}>{formatPaise(item.price)}</Text>
+            <Text style={[styles.menuPrice, { color: colors.primary }]}>{formatRupees(item.price)}</Text>
             {item.prep_time_minutes && (
               <Text style={[styles.prepTime, { color: colors.textSecondary }]}>⏱️ {item.prep_time_minutes}m</Text>
             )}

@@ -8,7 +8,7 @@ import type { RootStackParamList } from '../../types/navigation';
 import { Screen } from '../../components/Screen';
 import { GradientButton } from '../../components/GradientButton';
 import { useCart } from '../../context/CartContext';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 import { MENU_IMAGES } from '../../assets/images';
 import { getVendorMenu } from '../../services/vendorService';
 import { toAbsoluteUrl } from '../../utils/url';
@@ -80,7 +80,7 @@ export function CartScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.info}>
                   <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.meta}>{formatMoneyPaise(item.price)}</Text>
+                  <Text style={styles.meta}>{formatMoney(item.price)}</Text>
                 </View>
 
                 <Pressable
@@ -115,7 +115,7 @@ export function CartScreen({ navigation }: Props) {
 
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalValue}>{formatMoneyPaise(total)}</Text>
+        <Text style={styles.totalValue}>{formatMoney(total)}</Text>
       </View>
 
       <View style={styles.actions}>

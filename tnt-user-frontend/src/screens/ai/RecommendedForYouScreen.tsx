@@ -22,7 +22,7 @@ import type {
   MenuSuggestionItem,
 } from '../../services/recommendationService';
 import { toAbsoluteUrl } from '../../utils/url';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecommendedForYou'>;
 
@@ -173,7 +173,7 @@ export function RecommendedForYouScreen({ navigation }: Props) {
                     )}
                     <Text style={styles.menuName} numberOfLines={1}>{item.item_name}</Text>
                     <Text style={styles.menuVendor} numberOfLines={1}>{item.vendor_name}</Text>
-                    <Text style={styles.menuPrice}>{formatMoneyPaise(item.price_paise)}</Text>
+                    <Text style={styles.menuPrice}>{formatMoney(item.price)}</Text>
                     <Text style={styles.menuReason} numberOfLines={1}>{item.reason}</Text>
                     <View style={styles.confidenceBar}>
                       <View style={[styles.confidenceFill, { width: `${item.confidence * 100}%` }]} />
@@ -216,7 +216,7 @@ export function RecommendedForYouScreen({ navigation }: Props) {
                     )}
                     <Text style={styles.menuName} numberOfLines={1}>{item.item_name}</Text>
                     <Text style={styles.menuVendor} numberOfLines={1}>{item.vendor_name}</Text>
-                    <Text style={styles.menuPrice}>{formatMoneyPaise(item.price_paise)}</Text>
+                    <Text style={styles.menuPrice}>{formatMoney(item.price)}</Text>
                     <Text style={styles.menuReason} numberOfLines={1}>{item.reason}</Text>
                   </Pressable>
                 );

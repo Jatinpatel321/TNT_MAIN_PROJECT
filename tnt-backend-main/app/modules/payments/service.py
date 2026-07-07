@@ -67,7 +67,7 @@ def initiate_payment(
             return {
                 "payment_id": existing.id,
                 "razorpay_order_id": existing.razorpay_order_id,
-                "amount": existing.amount,
+                "amount": float(existing.amount),
                 "key": os.getenv("RAZORPAY_KEY_ID"),
                 "idempotent": True,
             }
@@ -377,7 +377,7 @@ def get_refund_status(order_id: int, user: dict, db: Session) -> dict:
         "order_id": order_id,
         "has_refund": True,
         "payment_id": payment.id,
-        "amount": payment.amount,
+        "amount": float(payment.amount),
         "refund_status": prog["refund_status"],
         "progress_percent": prog["progress_percent"],
         "message": prog["message"],

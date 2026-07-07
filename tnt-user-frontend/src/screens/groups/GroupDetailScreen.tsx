@@ -19,7 +19,7 @@ import type { RootStackParamList } from '../../types/navigation';
 import { Screen } from '../../components/Screen';
 import { RoundedCard } from '../../components/RoundedCard';
 import { GradientButton } from '../../components/GradientButton';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 import {
   addGroupCartItem,
   getGroup,
@@ -113,7 +113,6 @@ export function GroupDetailScreen() {
     (sum: number, ci: any) => sum + (ci.price_at_time ?? 0) * (ci.quantity ?? 1),
     0,
   );
-  const totalAmountPaise = totalAmount * 100;
   const memberCount = members.length || 1;
 
   // ── Load group data ──────────────────────────────────────────────────
@@ -318,7 +317,7 @@ export function GroupDetailScreen() {
   const onPlaceOrder = async () => {
     Alert.alert(
       'Confirm Group Order',
-      `Total: ${formatMoneyPaise(totalAmountPaise)}\nPlace order for all members?`,
+      `Total: ${formatMoney(totalAmount)}\nPlace order for all members?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -331,7 +330,7 @@ export function GroupDetailScreen() {
               const orderData = {
                 groupId,
                 orders,
-                total_amount: res.total_amount ?? totalAmountPaise,
+                total_amount: res.total_amount ?? totalAmount,
               };
               await storeGroupOrderData(groupId, orderData);
               setGroupOrders(orders);
@@ -349,18 +348,17 @@ export function GroupDetailScreen() {
   };
 
   /** Current user pays their share. */
-  const onPayShare = async (orderId: number, amountPaise: number) => {
-    const rupees = amountPaise / 100;
+  const onPayShare = async (orderId: number, amount: number) => {
     Alert.alert(
       'Pay Your Share',
-      `Pay ${formatMoneyPaise(amountPaise)} for your order?`,
+      `Pay ${formatMoney(amount)} for your order?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: `Pay ${formatMoneyPaise(amountPaise)}`,
+          text: `Pay ${formatMoney(amount)}`,
           onPress: async () => {
             try {
-              const result = await mockPayment(orderId, 'UPI', amountPaise);
+              const result = await mockPayment(orderId, 'UPI', amount);
               if (result.status === 'SUCCESS') {
                 Alert.alert('Payment Successful!', result.message);
                 // Refresh payment statuses
@@ -378,7 +376,7 @@ export function GroupDetailScreen() {
     );
   };
 
-  const equalShare = totalAmountPaise > 0 ? Math.floor(totalAmountPaise / memberCount) : 0;
+  const equalShare = totalAmount > 0 ? totalAmount / memberCount : 0;
 
   const currentUserOrder = groupOrders.find((o) => o.member_id === user?.id);
 
@@ -481,7 +479,7 @@ export function GroupDetailScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cartItemName}>{mi.name ?? `Item #${ci.menu_item_id}`}</Text>
                   <Text style={styles.cartItemMeta}>
-                    {ci.quantity}x · {formatMoneyPaise((ci.price_at_time ?? 0) * 100)}
+                    {ci.quantity}x · {formatMoney(ci.price_at_time ?? 0)}
                     {' · Added by '}
                     {owner.name ?? owner.phone ?? `User #${ci.owner_id}`}
                   </Text>
@@ -497,7 +495,7 @@ export function GroupDetailScreen() {
         )}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>{formatMoneyPaise(totalAmountPaise)}</Text>
+          <Text style={styles.totalValue}>{formatMoney(totalAmount)}</Text>
         </View>
       </RoundedCard>
 
@@ -565,12 +563,12 @@ export function GroupDetailScreen() {
           <View style={styles.splitSummary}>
             {splitType === 'equal' && (
               <Text style={styles.splitHint}>
-                Each person pays {formatMoneyPaise(equalShare)}
+                Each person pays {formatMoney(equalShare)}
               </Text>
             )}
             {splitType === 'unified' && (
               <Text style={styles.splitHint}>
-                The group owner (you) pays the full {formatMoneyPaise(totalAmountPaise)}
+                The group owner (you) pays the full {formatMoney(totalAmount)}
               </Text>
             )}
           </View>
@@ -684,7 +682,7 @@ export function GroupDetailScreen() {
                         {displayName} {isMe ? '(You)' : ''}
                       </Text>
                       <Text style={styles.paymentAmount}>
-                        {formatMoneyPaise(o.payable_amount)}
+                        {formatMoney(o.payable_amount)}
                       </Text>
                     </View>
                     <View
@@ -705,7 +703,7 @@ export function GroupDetailScreen() {
                     {/* Pay button for current user if unpaid */}
                     {isMe && status === 'unpaid' && (
                       <GradientButton
-                        label={`Pay ${formatMoneyPaise(o.payable_amount)}`}
+                        label={`Pay ${formatMoney(o.payable_amount)}`}
                         onPress={() => onPayShare(o.order_id, o.payable_amount)}
                         style={styles.payBtn}
                       />

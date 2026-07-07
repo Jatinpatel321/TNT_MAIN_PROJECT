@@ -313,12 +313,7 @@ export function OrderTrackingScreen({route, navigation}: Props) {
       })) ?? []);
 
   const totalAmount = detail?.total_amount ?? order?.total_amount ?? null;
-  const totalRupees =
-    typeof totalAmount === 'number'
-      ? totalAmount < 100
-        ? Number(totalAmount)
-        : Number(totalAmount) / 100
-      : null;
+  const totalRupees = typeof totalAmount === 'number' ? Number(totalAmount) : null;
 
   const statusKey = (status || '').toLowerCase();
   const active = isActiveOrder(statusKey);

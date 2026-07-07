@@ -9,7 +9,7 @@ import { Screen } from '../components/Screen';
 import { RoundedCard } from '../components/RoundedCard';
 import { GradientButton } from '../components/GradientButton';
 import { clearCart, getCart, removeCartItem } from '../services/cartService';
-import { formatMoneyPaise } from '../utils/format';
+import { formatMoney } from '../utils/format';
 import { toApiError } from '../services/apiClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Cart'>;
@@ -71,9 +71,9 @@ export function CartScreen({ navigation }: Props) {
           {cart.items.map((it) => (
             <RoundedCard key={it.menu_item_id}>
               <Text variant="titleMedium" style={styles.name}>{it.name}</Text>
-              <Text style={styles.meta}>Qty: {it.quantity} • {formatMoneyPaise(it.price)}</Text>
+              <Text style={styles.meta}>Qty: {it.quantity} • {formatMoney(it.price)}</Text>
               <View style={styles.row}>
-                <Text style={styles.lineTotal}>Line: {formatMoneyPaise(it.price * it.quantity)}</Text>
+                <Text style={styles.lineTotal}>Line: {formatMoney(it.price * it.quantity)}</Text>
                 <GradientButton label="Remove" onPress={() => onRemove(it.menu_item_id)} style={styles.smallBtn} />
               </View>
             </RoundedCard>
@@ -81,7 +81,7 @@ export function CartScreen({ navigation }: Props) {
 
           <RoundedCard>
             <Text style={styles.total}>Items: {cart.total_items}</Text>
-            <Text style={styles.total}>Total: {formatMoneyPaise(cart.total_amount)}</Text>
+            <Text style={styles.total}>Total: {formatMoney(cart.total_amount)}</Text>
           </RoundedCard>
 
           <View style={styles.actions}>

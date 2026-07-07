@@ -42,7 +42,7 @@ export type MenuSuggestionItem = {
   item_name: string;
   vendor_id: number;
   vendor_name: string;
-  price_paise: number;
+  price: number;
   image_url: string | null;
   is_available: boolean;
   reason: string;
@@ -59,7 +59,7 @@ export type SmartReorderItem = {
   item_name: string;
   vendor_id: number;
   vendor_name: string;
-  price_paise: number;
+  price: number;
   image_url: string | null;
   order_count: number;
   last_ordered_at: string;
@@ -158,7 +158,7 @@ export type SmartMenuItem = {
   item_id: number;
   item_name: string;
   description: string;
-  price_paise: number;
+  price: number;
   vendor_id: number;
   image_url: string | null;
   is_available: boolean;

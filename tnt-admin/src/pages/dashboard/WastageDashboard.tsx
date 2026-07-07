@@ -9,7 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import { StatCard } from '../../components/ui/StatCard';
 import { adminApi } from '../../api/admin';
-import { formatPaise, formatNumber } from '../../utils/format';
+import { formatRupees, formatNumber } from '../../utils/format';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -70,13 +70,13 @@ export default function WastageDashboard() {
   // Map data for charts
   const trendData = daily_trend.map((t: any) => ({
     label: t.date ? t.date.split('-').slice(1).join('/') : '', // MM/DD
-    revenue: (t.wasted_revenue || 0) / 100, // INR
+    revenue: t.wasted_revenue || 0, // INR
     count: t.cancelled_count || 0
   }));
 
   const vendorData = vendor_waste.map((v: any) => ({
     name: v.vendor_name || 'Unknown',
-    revenue: (v.wasted_revenue || 0) / 100,
+    revenue: v.wasted_revenue || 0,
     count: v.cancelled_count || 0
   }));
 
@@ -102,7 +102,7 @@ export default function WastageDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StatCard
           title="Total Wasted Revenue"
-          value={formatPaise(wasted_revenue)}
+          value={formatRupees(wasted_revenue)}
           icon={IndianRupee}
           color="red"
           description="Value of food cancelled after prep"
@@ -123,7 +123,7 @@ export default function WastageDashboard() {
         />
         <StatCard
           title="Daily Waste Avg"
-          value={formatPaise(daily_waste_average * 100)} // convert INR to paise for format
+          value={formatRupees(daily_waste_average)}
           icon={Trash2}
           color="rose"
           description="Wasted revenue average per day"
@@ -191,7 +191,7 @@ export default function WastageDashboard() {
                     <span className="font-semibold text-[#F1F0FF] text-sm">{item.name}</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-[#F1F0FF]">{formatPaise(item.wasted_value)}</div>
+                    <div className="text-sm font-bold text-[#F1F0FF]">{formatRupees(item.wasted_value)}</div>
                     <div className="text-xs text-[#9B9BC4]">{item.cancelled_count} cancellations</div>
                   </div>
                 </div>
@@ -211,7 +211,7 @@ export default function WastageDashboard() {
                 <div key={idx} className="py-3 flex items-center justify-between">
                   <span className="font-semibold text-[#F1F0FF] text-sm">{v.vendor_name}</span>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-red-400">{formatPaise(v.wasted_revenue)}</div>
+                    <div className="text-sm font-bold text-red-400">{formatRupees(v.wasted_revenue)}</div>
                     <div className="text-xs text-[#9B9BC4]">{v.cancelled_count} orders cancelled</div>
                   </div>
                 </div>

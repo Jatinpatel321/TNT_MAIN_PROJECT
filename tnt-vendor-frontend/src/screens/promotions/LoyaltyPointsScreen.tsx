@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import {vendorApi} from '../../services/vendorApi';
 import {colors, shadows, spacing} from '../../design-system';
-import {formatPaise, formatRupees} from '../../utils/format';
+import {formatRupees} from '../../utils/format';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatCard from '../../design-system/components/StatCard';
 import Badge from '../../design-system/components/Badge';
@@ -28,8 +28,8 @@ interface Voucher {
   description: string;
   discount_type: string;
   discount_value: number;
-  min_order_amount_paise: number;
-  max_discount_amount_paise: number | null;
+  min_order_amount: number;
+  max_discount_amount: number | null;
   usage_limit: number | null;
   times_redeemed: number;
   expires_at: string;
@@ -148,7 +148,7 @@ export default function LoyaltyPointsScreen() {
                       <View>
                         <Badge label={v.code} variant="primary" size="sm" />
                       </View>
-                      <Badge label={v.discount_type === 'fixed' ? formatPaise(v.discount_value) : `${v.discount_value}%`} variant="success" size="sm" />
+                      <Badge label={v.discount_type === 'fixed' ? formatRupees(v.discount_value) : `${v.discount_value}%`} variant="success" size="sm" />
                     </View>
                     <Text style={[styles.voucherDesc, {color: themeColors.textPrimary}]}>{v.description}</Text>
                     <View style={styles.voucherMeta}>
@@ -158,7 +158,7 @@ export default function LoyaltyPointsScreen() {
                       </View>
                       <View style={styles.metaItem}>
                         <Text style={[styles.metaLabel, {color: themeColors.textMuted}]}>Min Order</Text>
-                        <Text style={[styles.metaValue, {color: themeColors.textPrimary}]}>{formatPaise(v.min_order_amount_paise)}</Text>
+                        <Text style={[styles.metaValue, {color: themeColors.textPrimary}]}>{formatRupees(v.min_order_amount)}</Text>
                       </View>
                       <View style={styles.metaItem}>
                         <Text style={[styles.metaLabel, {color: themeColors.textMuted}]}>Expires</Text>

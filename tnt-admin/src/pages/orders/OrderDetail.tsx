@@ -10,7 +10,7 @@ import { ordersApi } from '../../api/orders';
 import { adminApi } from '../../api/admin';
 import { useOrderWebSocket } from '../../hooks/useOrderWebSocket';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { formatOrderId, formatDateTime, formatTimeAgo, formatPaise, formatCurrency } from '../../utils/format';
+import { formatOrderId, formatDateTime, formatTimeAgo, formatRupees, formatCurrency } from '../../utils/format';
 import { ACTIVE_ORDER_STATUSES } from '../../utils/constants';
 import type { Order, OrderTimeline } from '../../types';
 import { cn } from '../../utils/cn';

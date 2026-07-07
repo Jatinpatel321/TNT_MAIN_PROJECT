@@ -23,7 +23,7 @@ import { colors as staticColors, shadows, spacing } from '../../design-system';
 const colors = staticColors;
 import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 import StatCard from '../../design-system/components/StatCard';
 import AnimatedCounter from '../../design-system/components/AnimatedCounter';
 import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
@@ -300,7 +300,7 @@ export default function OrdersScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailIcon}>💰</Text>
             <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{isActualGroup ? 'Group Total' : 'Total'}</Text>
-            <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{formatPaise(combinedTotal)}</Text>
+            <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{formatRupees(combinedTotal)}</Text>
           </View>
           {/* Group order members summary */}
           {isActualGroup && (

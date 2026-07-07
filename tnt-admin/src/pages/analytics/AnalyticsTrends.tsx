@@ -3,12 +3,12 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineCh
 import { RefreshCw, RefreshCcw, ShieldAlert, MessageSquareWarning, Printer as PrinterIcon, Droplet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin';
-import { formatShortDate, formatPaise } from '../../utils/format';
+import { formatShortDate, formatRupees } from '../../utils/format';
 import { chartTokens } from '../../components/charts/shared/chartTheme';
 import { TNTTooltip } from '../../components/charts/shared/tntTooltip';
 import '../../components/charts/shared/tntTooltip.css';
 
-interface TrendPoint { date: string; count: number; amount_paise?: number; }
+interface TrendPoint { date: string; count: number; amount?: number; }
 interface PrinterUsage {
   total_printers: number; total_queue: number; total_capacity_pages_per_hour: number;
   avg_ink_level_pct: number; low_paper_printers: number; by_status: Record<string, number>;
@@ -20,7 +20,7 @@ interface TrendsResponse {
   fraud_trend: TrendPoint[];
   complaint_trend: TrendPoint[];
   printer_usage: PrinterUsage;
-  totals: { refunds: number; refund_amount_paise: number; fraud_flags: number; complaints: number };
+  totals: { refunds: number; refund_amount: number; fraud_flags: number; complaints: number };
 }
 
 function TrendChart({ data, color, label }: { data: TrendPoint[]; color: string; label: string }) {
@@ -89,7 +89,7 @@ export default function AnalyticsTrends() {
             <div className="tnt-card">
               <div className="flex items-center gap-2 mb-1"><RefreshCcw className="w-4 h-4 text-red-500" /><span className="text-xs text-[#6B7280]">Refunds</span></div>
               <p className="text-2xl font-bold font-mono text-[#111827]">{data.totals.refunds}</p>
-              <p className="text-xs text-[#9CA3AF]">{formatPaise(data.totals.refund_amount_paise)}</p>
+              <p className="text-xs text-[#9CA3AF]">{formatRupees(data.totals.refund_amount)}</p>
             </div>
             <div className="tnt-card">
               <div className="flex items-center gap-2 mb-1"><ShieldAlert className="w-4 h-4 text-amber-500" /><span className="text-xs text-[#6B7280]">Fraud Flags</span></div>

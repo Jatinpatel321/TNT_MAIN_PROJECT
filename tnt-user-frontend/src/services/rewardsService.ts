@@ -54,8 +54,8 @@ export type Voucher = {
   description: string;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
-  min_order_amount_paise: number;
-  max_discount_amount_paise: number | null;
+  min_order_amount: number;
+  max_discount_amount: number | null;
   usage_limit: number | null;
   times_redeemed: number;
   expires_at: string;
@@ -130,8 +130,8 @@ export async function redeemVoucher(
 ): Promise<{
   voucher_id: number;
   code: string;
-  discount_amount_paise: number;
-  updated_order_total_paise: number;
+  discount_amount: number;
+  updated_order_total: number;
 }> {
   const res = await apiClient.post(
     `/rewards/vouchers/${code}/redeem`,

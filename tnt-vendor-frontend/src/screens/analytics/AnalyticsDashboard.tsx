@@ -18,7 +18,7 @@ import { analyticsApi } from '../../services/analyticsApi';
 import { vendorApi } from '../../services/vendorApi';
 import { colors as staticColors, shadows, spacing } from '../../design-system';
 const colors = staticColors;
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatCard from '../../design-system/components/StatCard';
 import ForecastCard from '../../design-system/components/ForecastCard';
@@ -133,11 +133,11 @@ export default function AnalyticsDashboard({ navigation }: any) {
           <Animated.View style={{ opacity: fadeAnim }}>
             <RevenueCard
               title="Today's Revenue"
-              amount={(data?.daily?.total_revenue || 0) / 100}
+              amount={(data?.daily?.total_revenue || 0)}
               subtitle="Last 7 days performance"
               trend={{ value: data?.weekly?.growth_percentage || 0, isUp: (data?.weekly?.growth_percentage || 0) >= 0 }}
               data={(data?.daily?.sales_data || []).slice(-7).map((d: any) => ({
-                value: d.revenue / 100,
+                value: d.revenue,
                 label: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }).charAt(0),
               }))}
               color={colors.primary}
@@ -148,8 +148,8 @@ export default function AnalyticsDashboard({ navigation }: any) {
               icon="📈"
               color={colors.success}
               data={[
-                { label: 'Daily Avg', value: (data?.daily?.daily_average_revenue || 0) / 100, unit: '₹' },
-                { label: 'Weekly Avg', value: (data?.weekly?.weekly_average_revenue || 0) / 100, unit: '₹' },
+                { label: 'Daily Avg', value: (data?.daily?.daily_average_revenue || 0), unit: '₹' },
+                { label: 'Weekly Avg', value: (data?.weekly?.weekly_average_revenue || 0), unit: '₹' },
                 { label: 'Weekly Growth', value: Math.abs(data?.weekly?.growth_percentage || 0), unit: '%', trend: (data?.weekly?.growth_percentage || 0) >= 0 ? 'up' : 'down' },
               ]}
               style={{ marginBottom: spacing.md }}
@@ -163,7 +163,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
                       {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </Text>
                     <Text style={styles.dataValue}>{day.orders} orders</Text>
-                    <Text style={[styles.dataAmount, { color: colors.primary }]}>{formatPaise(day.revenue)}</Text>
+                    <Text style={[styles.dataAmount, { color: colors.primary }]}>{formatRupees(day.revenue)}</Text>
                   </View>
                 ))}
               </GlassCard>
@@ -224,7 +224,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemStats}>{item.order_count} orders · {item.total_quantity} units</Text>
                   </View>
-                  <Text style={styles.itemRevenue}>{formatPaise(item.total_revenue)}</Text>
+                  <Text style={styles.itemRevenue}>{formatRupees(item.total_revenue)}</Text>
                 </View>
               ))}
             </GlassCard>
@@ -276,7 +276,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
           <Animated.View style={{ opacity: fadeAnim }}>
             <View style={styles.statsRow}>
               <StatCard value={data?.waste?.cancellation_rate || 0} label="Cancellation Rate" suffix="%" color={colors.error} style={{ flex: 1 }} />
-              <StatCard value={(data?.waste?.wasted_revenue || 0) / 100} label="Wasted Revenue" prefix="₹" color={colors.warning} style={{ flex: 1 }} format="currency" />
+              <StatCard value={(data?.waste?.wasted_revenue || 0)} label="Wasted Revenue" prefix="₹" color={colors.warning} style={{ flex: 1 }} format="currency" />
             </View>
             <ForecastCard
               title="Waste Analysis"
@@ -284,7 +284,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
               color={colors.error}
               data={[
                 { label: 'Cancelled Orders', value: data?.waste?.cancelled_orders || 0 },
-                { label: 'Daily Waste Avg', value: (data?.waste?.daily_waste_average || 0) / 100, unit: '₹' },
+                { label: 'Daily Waste Avg', value: (data?.waste?.daily_waste_average || 0), unit: '₹' },
                 { label: 'Cancellation Rate', value: data?.waste?.cancellation_rate || 0, unit: '%', trend: (data?.waste?.cancellation_rate || 0) > 10 ? 'up' : 'down' },
               ]}
               style={{ marginBottom: spacing.md }}
@@ -305,7 +305,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
         {activeTab === 'yearly' && (
           <Animated.View style={{ opacity: fadeAnim }}>
             <View style={styles.statsRow}>
-              <StatCard value={(data?.yearly?.yearly_total_revenue || data?.yearly?.total_revenue || 0) / 100} label="Yearly Revenue" prefix="₹" color={colors.primary} style={{ flex: 1 }} format="currency" />
+              <StatCard value={(data?.yearly?.yearly_total_revenue || data?.yearly?.total_revenue || 0)} label="Yearly Revenue" prefix="₹" color={colors.primary} style={{ flex: 1 }} format="currency" />
               <StatCard value={data?.yearly?.yearly_total_orders || data?.yearly?.total_orders || 0} label="Total Orders" icon="📦" color={colors.secondary} style={{ flex: 1 }} />
             </View>
             <ForecastCard
@@ -313,9 +313,9 @@ export default function AnalyticsDashboard({ navigation }: any) {
               icon="📅"
               color={colors.primary}
               data={[
-                { label: 'Yearly Revenue', value: (data?.yearly?.yearly_total_revenue || data?.yearly?.total_revenue || 0) / 100, unit: '₹' },
+                { label: 'Yearly Revenue', value: (data?.yearly?.yearly_total_revenue || data?.yearly?.total_revenue || 0), unit: '₹' },
                 { label: 'Yearly Orders', value: data?.yearly?.yearly_total_orders || data?.yearly?.total_orders || 0 },
-                { label: 'Monthly Avg', value: (data?.yearly?.monthly_average || data?.yearly?.avg_monthly_revenue || 0) / 100, unit: '₹' },
+                { label: 'Monthly Avg', value: (data?.yearly?.monthly_average || data?.yearly?.avg_monthly_revenue || 0), unit: '₹' },
                 { label: 'Growth vs Prev Year', value: Math.abs(data?.yearly?.growth_percentage || 0), unit: '%', trend: (data?.yearly?.growth_percentage || 0) >= 0 ? 'up' : 'down' },
               ]}
               style={{ marginBottom: spacing.md }}
@@ -349,7 +349,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
                 <View style={styles.insightRow}>
                   <Text style={styles.insightDot}>•</Text>
                   <Text style={styles.insightText}>
-                    Monthly avg: <Text style={{ fontWeight: '700' }}>₹{((data?.yearly?.monthly_average || data?.yearly?.avg_monthly_revenue || 0) / 100).toFixed(2)}</Text>
+                    Monthly avg: <Text style={{ fontWeight: '700' }}>₹{((data?.yearly?.monthly_average || data?.yearly?.avg_monthly_revenue || 0)).toFixed(2)}</Text>
                   </Text>
                 </View>
               </View>
@@ -413,7 +413,7 @@ export default function AnalyticsDashboard({ navigation }: any) {
                     color={colors.info}
                     data={[
                       { label: 'Predicted Orders (7d)', value: stationeryData.daily.summary.total_orders || 0 },
-                      { label: 'Avg Daily Revenue', value: (stationeryData.daily.summary.avg_daily_revenue || 0) / 100, unit: '₹' },
+                      { label: 'Avg Daily Revenue', value: (stationeryData.daily.summary.avg_daily_revenue || 0), unit: '₹' },
                     ]}
                     style={{ marginBottom: spacing.md }}
                   />

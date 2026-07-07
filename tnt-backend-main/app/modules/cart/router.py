@@ -183,7 +183,7 @@ def _checkout_order_from_cart(
         "order_id": order.id,
         "pickup_token": pickup_token,
         "status": "Order placed",
-        "total_amount": order.total_amount,
+        "total_amount": float(order.total_amount),
         "discount_amount": discount_amount + points_discount_amount,
         "eta_minutes": eta_minutes,
         "payment_method": payment_method or "UPI",

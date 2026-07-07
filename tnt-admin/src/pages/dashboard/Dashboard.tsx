@@ -18,7 +18,7 @@ import { adminApi } from '../../api/admin';
 import { aiApi } from '../../api/ai';
 import { vendorsApi } from '../../api/vendors';
 import { complaintsApi } from '../../api/complaints';
-import { formatPaise, formatNumber, formatTimeAgo, formatOrderId } from '../../utils/format';
+import { formatRupees, formatNumber, formatTimeAgo, formatOrderId } from '../../utils/format';
 import { POLL_INTERVAL_ORDERS, RUSH_HOUR_COLORS } from '../../utils/constants';
 import type { Order, Vendor, Complaint, RushHourSignal, VendorRanking, DemandPlan } from '../../types';
 import { cn } from '../../utils/cn';
@@ -296,7 +296,7 @@ export default function Dashboard() {
         />
         <StatCard
           title="Revenue Today"
-          value={formatPaise(revenueToday)}
+          value={formatRupees(revenueToday)}
           subtitle="Via Razorpay"
           icon={IndianRupee}
           accent="amber"
@@ -382,7 +382,7 @@ export default function Dashboard() {
                     </td>
                     <td>
                       <span className="font-mono text-xs font-medium text-[#111827]">
-                        {formatPaise(order.total_amount)}
+                        {formatRupees(order.total_amount)}
                       </span>
                     </td>
                     <td>

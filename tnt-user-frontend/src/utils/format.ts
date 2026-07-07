@@ -12,7 +12,9 @@ export function formatCurrency(
   }
 
   let amount = 0;
-  const inputType = options?.inputType ?? 'paise';
+  // The API now returns every amount in rupees; 'paise' is kept only for
+  // call sites that still hold a raw Razorpay-boundary paise value.
+  const inputType = options?.inputType ?? 'rupees';
   const showDecimals = options?.showDecimals ?? true;
 
   if (typeof value === 'string') {
@@ -29,8 +31,9 @@ export function formatCurrency(
   return `₹${formattedAmount}`;
 }
 
-export function formatMoneyPaise(paise: number): string {
-  return formatCurrency(paise, { inputType: 'paise', showDecimals: true });
+/** Format a rupee amount (API values are always rupees now). */
+export function formatMoney(rupees: number): string {
+  return formatCurrency(rupees, { inputType: 'rupees', showDecimals: true });
 }
 
 export function formatTimeRange(startIso: string, endIso: string): string {

@@ -123,7 +123,7 @@ export function OrderTrackingScreen({ route }: Props) {
         <View style={styles.refundRow}>
           <MaterialCommunityIcons name="cash" size={16} color="#6B7280" />
           <Text style={styles.refundRowLabel}>Amount</Text>
-          <Text style={styles.refundRowValue}>₹{((refund.amount ?? 0) / 100).toFixed(2)}</Text>
+          <Text style={styles.refundRowValue}>₹{(refund.amount ?? 0).toFixed(2)}</Text>
         </View>
         <View style={styles.refundRow}>
           <MaterialCommunityIcons name="calendar-clock" size={16} color="#6B7280" />

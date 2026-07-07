@@ -34,7 +34,7 @@ router = APIRouter(prefix="/menu", tags=["Menu & Inventory"])
 @router.post("/items", response_model=MenuItemResponse)
 def add_menu_item(
     name: str = Form(...),
-    price: int = Form(...),
+    price: float = Form(...),
     description: str | None = Form(None),
     category: str = Form("food"),
     prep_time_minutes: int | None = Form(None),
@@ -101,7 +101,7 @@ def get_menu_item_by_id(item_id: int, db: Session = Depends(get_db)):
 def edit_menu_item(
     item_id: int,
     name: str | None = Form(None),
-    price: int | None = Form(None),
+    price: float | None = Form(None),
     description: str | None = Form(None),
     is_available: bool | None = Form(None),
     prep_time_minutes: int | None = Form(None),
@@ -305,7 +305,7 @@ def add_stationery_service(
     service_type: str = Form(...),
     name: str = Form(...),
     description: str | None = Form(None),
-    price_per_page: int = Form(...),
+    price_per_page: float = Form(...),
     max_capacity: int | None = Form(None),
     is_available: bool = Form(True),
     db: Session = Depends(get_db),
@@ -359,7 +359,7 @@ def edit_stationery_service(
     service_id: int,
     name: str | None = Form(None),
     description: str | None = Form(None),
-    price_per_page: int | None = Form(None),
+    price_per_page: float | None = Form(None),
     max_capacity: int | None = Form(None),
     current_load: int | None = Form(None),
     is_available: bool | None = Form(None),

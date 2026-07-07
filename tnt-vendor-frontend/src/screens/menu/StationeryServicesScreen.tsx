@@ -16,7 +16,7 @@ import GlassCard from '../../design-system/components/GlassCard';
 import StatusPill from '../../design-system/components/StatusPill';
 import apiClient from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 
 interface StationeryService {
   id: number;
@@ -78,7 +78,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
     setEditingService(service);
     setName(service.name);
     setDescription(service.description || '');
-    setPrice((service.price_per_page / 100).toString());
+    setPrice(service.price_per_page.toString());
     setMaxCapacity(service.max_capacity?.toString() || '');
     setServiceType(service.service_type);
     setIsModalVisible(true);
@@ -94,14 +94,13 @@ export default function StationeryServicesScreen({ navigation }: any) {
       Alert.alert('Validation Error', 'Price per page must be a positive number.');
       return;
     }
-    const pricePaise = Math.round(priceVal * 100);
     const capVal = maxCapacity ? parseInt(maxCapacity, 10) : null;
 
     try {
       const formData = new FormData();
       formData.append('name', name.trim());
       formData.append('description', description.trim());
-      formData.append('price_per_page', pricePaise.toString());
+      formData.append('price_per_page', priceVal.toString());
       if (capVal !== null) {
         formData.append('max_capacity', capVal.toString());
       }
@@ -186,7 +185,7 @@ export default function StationeryServicesScreen({ navigation }: any) {
         </Text>
 
         <View style={styles.metaRow}>
-          <Text style={styles.price}>{formatPaise(item.price_per_page)}/page</Text>
+          <Text style={styles.price}>{formatRupees(item.price_per_page)}/page</Text>
           <View style={styles.capacityRow}>
             <Text style={styles.capacityText}>
               Load: {item.current_load}/{item.max_capacity || '∞'}

@@ -70,7 +70,7 @@ def seed_data(test_db_session):
         slot_id=slot.id,
         vendor_id=vendor.id,
         status=OrderStatus.PENDING,
-        total_amount=7350,
+        total_amount=73.50,  # rupees (was 7350 paise)
     )
     invalid_order = Order(
         user_id=student.id,
@@ -133,8 +133,8 @@ def test_initiate_uses_persisted_order_total_amount(client, seed_data, monkeypat
     assert response.status_code == 200
 
     body = response.json()
-    assert body["amount"] == 7350
-    assert captured["amount"] == 7350
+    assert body["amount"] == 73.50  # rupees (order total, unconverted)
+    assert captured["amount"] == 7350  # paise (what Razorpay actually receives)
 
 
 def test_initiate_rejects_invalid_order_amount(client, seed_data, monkeypatch):

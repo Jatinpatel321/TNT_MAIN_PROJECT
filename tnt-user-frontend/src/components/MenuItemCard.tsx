@@ -6,7 +6,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import type { MenuItem } from '../types/models';
 import { MENU_IMAGES } from '../assets/images';
 import { toAbsoluteUrl } from '../utils/url';
-import { formatMoneyPaise } from '../utils/format';
+import { formatMoney } from '../utils/format';
 
 export function MenuItemCard(props: {
   item: MenuItem;
@@ -37,7 +37,7 @@ export function MenuItemCard(props: {
             )}
           </View>
           {item.description ? <Text style={styles.desc} numberOfLines={2}>{item.description}</Text> : null}
-          <Text style={styles.meta}>{formatMoneyPaise(item.price)} • Prep: {item.prep_time_minutes ?? 'Varies'} min</Text>
+          <Text style={styles.meta}>{formatMoney(item.price)} • Prep: {item.prep_time_minutes ?? 'Varies'} min</Text>
           {!available && <Text style={styles.unavailable}>Unavailable</Text>}
         </View>
         {source ? (

@@ -274,7 +274,7 @@ def get_current_slot_orders(
                 "id": o.id,
                 "user_id": o.user_id,
                 "status": o.status.value,
-                "total_amount": o.total_amount,
+                "total_amount": float(o.total_amount),
                 "created_at": o.created_at.isoformat(),
             }
             for o in orders
@@ -312,7 +312,7 @@ def get_upcoming_orders(
                     "id": o.id,
                     "user_id": o.user_id,
                     "status": o.status.value,
-                    "total_amount": o.total_amount,
+                    "total_amount": float(o.total_amount),
                 }
                 for o in orders
             ],
@@ -521,7 +521,7 @@ def get_vendor_menu(vendor_id: int, db: Session = Depends(get_db)):
                 "vendor_id": item.vendor_id,
                 "name": item.name,
                 "description": item.description or f"Delicious {item.name}",
-                "price": item.price,
+                "price": float(item.price),
                 "image_url": img_url,
                 "is_available": item.is_available,
             }

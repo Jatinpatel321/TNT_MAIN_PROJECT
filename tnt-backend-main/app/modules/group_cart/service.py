@@ -337,8 +337,8 @@ class GroupCartService:
                 ]
 
                 member_total = add_items_to_order(order, order_items, self.db)
-                order.total_amount = int(member_total)
-                member_totals[member.user_id] = int(member_total)
+                order.total_amount = member_total
+                member_totals[member.user_id] = round(member_total)
 
                 orders.append(
                     {
@@ -388,7 +388,7 @@ class GroupCartService:
             self._notify_group(
                 group_id=group_id,
                 title="Group Order Placed",
-                message=f"Group order placed successfully. Total amount: ₹{int(total_amount)}.",
+                message=f"Group order placed successfully. Total amount: ₹{total_amount:.2f}.",
                 event="order_placed",
             )
 
@@ -415,7 +415,7 @@ class GroupCartService:
                     user_id=user.id,
                     phone=user.phone,
                     title="Payment Split Finalized",
-                    message=f"Your payable amount for this group order is ₹{int(payable_amount)}.",
+                    message=f"Your payable amount for this group order is ₹{payable_amount:.2f}.",
                     db=self.db,
                     send_sms_flag=False,
                 )
@@ -464,7 +464,7 @@ class GroupCartService:
             return {member_id: (total_amount if member_id == owner_id else 0) for member_id in member_ids}
 
         if split_type == PaymentSplitType.CUSTOM:
-            custom_amounts = {split.user_id: int(split.amount or 0) for split in splits if split.user_id in member_ids}
+            custom_amounts = {split.user_id: round(split.amount or 0) for split in splits if split.user_id in member_ids}
             if set(custom_amounts.keys()) != set(member_ids):
                 raise HTTPException(status_code=400, detail="Custom split amounts required for all members with items")
             if sum(custom_amounts.values()) != total_amount:
@@ -529,7 +529,7 @@ class GroupCartService:
         actor_name = member.user.name if member and member.user else "A group member"
         message = f"{actor_name} set payment split to {split_type.value}."
         if split_type == PaymentSplitType.CUSTOM and amount is not None:
-            message = f"{actor_name} set custom payable amount to ₹{int(amount)}."
+            message = f"{actor_name} set custom payable amount to ₹{amount:.2f}."
 
         self._notify_group(
             group_id=group_id,

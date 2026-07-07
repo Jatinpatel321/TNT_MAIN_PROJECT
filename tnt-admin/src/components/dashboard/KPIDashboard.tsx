@@ -13,7 +13,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { formatPaise, formatNumber, formatRupees } from '../../utils/format';
+import { formatNumber, formatRupees } from '../../utils/format';
 
 const DEPARTMENTS = [
   'Computer Science',

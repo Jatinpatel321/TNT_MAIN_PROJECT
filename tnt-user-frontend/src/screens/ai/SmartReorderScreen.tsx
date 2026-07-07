@@ -15,7 +15,7 @@ import type { RootStackParamList } from '../../types/navigation';
 import { Screen } from '../../components/Screen';
 import { getSmartReorder } from '../../services/recommendationService';
 import type { SmartReorderItem as SmartReorderItemType } from '../../services/recommendationService';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
 import { toApiError } from '../../services/apiClient';
 
@@ -164,7 +164,7 @@ export function SmartReorderScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.itemRight}>
                   <Text style={styles.itemPrice}>
-                    {formatMoneyPaise(item.price_paise)}
+                    {formatMoney(item.price)}
                   </Text>
                   <Text style={styles.itemQty}>Qty: {item.suggested_quantity}</Text>
                 </View>

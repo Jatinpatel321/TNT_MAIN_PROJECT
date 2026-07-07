@@ -55,7 +55,7 @@ def create_menu_item(db: Session, vendor_id: int, data: MenuItemCreate) -> MenuI
             actor_role="vendor",
             entity_type="MenuItem",
             entity_id=str(item.id),
-            after_state={"name": item.name, "price": item.price},
+            after_state={"name": item.name, "price": float(item.price)},
         )
     except Exception:
         pass

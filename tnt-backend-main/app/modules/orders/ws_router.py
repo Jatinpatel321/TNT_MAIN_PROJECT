@@ -76,7 +76,7 @@ def _get_order_snapshot(order_id: int) -> Optional[dict]:
             "user_id": order.user_id,
             "status": order.status.value if hasattr(order.status, "value") else str(order.status),
             "vendor_id": order.vendor_id,
-            "total_amount": order.total_amount,
+            "total_amount": float(order.total_amount),
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "eta_minutes": order.eta_minutes,
         }

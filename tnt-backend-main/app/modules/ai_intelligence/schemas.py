@@ -117,7 +117,7 @@ class MenuSuggestionItem(BaseModel):
     item_name: str
     vendor_id: int
     vendor_name: str
-    price_paise: int
+    price: float
     image_url: Optional[str] = None
     is_available: bool
     reason: str
@@ -134,7 +134,7 @@ class SmartReorderItem(BaseModel):
     item_name: str
     vendor_id: int
     vendor_name: str
-    price_paise: int
+    price: float
     image_url: Optional[str] = None
     order_count: int
     last_ordered_at: str
