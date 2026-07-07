@@ -10,7 +10,7 @@ import { RoundedCard } from '../components/RoundedCard';
 import { GradientButton } from '../components/GradientButton';
 import { addCartItem } from '../services/cartService';
 import { getVendorMenu } from '../services/vendorService';
-import { formatMoneyPaise } from '../utils/format';
+import { formatMoney } from '../utils/format';
 import { toApiError } from '../services/apiClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Menu'>;
@@ -66,7 +66,7 @@ export function MenuScreen({ route, navigation }: Props) {
             <Text variant="titleMedium" style={styles.name}>{it.name}</Text>
             {it.description ? <Text style={styles.desc}>{it.description}</Text> : null}
             <View style={styles.row}>
-              <Text style={styles.price}>{formatMoneyPaise(it.price)}</Text>
+              <Text style={styles.price}>{formatMoney(it.price)}</Text>
               <GradientButton
                 label={addingId === it.id ? 'Adding…' : 'Add'}
                 onPress={() => onAdd(it)}

@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { retentionApi } from '../../services/retentionApi';
 import { colors as staticColors, shadows, spacing } from '../../design-system';
 const colors = staticColors;
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 import GlassCard from '../../design-system/components/GlassCard';
 import StatCard from '../../design-system/components/StatCard';
 import ForecastCard from '../../design-system/components/ForecastCard';
@@ -183,7 +183,7 @@ export default function PromotionsDashboard({ navigation }: any) {
                 <Text style={styles.offerType}>{offer.discount_type?.replace(/_/g, ' ')}</Text>
                 <View style={styles.offerMeta}>
                   <Text style={styles.offerDiscount}>
-                    {offer.discount_type === 'fixed' ? `${formatPaise(offer.discount_value)} OFF` : `${offer.discount_value}% OFF`}
+                    {offer.discount_type === 'fixed' ? `${formatRupees(offer.discount_value)} OFF` : `${offer.discount_value}% OFF`}
                   </Text>
                   <Text style={styles.offerRedeemed}>{offer.times_redeemed} redeemed</Text>
                 </View>
@@ -214,7 +214,7 @@ export default function PromotionsDashboard({ navigation }: any) {
                 <Text style={styles.offerType}>{campaign.offer_type?.replace(/_/g, ' ')}</Text>
                 <View style={styles.offerMeta}>
                   <Text style={styles.offerDiscount}>
-                    {campaign.offer_type === 'discount_fixed' ? `${formatPaise(campaign.discount_value)} OFF` : `${campaign.discount_value}% OFF`}
+                    {campaign.offer_type === 'discount_fixed' ? `${formatRupees(campaign.discount_value)} OFF` : `${campaign.discount_value}% OFF`}
                   </Text>
                   <Text style={styles.offerRedeemed}>{campaign.times_used} used</Text>
                 </View>
@@ -241,7 +241,7 @@ export default function PromotionsDashboard({ navigation }: any) {
                   <View style={styles.rankBadge}><Text style={styles.rankText}>#{i + 1}</Text></View>
                   <View style={styles.customerInfo}>
                     <Text style={styles.customerName}>{c.name}</Text>
-                    <Text style={styles.customerMeta}>{c.total_orders} orders · {formatPaise(c.total_spent)}</Text>
+                    <Text style={styles.customerMeta}>{c.total_orders} orders · {formatRupees(c.total_spent)}</Text>
                   </View>
                   <Badge label={c.segment} variant={c.segment === 'loyal' ? 'success' : c.segment === 'repeat' ? 'primary' : 'neutral'} size="sm" />
                 </View>

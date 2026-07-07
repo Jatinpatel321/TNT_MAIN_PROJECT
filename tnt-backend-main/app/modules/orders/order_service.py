@@ -324,7 +324,7 @@ def get_my_orders(
                 "menu_item_id": oi.menu_item_id,
                 "name": mi.name if mi else "Unknown Item",
                 "quantity": oi.quantity,
-                "price_at_time": oi.price_at_time,
+                "price_at_time": float(oi.price_at_time),
                 "line_total": float(oi.price_at_time) * oi.quantity,
             })
 
@@ -353,7 +353,7 @@ def get_my_orders(
                     "id": sj.id,
                     "service_id": sj.service_id,
                     "quantity": sj.quantity,
-                    "amount": sj.amount or 0,
+                    "amount": float(sj.amount or 0),
                     "status": sj.status.value if hasattr(sj.status, "value") else str(sj.status),
                     "print_type": sj.print_type.value if hasattr(sj.print_type, "value") else sj.print_type,
                     "paper_size": sj.paper_size.value if hasattr(sj.paper_size, "value") else sj.paper_size,
@@ -372,7 +372,7 @@ def get_my_orders(
             "vendor_name": vendor_name,
             "status": order.status.value if hasattr(order.status, "value") else str(order.status),
             "created_at": order.created_at,
-            "total_amount": order.total_amount,
+            "total_amount": float(order.total_amount),
             "qr_code": order.qr_code,
             "items": items,
             "eta_minutes": order.eta_minutes,
@@ -571,7 +571,7 @@ def get_vendor_analytics(user: dict, db: Session) -> dict:
     ready_orders        — orders currently in READY state
     completed_orders    — terminal orders (PICKED + COMPLETED)
     cancelled_orders    — terminal cancelled orders
-    total_revenue_paise — sum of total_amount for non-cancelled orders
+    total_revenue — sum of total_amount for non-cancelled orders (rupees)
     completion_rate_pct — completed / (completed + cancelled) * 100
     avg_confirmation_ms — avg latency from placement to confirmation
     peak_hour           — hour of day (0-23) with the most orders placed
@@ -609,7 +609,7 @@ def get_vendor_analytics(user: dict, db: Session) -> dict:
             state_counts[status_val] += 1
 
         if status_val not in {"CANCELLED"}:
-            total_revenue += int(o.total_amount or 0)
+            total_revenue += float(o.total_amount or 0)
 
         if o.created_at:
             h = o.created_at.hour
@@ -653,7 +653,7 @@ def get_vendor_analytics(user: dict, db: Session) -> dict:
         {
             "order_id": o.id,
             "status": o.status.value if hasattr(o.status, "value") else str(o.status),
-            "total_amount": o.total_amount,
+            "total_amount": float(o.total_amount),
             "created_at": o.created_at.isoformat() if o.created_at else None,
         }
         for o in recent
@@ -668,7 +668,7 @@ def get_vendor_analytics(user: dict, db: Session) -> dict:
         "ready_orders": ready,
         "completed_orders": completed,
         "cancelled_orders": cancelled,
-        "total_revenue_paise": total_revenue,
+        "total_revenue": total_revenue,
         "completion_rate_pct": completion_rate,
         "avg_confirmation_ms": avg_confirmation_ms,
         "peak_hour": peak_hour,

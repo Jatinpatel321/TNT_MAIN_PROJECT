@@ -201,7 +201,7 @@ def get_fraud_alert_detail(
             order_details = {
                 "id": o.id,
                 "status": o.status.value,
-                "total_amount": o.total_amount,
+                "total_amount": float(o.total_amount),
                 "created_at": o.created_at,
                 "booking_type": o.booking_type,
             }

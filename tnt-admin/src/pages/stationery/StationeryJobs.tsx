@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { stationeryApi } from '../../api/stationery';
-import { formatDateTime, formatTimeAgo, formatPaise } from '../../utils/format';
+import { formatDateTime, formatTimeAgo, formatRupees } from '../../utils/format';
 import type { PrintJob, PrintJobStatus } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -120,7 +120,7 @@ export default function StationeryJobs() {
       header: 'Payment',
       cell: ({ row }) => (
         <div>
-          <p className="font-mono text-sm text-[#F1F0FF]">{formatPaise(row.original.total_amount)}</p>
+          <p className="font-mono text-sm text-[#F1F0FF]">{formatRupees(row.original.total_amount)}</p>
           <p className="text-xs text-[#9B9BC4] capitalize">{row.original.payment_status}</p>
         </div>
       ),

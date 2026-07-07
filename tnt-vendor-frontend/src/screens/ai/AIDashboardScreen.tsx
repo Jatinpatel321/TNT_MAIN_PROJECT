@@ -170,7 +170,7 @@ export default function AIDashboardScreen({ navigation }: any) {
                   </View>
                   <View style={styles.itemInfo}>
                     <Text style={[styles.itemName, { color: colors.textPrimary }]}>{item.name}</Text>
-                    <Text style={[styles.itemMeta, { color: colors.textMuted }]}>₹{(item.price / 100).toFixed(2)} · {item.order_count} orders</Text>
+                    <Text style={[styles.itemMeta, { color: colors.textMuted }]}>₹{Number(item.price).toFixed(2)} · {item.order_count} orders</Text>
                   </View>
                   <Badge
                     label={item.trend === 'up' ? '↑ Growing' : item.trend === 'down' ? '↓ Declining' : '→ Stable'}

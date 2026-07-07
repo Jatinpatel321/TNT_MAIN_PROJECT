@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Wallet, RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin';
-import { formatPaise, formatDateTime, formatDate } from '../../utils/format';
+import { formatRupees, formatDateTime, formatDate } from '../../utils/format';
 
 type FinTab = 'settlements' | 'refunds';
 
@@ -142,7 +142,7 @@ export default function Finance() {
                     {s.period_start ? formatDate(s.period_start) : '—'} – {s.period_end ? formatDate(s.period_end) : '—'}
                   </td>
                   <td className="py-2 px-3 font-mono">{s.order_count}</td>
-                  <td className="py-2 px-3 font-mono font-semibold">{formatPaise(Math.round((s.net_amount || 0) * 100))}</td>
+                  <td className="py-2 px-3 font-mono font-semibold">{formatRupees(s.net_amount || 0)}</td>
                   <td className="py-2 px-3"><span className={`px-2 py-0.5 rounded-full text-xs border ${statusPill(s.status)}`}>{s.status}</span></td>
                   <td className="py-2 px-3 text-xs text-[#6B7280]">{s.settled_at ? formatDateTime(s.settled_at) : '—'}</td>
                   <td className="py-2 px-3">
@@ -179,7 +179,7 @@ export default function Finance() {
                 <tr key={r.id} className="border-b border-[#F3F4F6]">
                   <td className="py-2 px-3 font-mono text-xs">#{r.order_id}</td>
                   <td className="py-2 px-3">{r.user_name}</td>
-                  <td className="py-2 px-3 font-mono font-semibold">{formatPaise(r.amount)}</td>
+                  <td className="py-2 px-3 font-mono font-semibold">{formatRupees(r.amount)}</td>
                   <td className="py-2 px-3 text-xs text-[#6B7280] max-w-[180px] truncate">{r.reason || '—'}</td>
                   <td className="py-2 px-3 text-[11px] text-[#6B7280]">
                     <div className="flex items-center gap-1"><Clock className="w-3 h-3" /> {r.requested_at ? formatDateTime(r.requested_at) : '—'}</div>

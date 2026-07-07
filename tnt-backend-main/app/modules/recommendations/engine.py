@@ -505,7 +505,7 @@ class RecommendationEngine:
             "id": mi.id,
             "name": mi.name,
             "description": mi.description or f"Delicious {mi.name}",
-            "price": mi.price,
+            "price": float(mi.price),
             "image_url": mi.image_url or menu_image_for(mi.name),
             "vendor_id": mi.vendor_id,
             "is_available": mi.is_available,

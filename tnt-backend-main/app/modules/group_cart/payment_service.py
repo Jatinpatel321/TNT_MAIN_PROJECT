@@ -544,7 +544,7 @@ class GroupPaymentService:
             "user_id": user_id,
             "split": {
                 "split_type": split.split_type.value,
-                "amount": split.amount,
+                "amount": float(split.amount or 0),
                 "percentage": split.percentage,
             },
         }

@@ -9,7 +9,7 @@ import { vendorApi } from '../../services/vendorApi';
 import { colors, spacing } from '../../design-system';
 import GlassCard from '../../design-system/components/GlassCard';
 import Button from '../../design-system/components/Button';
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 
 export function QRScanScreen({ navigation }: any) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -34,7 +34,7 @@ export function QRScanScreen({ navigation }: any) {
       const order = orderRes.data;
       Alert.alert(
         `Order #${order.id}`,
-        `Customer: ${order.user_name || 'Unknown'}\nItems: ${order.item_count || '?'}\nAmount: ${formatPaise(order.total_amount)}`,
+        `Customer: ${order.user_name || 'Unknown'}\nItems: ${order.item_count || '?'}\nAmount: ${formatRupees(order.total_amount)}`,
         [
           {text: 'Cancel', style: 'cancel', onPress: () => setScanned(false)},
           {text: 'Confirm Pickup ✓', onPress: async () => {

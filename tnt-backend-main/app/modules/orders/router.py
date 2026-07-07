@@ -285,7 +285,7 @@ def orders_by_user_id(
                 "menu_item_id": oi.menu_item_id,
                 "name": mi.name if mi else "Unknown Item",
                 "quantity": oi.quantity,
-                "price_at_time": oi.price_at_time,
+                "price_at_time": float(oi.price_at_time),
             })
 
         # Fetch stationery jobs linked to this order (for combined bookings)
@@ -305,7 +305,7 @@ def orders_by_user_id(
                     "id": sj.id,
                     "service_id": sj.service_id,
                     "quantity": sj.quantity,
-                    "amount": sj.amount or 0,
+                    "amount": float(sj.amount or 0),
                     "status": sj.status.value if hasattr(sj.status, "value") else str(sj.status),
                     "print_type": sj.print_type.value if hasattr(sj.print_type, "value") else sj.print_type,
                     "paper_size": sj.paper_size.value if hasattr(sj.paper_size, "value") else sj.paper_size,

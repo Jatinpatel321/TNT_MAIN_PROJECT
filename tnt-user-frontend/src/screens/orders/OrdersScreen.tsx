@@ -148,11 +148,7 @@ export function OrdersScreen() {
     const vendor = vendorMap[o.vendor_id];
     const vendorName = o.vendor_name ?? vendor?.name ?? `Vendor #${o.vendor_id}`;
     const totalRupees =
-      typeof o.total_amount === 'number'
-        ? o.total_amount < 100
-          ? Number(o.total_amount)
-          : Number(o.total_amount) / 100
-        : null;
+      typeof o.total_amount === 'number' ? Number(o.total_amount) : null;
     return (
       <OrderHistoryCard
         order={o}

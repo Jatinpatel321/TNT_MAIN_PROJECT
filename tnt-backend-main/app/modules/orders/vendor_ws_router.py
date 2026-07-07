@@ -97,7 +97,7 @@ def _enrich_order(o: Order, db) -> dict:
             "menu_item_id": oi.menu_item_id,
             "name": mi.name if mi else "Unknown Item",
             "quantity": oi.quantity,
-            "price_at_time": oi.price_at_time,
+            "price_at_time": float(oi.price_at_time),
         })
 
     stationery_jobs = None
@@ -113,7 +113,7 @@ def _enrich_order(o: Order, db) -> dict:
                 "id": sj.id,
                 "service_id": sj.service_id,
                 "quantity": sj.quantity,
-                "amount": sj.amount or 0,
+                "amount": float(sj.amount or 0),
                 "status": sj.status.value if hasattr(sj.status, "value") else str(sj.status),
                 "print_type": sj.print_type.value if hasattr(sj.print_type, "value") else sj.print_type,
                 "paper_size": sj.paper_size.value if hasattr(sj.paper_size, "value") else sj.paper_size,
@@ -130,7 +130,7 @@ def _enrich_order(o: Order, db) -> dict:
         "slot_id": o.slot_id,
         "vendor_id": o.vendor_id,
         "status": o.status.value if hasattr(o.status, "value") else str(o.status),
-        "total_amount": o.total_amount,
+        "total_amount": float(o.total_amount),
         "created_at": o.created_at.isoformat() if o.created_at else None,
         "eta_minutes": o.eta_minutes,
         "qr_code": o.qr_code is not None,

@@ -281,7 +281,7 @@ function DailyView({forecast, getConfidenceColor}: any) {
     labels: forecast.daily_forecast?.map((d: any) => d.day_name.substring(0, 3)) || [],
     datasets: [
       {
-        data: forecast.daily_forecast?.map((d: any) => d.predicted_revenue / 100) || [],
+        data: forecast.daily_forecast?.map((d: any) => d.predicted_revenue) || [],
       },
     ],
   };

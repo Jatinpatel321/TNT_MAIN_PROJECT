@@ -26,7 +26,7 @@ import type {
 import { Screen } from '../../components/Screen';
 import { search, searchSuggestions } from '../../services/searchService';
 import { toApiError } from '../../services/apiClient';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -128,8 +128,8 @@ export function SearchScreen() {
       sort: tempSort,
       min_rating: tempMinRating,
       availability: tempAvailability || undefined,
-      price_min: tempPriceMin ? parseInt(tempPriceMin, 10) * 100 : undefined,
-      price_max: tempPriceMax ? parseInt(tempPriceMax, 10) * 100 : undefined,
+      price_min: tempPriceMin ? parseInt(tempPriceMin, 10) : undefined,
+      price_max: tempPriceMax ? parseInt(tempPriceMax, 10) : undefined,
     };
     setFilters(newFilters);
     setShowFilterModal(false);
@@ -141,8 +141,8 @@ export function SearchScreen() {
     setTempSort(filters.sort ?? 'popular');
     setTempMinRating(filters.min_rating);
     setTempAvailability(filters.availability ?? false);
-    setTempPriceMin(filters.price_min != null ? String(Math.round(filters.price_min / 100)) : '');
-    setTempPriceMax(filters.price_max != null ? String(Math.round(filters.price_max / 100)) : '');
+    setTempPriceMin(filters.price_min != null ? String(filters.price_min) : '');
+    setTempPriceMax(filters.price_max != null ? String(filters.price_max) : '');
     setShowFilterModal(true);
   }, [filters]);
 
@@ -208,7 +208,7 @@ export function SearchScreen() {
         <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.itemVendor} numberOfLines={1}>{item.vendor_name ?? `Vendor #${item.vendor_id}`}</Text>
         <View style={styles.itemMetaRow}>
-          <Text style={styles.itemPrice}>{formatMoneyPaise(item.price)}{item.unit ? ` / ${item.unit}` : ''}</Text>
+          <Text style={styles.itemPrice}>{formatMoney(item.price)}{item.unit ? ` / ${item.unit}` : ''}</Text>
           {item.is_available ? (
             <Text style={styles.availableText}>Available</Text>
           ) : (

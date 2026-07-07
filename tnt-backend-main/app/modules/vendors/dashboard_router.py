@@ -123,7 +123,7 @@ def get_dashboard_metrics(
             "id": o.id,
             "user_id": o.user_id,
             "status": o.status.value if hasattr(o.status, 'value') else str(o.status),
-            "total_amount": o.total_amount,
+            "total_amount": float(o.total_amount),
             "created_at": o.created_at.isoformat() if o.created_at else None,
         }
         for o in recent_orders
@@ -241,7 +241,7 @@ def get_live_orders(
             "user_id": o.user_id,
             "user_name": user_name,
             "status": status,
-            "total_amount": o.total_amount,
+            "total_amount": float(o.total_amount),
             "eta_minutes": o.eta_minutes,
             "created_at": o.created_at.isoformat() if o.created_at else None,
             "items": items,

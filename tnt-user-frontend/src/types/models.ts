@@ -281,8 +281,8 @@ export type Voucher = {
   description: string;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
-  min_order_amount_paise: number;
-  max_discount_amount_paise: number | null;
+  min_order_amount: number;
+  max_discount_amount: number | null;
   usage_limit: number | null;
   times_redeemed: number;
   expires_at: string;
@@ -325,7 +325,7 @@ export type MenuSuggestion = {
   item_name: string;
   vendor_id: number;
   vendor_name: string;
-  price_paise: number;
+  price: number;
   image_url: string | null;
   is_available: boolean;
   reason: string;
@@ -337,7 +337,7 @@ export type SmartReorderItem = {
   item_name: string;
   vendor_id: number;
   vendor_name: string;
-  price_paise: number;
+  price: number;
   image_url: string | null;
   order_count: number;
   last_ordered_at: string;

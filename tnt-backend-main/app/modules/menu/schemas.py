@@ -6,7 +6,7 @@ from typing import Optional, List, Any
 class MenuItemCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     description: Optional[str] = Field(None, max_length=500)
-    price: int = Field(..., gt=0)
+    price: float = Field(..., gt=0)
     category: str = Field(default="food", pattern="^(food|stationery)$")
     prep_time_minutes: Optional[int] = Field(None, ge=0)
     available_quantity: Optional[int] = Field(None, ge=0)
@@ -16,7 +16,7 @@ class MenuItemCreate(BaseModel):
 class MenuItemUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=150)
     description: Optional[str] = Field(None, max_length=500)
-    price: Optional[int] = Field(None, gt=0)
+    price: Optional[float] = Field(None, gt=0)
     is_available: Optional[bool] = None
     prep_time_minutes: Optional[int] = Field(None, ge=0)
     available_quantity: Optional[int] = Field(None, ge=0)
@@ -28,7 +28,7 @@ class MenuItemResponse(BaseModel):
     vendor_id: int
     name: str
     description: Optional[str]
-    price: int
+    price: float
     image_url: Optional[str]
     is_available: bool
     prep_time_minutes: Optional[int]
@@ -73,7 +73,7 @@ class StationeryServiceCreate(BaseModel):
     service_type: str = Field(..., pattern="^(xerox|color_print|bw_print)$")
     name: str = Field(..., min_length=1, max_length=150)
     description: Optional[str] = Field(None, max_length=500)
-    price_per_page: int = Field(..., gt=0)
+    price_per_page: float = Field(..., gt=0)
     max_capacity: Optional[int] = Field(None, ge=0)
     is_available: bool = True
 
@@ -81,7 +81,7 @@ class StationeryServiceCreate(BaseModel):
 class StationeryServiceUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=150)
     description: Optional[str] = Field(None, max_length=500)
-    price_per_page: Optional[int] = Field(None, gt=0)
+    price_per_page: Optional[float] = Field(None, gt=0)
     max_capacity: Optional[int] = Field(None, ge=0)
     current_load: Optional[int] = Field(None, ge=0)
     is_available: Optional[bool] = None
@@ -93,7 +93,7 @@ class StationeryServiceResponse(BaseModel):
     service_type: str
     name: str
     description: Optional[str]
-    price_per_page: int
+    price_per_page: float
     max_capacity: Optional[int]
     current_load: int
     is_available: bool

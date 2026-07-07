@@ -127,7 +127,7 @@ def create_reorder(original_order_id: int, user_id: int, db: Session):
         return {
             "order_id": new_order.id,
             "status": new_order.status.value,
-            "total_amount": total_amount,
+            "total_amount": float(total_amount),
             "estimated_ready_at": eta.isoformat(),
             "slot_time": f"{target_slot.start_time.strftime('%I:%M %p')} - {target_slot.end_time.strftime('%I:%M %p')}",
             "pickup_load_label": get_load_label(target_slot.current_orders, target_slot.max_orders),

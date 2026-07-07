@@ -28,7 +28,7 @@ import ProgressRing from '../../design-system/components/ProgressRing';
 import StatusPill from '../../design-system/components/StatusPill';
 import AICard from '../../design-system/components/AICard';
 import AnimatedCounter from '../../design-system/components/AnimatedCounter';
-import { formatPaise } from '../../utils/format';
+import { formatRupees } from '../../utils/format';
 
 
 const { width } = Dimensions.get('window');
@@ -330,7 +330,7 @@ export default function DashboardScreen({ navigation }: any) {
                       <View>
                         <Text style={[styles.recentOrderId, { color: colors.textPrimary }]}>Order #{order.id}</Text>
                         <Text style={[styles.recentOrderMeta, { color: colors.textMuted }]}>
-                          {formatPaise(order.total_amount)} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatRupees(order.total_amount)} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                       </View>
                     </View>

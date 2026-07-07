@@ -176,7 +176,7 @@ export const adminApi = {
     print_type: 'bw' | 'color';
     paper_size: 'A4' | 'A3';
     duplex: boolean;
-    price_per_page_paise: number;
+    price_per_page: number;
   }) => api.put('/v1/admin/print-cost-matrix', payload),
 
   deletePrintCost: (id: number) =>

@@ -116,7 +116,7 @@ export default function MenuBulkImportScreen({ navigation }: any) {
       try {
         await apiClient.post(`/v1/menu/items`, {
           name: row.name,
-          price: Math.round(Number(row.price) * 100),
+          price: Number(row.price),
           category: row.category,
           description: row.description || undefined,
           prep_time_minutes: row.prep_time ? Number(row.prep_time) : undefined,
@@ -152,7 +152,7 @@ export default function MenuBulkImportScreen({ navigation }: any) {
       const rows = items.map(i =>
         [
           `"${(i.name || '').replace(/"/g, '""')}"`,
-          i.price !== undefined ? i.price / 100 : 0,
+          i.price !== undefined ? i.price : 0,
           `"${(i.category || '').replace(/"/g, '""')}"`,
           `"${(i.description || '').replace(/"/g, '""')}"`,
           i.prep_time_minutes ?? '',

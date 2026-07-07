@@ -4,7 +4,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import toast from 'react-hot-toast';
 import { DataTable } from '../../components/ui/DataTable';
 import { adminApi } from '../../api/admin';
-import { formatDateTime, formatPaise, formatCurrency } from '../../utils/format';
+import { formatDateTime, formatRupees, formatCurrency } from '../../utils/format';
 import type { LedgerEntry } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -14,7 +14,7 @@ function exportToCsv(data: LedgerEntry[], filename: string) {
     e.id,
     e.user_name || `User #${e.user_id}`,
     e.type,
-    (e.amount / 100).toFixed(2),
+    e.amount.toFixed(2),
     `"${e.description.replace(/"/g, '""')}"`,
     e.order_id || '',
     e.timestamp,
@@ -44,7 +44,7 @@ function AdjustmentModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
     try {
       await adminApi.addLedgerAdjustment({
         type,
-        amount: Math.round(rupees * 100),
+        amount: rupees,
         description: description.trim(),
         order_id: orderId ? Number(orderId) : null,
       });
@@ -230,7 +230,7 @@ export default function Ledger() {
             <TrendingUp className="w-4 h-4 text-green-500" />
             <span className="text-xs text-[#6B7280]">Total Inflow</span>
           </div>
-          <p className="text-2xl font-bold font-mono text-green-500">+{formatPaise(totalInflow)}</p>
+          <p className="text-2xl font-bold font-mono text-green-500">+{formatRupees(totalInflow)}</p>
           <p className="text-xs text-[#6B7280] mt-1">{filtered.filter(e => e.type === 'credit').length} credit entries</p>
         </div>
         <div className="tnt-card">
@@ -238,7 +238,7 @@ export default function Ledger() {
             <TrendingDown className="w-4 h-4 text-red-500" />
             <span className="text-xs text-[#6B7280]">Total Outflow</span>
           </div>
-          <p className="text-2xl font-bold font-mono text-red-500">-{formatPaise(totalOutflow)}</p>
+          <p className="text-2xl font-bold font-mono text-red-500">-{formatRupees(totalOutflow)}</p>
           <p className="text-xs text-[#6B7280] mt-1">{filtered.filter(e => e.type === 'debit').length} debit entries</p>
         </div>
         <div className="tnt-card">
@@ -247,7 +247,7 @@ export default function Ledger() {
             <span className="text-xs text-[#6B7280]">Net Balance</span>
           </div>
           <p className={cn('text-2xl font-bold font-mono', netBalance >= 0 ? 'text-[#E85D24]' : 'text-red-500')}>
-            {netBalance >= 0 ? '+' : ''}{formatPaise(Math.abs(netBalance))}
+            {netBalance >= 0 ? '+' : ''}{formatRupees(Math.abs(netBalance))}
           </p>
           <p className="text-xs text-[#6B7280] mt-1">{filtered.length} total entries</p>
         </div>

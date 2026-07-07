@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { adminApi } from '../../api/admin';
-import { formatOrderId, formatPaise, formatTimeAgo, formatDateTime } from '../../utils/format';
+import { formatOrderId, formatRupees, formatTimeAgo, formatDateTime } from '../../utils/format';
 import { POLL_INTERVAL_ORDERS, ACTIVE_ORDER_STATUSES } from '../../utils/constants';
 import type { Order, OrderStatus } from '../../types';
 import { cn } from '../../utils/cn';
@@ -121,7 +121,7 @@ export default function OrdersHub() {
       header: 'Amount',
       cell: ({ row }) => (
         <span className="font-mono text-sm font-medium">
-          {formatPaise(row.original.total_amount)}
+          {formatRupees(row.original.total_amount)}
         </span>
       ),
     },
@@ -170,7 +170,7 @@ export default function OrdersHub() {
           { label: 'Total Orders', value: orders.length, color: 'text-blue-500' },
           { label: 'Live (Active)', value: liveOrders.length, color: 'text-green-500' },
           { label: 'Fraud Flagged', value: fraudOrders.length, color: 'text-red-500' },
-          { label: 'Revenue Today', value: formatPaise(orders.reduce((a, o) => a + o.total_amount, 0)), color: 'text-[#E85D24]' },
+          { label: 'Revenue Today', value: formatRupees(orders.reduce((a, o) => a + o.total_amount, 0)), color: 'text-[#E85D24]' },
         ].map(stat => (
           <div key={stat.label} className="tnt-card-sm text-center">
             <p className={cn('text-xl font-bold font-mono', stat.color)}>{stat.value}</p>
@@ -261,7 +261,7 @@ export default function OrdersHub() {
                     </div>
                     <p className="text-xs text-[#4B5563] mt-0.5">
                       {order.user_name || `User #${order.user_id}`} → {order.vendor_name || `Vendor #${order.vendor_id}`}
-                      {' '}• {order.items?.length || 0} item(s) • {formatPaise(order.total_amount)}
+                      {' '}• {order.items?.length || 0} item(s) • {formatRupees(order.total_amount)}
                     </p>
                   </div>
                   <div className="text-right">

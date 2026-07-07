@@ -74,7 +74,7 @@ export function OrderHistoryCard(props: {
           </View>
           {typeof totalAmount === 'number' ? (
             <Text style={styles.total}>
-              {formatCurrency(totalAmount, { inputType: totalAmount < 100 ? 'rupees' : 'paise' })}
+              {formatCurrency(totalAmount, { inputType: 'rupees' })}
             </Text>
           ) : null}
         </View>

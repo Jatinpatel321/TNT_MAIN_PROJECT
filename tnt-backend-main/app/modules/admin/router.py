@@ -251,7 +251,7 @@ def get_vendor_menu(vendor_id: int, db: Session = Depends(get_db), user=Depends(
             "vendor_id": item.vendor_id,
             "name": item.name,
             "description": item.description or f"Delicious {item.name}",
-            "price": item.price,
+            "price": float(item.price),
             "image_url": img_url,
             "is_available": item.is_available,
         })
@@ -525,7 +525,7 @@ def ledger_view(
             "user_id": uid,
             "user_name": users_map.get(uid),
             "type": r.entry_type.value if hasattr(r.entry_type, "value") else r.entry_type,
-            "amount": r.amount,
+            "amount": float(r.amount),
             "description": r.description or "",
             "order_id": r.order_id,
             "source": r.source.value if hasattr(r.source, "value") else r.source,
@@ -548,9 +548,9 @@ def create_ledger_adjustment(
     if entry_type not in ("credit", "debit"):
         raise HTTPException(status_code=400, detail="type must be 'credit' or 'debit'")
     try:
-        amount = int(payload.get("amount"))
+        amount = float(payload.get("amount"))
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="amount (paise) must be an integer")
+        raise HTTPException(status_code=400, detail="amount (rupees) must be a number")
     if amount <= 0:
         raise HTTPException(status_code=400, detail="amount must be positive")
 
@@ -1377,9 +1377,9 @@ def list_settlements(
             "vendor_name": names.get(r.vendor_id, f"Vendor #{r.vendor_id}"),
             "period_start": r.period_start.isoformat() if r.period_start else None,
             "period_end": r.period_end.isoformat() if r.period_end else None,
-            "total_amount": r.total_amount,
+            "total_amount": float(r.total_amount),
             "total_fees": r.total_fees,
-            "net_amount": r.net_amount,
+            "net_amount": float(r.net_amount),
             "order_count": r.order_count,
             "status": r.status.value if hasattr(r.status, "value") else r.status,
             "settled_at": r.settled_at.isoformat() if r.settled_at else None,
@@ -1432,7 +1432,7 @@ def _refund_request_dict(r, users_map) -> dict:
         "payment_id": r.payment_id,
         "user_id": r.user_id,
         "user_name": users_map.get(r.user_id, f"User #{r.user_id}"),
-        "amount": r.amount,
+        "amount": float(r.amount),
         "reason": r.reason,
         "status": r.status.value if hasattr(r.status, "value") else r.status,
         "decision_note": r.decision_note,
@@ -1503,7 +1503,7 @@ def approve_refund_request(
             db=db, action=AuditAction.REFUND_APPROVED, action_category=AuditCategory.REFUND,
             actor_id=user.get("id"), actor_role=user.get("role"),
             entity_type="RefundRequest", entity_id=str(req.id),
-            after_state={"status": "approved", "amount": req.amount},
+            after_state={"status": "approved", "amount": float(req.amount)},
         )
         db.commit()
     except Exception:
@@ -2170,7 +2170,7 @@ async def get_analytics_trends(
         Payment.refunded_at.isnot(None),
         Payment.refunded_at >= since,
     ).group_by(func.date(Payment.refunded_at)).order_by(func.date(Payment.refunded_at)).all()
-    refund_trend = [{"date": str(r.day), "count": r.count, "amount_paise": int(r.amount)} for r in refund_rows]
+    refund_trend = [{"date": str(r.day), "count": r.count, "amount": float(r.amount)} for r in refund_rows]
 
     # Fraud trend — flagged orders by day.
     fraud_rows = db.query(
@@ -2225,7 +2225,7 @@ async def get_analytics_trends(
         "printer_usage": printer_usage,
         "totals": {
             "refunds": sum(r["count"] for r in refund_trend),
-            "refund_amount_paise": sum(r["amount_paise"] for r in refund_trend),
+            "refund_amount": sum(r["amount"] for r in refund_trend),
             "fraud_flags": sum(r["count"] for r in fraud_trend),
             "complaints": sum(r["count"] for r in complaint_trend),
         },

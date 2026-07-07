@@ -8,7 +8,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import type { RootStackParamList } from '../../types/navigation';
 import { Screen } from '../../components/Screen';
 import { toAbsoluteUrl } from '../../utils/url';
-import { formatMoneyPaise } from '../../utils/format';
+import { formatMoney } from '../../utils/format';
 import {
   getSuggestedReorder,
   getPredictionInsights,
@@ -153,7 +153,7 @@ export function PredictionsScreen() {
                     )}
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.item_name}</Text>
-                      <Text style={styles.itemPrice}>{formatMoneyPaise(item.price)}</Text>
+                      <Text style={styles.itemPrice}>{formatMoney(item.price)}</Text>
                       <Text style={styles.itemReason} numberOfLines={1}>{item.reason}</Text>
                     </View>
                   </TouchableOpacity>

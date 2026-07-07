@@ -326,7 +326,7 @@ def test_smart_reorder_items_have_order_count(client, seed_data):
         assert item["order_count"] >= 1
         assert item["item_name"]
         assert item["vendor_name"]
-        assert item["price_paise"] > 0
+        assert item["price"] > 0
 
 
 def test_smart_reorder_best_time(client, seed_data):

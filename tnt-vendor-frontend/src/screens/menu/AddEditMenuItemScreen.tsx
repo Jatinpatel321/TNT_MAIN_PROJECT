@@ -22,7 +22,7 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
   const isEdit = !!item;
 
   const [name, setName] = useState(item?.name || '');
-  const [price, setPrice] = useState(item?.price !== undefined ? (item.price / 100).toString() : '');
+  const [price, setPrice] = useState(item?.price !== undefined ? item.price.toString() : '');
   const [description, setDescription] = useState(item?.description || '');
   const [category, setCategory] = useState(item?.category || 'food');
   const [prepTime, setPrepTime] = useState(item?.prep_time_minutes?.toString() || '');
@@ -40,13 +40,11 @@ export default function AddEditMenuItemScreen({ route, navigation }: any) {
       Alert.alert('Validation Error', 'Please enter a valid positive price.');
       return;
     }
-    const pricePaise = Math.round(priceNum * 100);
-
     setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append('name', name.trim());
-      formData.append('price', pricePaise.toString());
+      formData.append('price', priceNum.toString());
       formData.append('description', description.trim());
       formData.append('category', category);
       

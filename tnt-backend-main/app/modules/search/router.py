@@ -9,8 +9,8 @@ Query params
 q : str              Free-text search across vendor/item names
 type : str           "all" | "food" | "stationery"   (default "all")
 category : str       Vendor category filter (e.g. "cafe", "fast food")
-price_min : int      Minimum price in paise
-price_max : int      Maximum price in paise
+price_min : int      Minimum price in rupees
+price_max : int      Maximum price in rupees
 min_rating : float   Minimum vendor rating
 availability : bool  Only show available items / open vendors
 prep_time_max : int  Max estimated prep time in minutes (food only)
@@ -261,8 +261,8 @@ def search(
     q: str | None = Query(None, description="Search query"),
     type: str = Query("all", description="Filter: all, food, stationery"),
     category: str | None = Query(None, description="Vendor category"),
-    price_min: int | None = Query(None, description="Min price (paise)"),
-    price_max: int | None = Query(None, description="Max price (paise)"),
+    price_min: int | None = Query(None, description="Min price (rupees)"),
+    price_max: int | None = Query(None, description="Max price (rupees)"),
     is_veg: bool | None = Query(None, description="Filter by vegetarian items (food only)"),
     min_rating: float | None = Query(None, ge=0, le=5, description="Min vendor rating"),
     availability: bool | None = Query(None, description="Only available items/vendors"),

@@ -45,7 +45,7 @@ def list_jobs(
             "notes": job.notes,
             "status": job.status.value if hasattr(job.status, "value") else job.status,
             "payment_status": "paid" if job.is_paid else "unpaid",
-            "total_amount": job.amount or 0,
+            "total_amount": float(job.amount or 0),
             "submitted_at": job.created_at.isoformat() if job.created_at else None,
         })
     return result
@@ -95,7 +95,7 @@ def list_services(
 @router.post("/services")
 def add_service(
     name: str = Form(...),
-    price_per_unit: int = Form(...),
+    price_per_unit: float = Form(...),
     unit: str = Form(...),
     db: Session = Depends(get_db),
     user=Depends(require_role("vendor"))

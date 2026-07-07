@@ -37,7 +37,7 @@ def get_vendor_order_details(order_id: int, vendor_id: int, db: Session):
             "name": menu_item.name,
             "image_url": menu_item.image_url,
             "quantity": order_item.quantity,
-            "price_at_time": order_item.price_at_time,
+            "price_at_time": float(order_item.price_at_time),
             "line_total": line_total
         })
 

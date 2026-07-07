@@ -1,4 +1,5 @@
 """Audit log service — write and query immutable audit entries."""
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import Request
@@ -7,6 +8,18 @@ from sqlalchemy.orm import Session
 
 from app.modules.auditlog.model import AuditLog
 from app.modules.users.model import User
+
+
+def _json_safe(value: Any) -> Any:
+    """Recursively convert Decimal (money) values so the JSON before/after
+    snapshot columns can serialize them regardless of DB engine/dialect."""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
 
 
 # Action constants
@@ -88,9 +101,9 @@ def write(
         action_category=action_category,
         entity_type=entity_type,
         entity_id=str(entity_id) if entity_id is not None else None,
-        before_state=before_state,
-        after_state=after_state,
-        metadata=metadata,
+        before_state=_json_safe(before_state),
+        after_state=_json_safe(after_state),
+        metadata=_json_safe(metadata),
         ip_address=ip,
         user_agent=ua,
     )

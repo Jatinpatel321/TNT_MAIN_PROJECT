@@ -414,7 +414,7 @@ class GroupAIService:
                         "item_id": item_id,
                         "item_name": menu_item.name,
                         "vendor_id": menu_item.vendor_id,
-                        "price": menu_item.price,
+                        "price": float(menu_item.price),
                         "category": menu_item.category,
                         "liking_members": len(liking_members),
                         "total_members": len(group.members),

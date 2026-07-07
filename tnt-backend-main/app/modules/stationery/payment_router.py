@@ -51,7 +51,7 @@ def initiate_job_payment(
 
 
     razorpay_order = client.order.create({
-        "amount": job.amount,
+        "amount": float(job.amount),
         "currency": "INR",
         "payment_capture": 1
     })
@@ -74,7 +74,7 @@ def initiate_job_payment(
     return {
         "payment_id": payment.id,
         "razorpay_order_id": razorpay_order["id"],
-        "amount": job.amount,
+        "amount": float(job.amount),
         "key": os.getenv("RAZORPAY_KEY_ID")
     }
 
