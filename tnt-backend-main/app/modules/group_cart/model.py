@@ -113,7 +113,7 @@ class GroupPaymentSplit(Base):
     group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     split_type = Column(Enum(PaymentSplitType, values_callable=lambda x: [e.value for e in x]), default=PaymentSplitType.EQUAL)
-    amount = Column(Float, nullable=True)  # For custom splits
+    amount = Column(Numeric(10, 2), nullable=True)  # rupees, for custom splits
     percentage = Column(Float, nullable=True)  # For percentage-based splits
     created_at = Column(DateTime, default=utcnow_naive)
 

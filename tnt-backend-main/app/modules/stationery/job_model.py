@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base
@@ -34,7 +34,7 @@ class StationeryJob(Base):
 
     quantity = Column(Integer, nullable=False)
     file_url = Column(String, nullable=True)
-    amount = Column(Integer, nullable=False, default=0)
+    amount = Column(Numeric(10, 2), nullable=False, default=0)  # rupees
     is_paid = Column(Boolean, nullable=False, default=False)
     razorpay_order_id = Column(String, nullable=True)
     razorpay_payment_id = Column(String, nullable=True)

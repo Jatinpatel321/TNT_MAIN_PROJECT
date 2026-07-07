@@ -34,8 +34,9 @@ def _publish(channel: str, payload: dict) -> bool:
     """Low-level publish helper."""
     try:
         from app.core.redis import redis_client
+        from app.core.money import json_default
 
-        data = json.dumps(payload)
+        data = json.dumps(payload, default=json_default)
         redis_client.publish(channel, data)
         return True
     except Exception as exc:

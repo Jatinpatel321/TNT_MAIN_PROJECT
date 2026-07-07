@@ -29,8 +29,9 @@ def _publish(channel: str, payload: dict) -> bool:
     """Low-level publish helper."""
     try:
         from app.core.redis import redis_client
+        from app.core.money import json_default
 
-        redis_client.publish(channel, json.dumps(payload))
+        redis_client.publish(channel, json.dumps(payload, default=json_default))
         return True
     except Exception as exc:
         logger.exception("group_redis_publish_failed channel=%s error=%s", channel, exc)
