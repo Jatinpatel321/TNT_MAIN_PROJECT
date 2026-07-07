@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base
@@ -30,7 +30,7 @@ class Order(Base):
     vendor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     status = Column(Enum(OrderStatus, values_callable=lambda x: [e.value for e in x]), default=OrderStatus.PLACED)
-    total_amount = Column(Integer, nullable=False, default=0)
+    total_amount = Column(Numeric(10, 2), nullable=False, default=0)
     created_at = Column(DateTime, default=utcnow_naive)
 
     # QR Pickup fields
@@ -68,4 +68,4 @@ class OrderItem(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
     menu_item_id = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
-    price_at_time = Column(Float, nullable=False)
+    price_at_time = Column(Numeric(10, 2), nullable=False)

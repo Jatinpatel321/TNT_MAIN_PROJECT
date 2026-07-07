@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base

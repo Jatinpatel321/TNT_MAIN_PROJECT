@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base
@@ -29,7 +29,7 @@ class Ledger(Base):
     # Admin user id for manual adjustments (attribution); null for auto entries.
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
-    amount = Column(Integer, nullable=False)  # paise
+    amount = Column(Numeric(10, 2), nullable=False)  # rupees
     entry_type = Column(Enum(LedgerType, values_callable=lambda x: [e.value for e in x]), nullable=False)
     source = Column(Enum(LedgerSource, values_callable=lambda x: [e.value for e in x]), nullable=False)
 

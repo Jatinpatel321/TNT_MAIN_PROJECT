@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, DateTime
 from sqlalchemy.orm import relationship
 
 from app.core.time_utils import utcnow_naive
@@ -13,7 +13,7 @@ class MenuItem(Base):
     
     name = Column(String(150), nullable=False)
     description = Column(String(500), nullable=True)
-    price = Column(Integer, nullable=False)  # paise
+    price = Column(Numeric(10, 2), nullable=False)  # rupees
     image_url = Column(String(500), nullable=True)
     is_available = Column(Boolean, default=True)
     

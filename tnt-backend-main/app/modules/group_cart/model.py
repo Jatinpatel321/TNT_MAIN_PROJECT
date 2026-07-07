@@ -9,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
 )
@@ -80,7 +81,7 @@ class GroupCartItem(Base):
     menu_item_id = Column(Integer, ForeignKey("menu_items.id"), nullable=False)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who added this item
     quantity = Column(Integer, nullable=False)
-    price_at_time = Column(Float, nullable=False)
+    price_at_time = Column(Numeric(10, 2), nullable=False)
     added_at = Column(DateTime, default=utcnow_naive)
 
     # Relationships
