@@ -59,10 +59,10 @@ class VendorSettlementService:
         ).scalar() or 0
 
         # Platform is online-prepaid only — revenue is successful online payments.
-        total_earned = float(online) / 100
+        total_earned = float(online)
         wallet.total_earned = total_earned
-        wallet.total_refunded = float(refunds) / 100
-        wallet.balance = total_earned - (float(refunds) / 100)
+        wallet.total_refunded = float(refunds)
+        wallet.balance = total_earned - (float(refunds))
         wallet.total_pending = total_earned * 0.3  # 30% pending settlement
         wallet.total_settled = total_earned - wallet.total_pending
 
@@ -93,8 +93,8 @@ class VendorSettlementService:
             Payment.created_at >= today_start,
         ).scalar() or 0
 
-        today_online_rupees = float(today_online) / 100
-        today_refunds_rupees = float(today_refunds) / 100
+        today_online_rupees = float(today_online)
+        today_refunds_rupees = float(today_refunds)
 
         return {
             "vendor_id": vendor_id,
@@ -144,7 +144,7 @@ class VendorSettlementService:
         transactions = []
         for p in payments:
             t_type = TransactionType.REFUND if p.status == PaymentStatus.REFUNDED else TransactionType.ONLINE_PAYMENT
-            amount = float(p.amount or 0) / 100  # Convert paise to rupees
+            amount = float(p.amount or 0)  # Convert paise to rupees
             transactions.append({
                 "id": p.payment_id,
                 "type": t_type.value,
@@ -215,9 +215,9 @@ class VendorSettlementService:
             "pending_settlement": {
                 "period_start": start_date.isoformat(),
                 "period_end": end_date.isoformat(),
-                "online_payments": round(float(pending_online) / 100, 2),
-                "refunds": round(float(pending_refunds) / 100, 2),
-                "net_amount": round(float(pending_online - pending_refunds) / 100, 2),
+                "online_payments": round(float(pending_online), 2),
+                "refunds": round(float(pending_refunds), 2),
+                "net_amount": round(float(pending_online - pending_refunds), 2),
             },
             "settlements": [
                 {
@@ -261,7 +261,7 @@ class VendorSettlementService:
             refunds.append({
                 "id": p.id,
                 "order_id": p.order_id,
-                "amount": round(float(p.amount) / 100, 2),
+                "amount": round(float(p.amount), 2),
                 "razorpay_refund_id": p.razorpay_refund_id,
                 "razorpay_payment_id": p.razorpay_payment_id,
                 "status": "processed" if p.razorpay_refund_id else "initiated",
@@ -273,7 +273,7 @@ class VendorSettlementService:
         return {
             "vendor_id": vendor_id,
             "total_refunds": len(refunds),
-            "total_refunded_amount": round(total_refunded / 100, 2),
+            "total_refunded_amount": round(total_refunded, 2),
             "refund_rate": round(len(refunds) / max(1, len(refunds) + 100) * 100, 1),
             "refunds": refunds,
             "monthly_refunds": self._get_monthly_refund_trend(vendor_id),
@@ -309,7 +309,7 @@ class VendorSettlementService:
                 "year": int(row.year),
                 "label": f"{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][int(row.month)-1]} {int(row.year)}",
                 "refund_count": row.refund_count,
-                "refund_amount": round(float(row.refund_amount or 0) / 100, 2),
+                "refund_amount": round(float(row.refund_amount or 0), 2),
             }
             for row in monthly
         ]
@@ -346,9 +346,9 @@ class VendorSettlementService:
             daily_data.append({
                 "date": day.date().isoformat(),
                 "day_name": day.strftime("%A"),
-                "online": round(float(online) / 100, 2),
-                "refunds": round(float(refunds) / 100, 2),
-                "net": round(float(online - refunds) / 100, 2),
+                "online": round(float(online), 2),
+                "refunds": round(float(refunds), 2),
+                "net": round(float(online - refunds), 2),
             })
 
         daily_data.reverse()

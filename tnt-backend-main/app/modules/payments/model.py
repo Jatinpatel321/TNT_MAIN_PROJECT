@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base
@@ -39,7 +39,7 @@ class RefundRequest(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
     payment_id = Column(Integer, ForeignKey("payments.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    amount = Column(Integer, nullable=False)  # paise
+    amount = Column(Numeric(10, 2), nullable=False)  # rupees
     reason = Column(String, nullable=True)
     status = Column(
         Enum(RefundRequestStatus, values_callable=lambda x: [e.value for e in x]),
@@ -65,7 +65,7 @@ class Payment(Base):
         Integer, ForeignKey("stationery_jobs.id"), nullable=True, index=True
     )
 
-    amount = Column(Integer, nullable=False)  # paise
+    amount = Column(Numeric(10, 2), nullable=False)  # rupees
     status = Column(Enum(PaymentStatus, values_callable=lambda x: [e.value for e in x]), default=PaymentStatus.INITIATED)
 
     # Caller-supplied UUID that makes the initiate endpoint idempotent.

@@ -76,7 +76,7 @@ def seed(db):
         db.refresh(u)
 
     item = MenuItem(vendor_id=vendor.id, name="E2E Burger", description="test",
-                    price=8000, is_available=True, available_quantity=100)
+                    price=80, is_available=True, available_quantity=100)  # rupees
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -141,7 +141,7 @@ def test_full_online_order_lifecycle(client, db, seed):
     # 1. add to cart (2 × ₹80 = ₹160)
     res = client.post("/cart/add", json={"menu_item_id": item.id, "quantity": 2}, headers=_auth(student))
     assert res.status_code == 200, res.text
-    assert res.json()["total_amount"] == 16000
+    assert float(res.json()["total_amount"]) == 160.0
 
     # 2. checkout → order
     res = client.post("/cart/checkout", json={"slot_id": slot.id, "payment_method": "UPI"}, headers=_auth(student))
@@ -156,8 +156,8 @@ def test_full_online_order_lifecycle(client, db, seed):
     pay = db.query(Payment).filter(Payment.order_id == order_id).order_by(Payment.id.desc()).first()
     db.refresh(pay)
     assert pay.status == PaymentStatus.SUCCESS
-    amount_paise = pay.amount
-    assert amount_paise == 16000
+    amount_rupees = float(pay.amount)
+    assert amount_rupees == 160.0
 
     # 4. vendor prepares → ready
     assert client.post(f"/orders/{order_id}/preparing", headers=_auth(vendor)).status_code == 200
@@ -187,5 +187,5 @@ def test_full_online_order_lifecycle(client, db, seed):
     #    force a recompute to observe the new online payment.
     _invalidate_analytics_cache()
     admin_after = _admin_revenue_paise(client, admin)
-    assert admin_after - admin_before == amount_paise, \
-        f"admin revenue delta {admin_after - admin_before} != {amount_paise}"
+    assert admin_after - admin_before == amount_rupees, \
+        f"admin revenue delta {admin_after - admin_before} != {amount_rupees}"

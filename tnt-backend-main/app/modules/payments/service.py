@@ -73,19 +73,22 @@ def initiate_payment(
             }
     # ─────────────────────────────────────────────────────────────────────
 
-    amount = int(order.total_amount or 0)
+    from decimal import Decimal
+    from app.core.money import to_paise
+
+    amount = Decimal(str(order.total_amount or 0))  # rupees
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Order amount is invalid")
 
     razorpay_order = client.order.create({
-        "amount": amount,
+        "amount": to_paise(amount),  # Razorpay transacts in paise
         "currency": "INR",
         "payment_capture": 1,
     })
 
     payment = Payment(
         order_id=order_id,
-        amount=amount,
+        amount=amount,  # stored in rupees
         razorpay_order_id=razorpay_order["id"],
         status=PaymentStatus.INITIATED,
         idempotency_key=idempotency_key,  # None when no key supplied
@@ -98,7 +101,7 @@ def initiate_payment(
     return {
         "payment_id": payment.id,
         "razorpay_order_id": razorpay_order["id"],
-        "amount": amount,
+        "amount": float(amount),
         "key": os.getenv("RAZORPAY_KEY_ID"),
         "idempotent": False,
     }
@@ -153,14 +156,14 @@ def finalize_payment(payment: Payment, order: Order, db: Session) -> None:
             data={
                 "order_id": order.id,
                 "vendor_id": order.vendor_id,
-                "amount": float(payment.amount or 0) / 100,  # rupees
+                "amount": float(payment.amount or 0),  # rupees
                 "timestamp": utcnow_naive().isoformat(),
                 "description": f"Order #{order.id} payment confirmed",
                 "payment_method": "online",
                 "is_online": True,
                 "type": "online_payment",
-                "fee": round((float(payment.amount or 0) / 100) * 0.02, 2),
-                "net_amount": round((float(payment.amount or 0) / 100) * 0.98, 2),
+                "fee": round((float(payment.amount or 0)) * 0.02, 2),
+                "net_amount": round((float(payment.amount or 0)) * 0.98, 2),
             }
         )
     except Exception as e:
@@ -236,10 +239,11 @@ def refund_payment(payment_id: int, user: dict, db):
         )
 
     # 🔁 Razorpay refund
+    from app.core.money import to_paise
     refund = client.payment.refund(
         payment.razorpay_payment_id,
         {
-            "amount": payment.amount
+            "amount": to_paise(payment.amount)  # Razorpay refunds in paise
         }
     )
 

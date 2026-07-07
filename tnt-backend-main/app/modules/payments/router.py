@@ -59,7 +59,8 @@ def mock_payment(
         .first()
     )
 
-    amount_paise = int(payload.amount) if payload.amount else (order.total_amount or 0)
+    from decimal import Decimal
+    amount = Decimal(str(payload.amount)) if payload.amount else Decimal(str(order.total_amount or 0))
     mock_payment_id = f"mock_pay_{uuid.uuid4().hex[:16]}"
 
     if payment:
@@ -68,7 +69,7 @@ def mock_payment(
     else:
         payment = Payment(
             order_id=payload.order_id,
-            amount=amount_paise,
+            amount=amount,
             status=PaymentStatus.SUCCESS,
             razorpay_payment_id=mock_payment_id,
             idempotency_key=f"mock_{payload.order_id}_{uuid.uuid4().hex[:8]}",
@@ -80,7 +81,7 @@ def mock_payment(
     notification = Notification(
         user_id=user["id"],
         title="Payment Successful 🎉",
-        message=f"₹{amount_paise / 100:.2f} paid via {method}. Order #{payload.order_id} is confirmed!",
+        message=f"₹{amount:.2f} paid via {method}. Order #{payload.order_id} is confirmed!",
         is_read=False,
     )
     db.add(notification)
@@ -92,10 +93,10 @@ def mock_payment(
         "order_id": payload.order_id,
         "status": "SUCCESS",
         "method": method,
-        "amount": amount_paise,
-        "amount_display": f"₹{amount_paise / 100:.2f}",
+        "amount": float(amount),
+        "amount_display": f"₹{amount:.2f}",
         "mock_payment_id": mock_payment_id,
-        "message": f"Payment of ₹{amount_paise / 100:.2f} via {method} was successful.",
+        "message": f"Payment of ₹{amount:.2f} via {method} was successful.",
     }
 
 

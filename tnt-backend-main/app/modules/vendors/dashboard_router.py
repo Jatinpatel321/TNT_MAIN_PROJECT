@@ -82,7 +82,7 @@ def get_dashboard_metrics(
         Payment.status == PaymentStatus.SUCCESS,
     ).scalar() or 0
     revenue_today = order_rev + job_rev
-    revenue_today_rupees = float(revenue_today) / 100.0  # Convert paise to rupees
+    revenue_today_rupees = float(revenue_today)  # Convert paise to rupees
 
     # Pending Orders (PLACED + CONFIRMED + PREPARING)
     pending_orders = db.query(Order).filter(
@@ -160,7 +160,7 @@ def get_dashboard_metrics(
         
         revenue_trend.append({
             "date": date.isoformat(),
-            "revenue": round(float(day_revenue) / 100, 2),
+            "revenue": round(float(day_revenue), 2),
         })
     
     revenue_trend.reverse()  # Oldest first
@@ -316,9 +316,9 @@ def get_revenue_chart(
         daily_data.append({
             "date": day.isoformat(),
             "day_name": day.strftime("%a"),
-            "online": round(float(online) / 100, 2),
-            "refunds": round(float(refunds) / 100, 2),
-            "net": round(float(online - refunds) / 100, 2),
+            "online": round(float(online), 2),
+            "refunds": round(float(refunds), 2),
+            "net": round(float(online - refunds), 2),
             "orders": order_count,
         })
 
