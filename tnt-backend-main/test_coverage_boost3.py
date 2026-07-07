@@ -223,8 +223,8 @@ class TestRewardsServiceVouchers:
                 description="Test discount",
                 discount_type=VoucherDiscountType.PERCENTAGE,
                 discount_value=10.0,
-                min_order_amount_paise=1000,
-                max_discount_amount_paise=500,
+                min_order_amount=10,  # rupees (was 1000 paise)
+                max_discount_amount=5,  # rupees (was 500 paise)
                 usage_limit=100,
                 expires_at=_utcnow() + timedelta(days=30),
                 created_by_user_id=admin.id,
@@ -250,8 +250,8 @@ class TestRewardsServiceVouchers:
                     description="Test",
                     discount_type=VoucherDiscountType.FIXED,
                     discount_value=50.0,
-                    min_order_amount_paise=0,
-                    max_discount_amount_paise=None,
+                    min_order_amount=0,
+                    max_discount_amount=None,
                     usage_limit=None,
                     expires_at=_utcnow() + timedelta(days=1),
                     created_by_user_id=admin.id,
@@ -275,8 +275,8 @@ class TestRewardsServiceVouchers:
                     description="Zero",
                     discount_type=VoucherDiscountType.FIXED,
                     discount_value=0.0,
-                    min_order_amount_paise=0,
-                    max_discount_amount_paise=None,
+                    min_order_amount=0,
+                    max_discount_amount=None,
                     usage_limit=None,
                     expires_at=_utcnow() + timedelta(days=1),
                     created_by_user_id=admin.id,
@@ -300,8 +300,8 @@ class TestRewardsServiceVouchers:
                     description="Past",
                     discount_type=VoucherDiscountType.FIXED,
                     discount_value=10.0,
-                    min_order_amount_paise=0,
-                    max_discount_amount_paise=None,
+                    min_order_amount=0,
+                    max_discount_amount=None,
                     usage_limit=None,
                     expires_at=_utcnow() - timedelta(days=1),  # past
                     created_by_user_id=admin.id,
@@ -324,8 +324,8 @@ class TestRewardsServiceVouchers:
                 description="First",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=10.0,
-                min_order_amount_paise=0,
-                max_discount_amount_paise=None,
+                min_order_amount=0,
+                max_discount_amount=None,
                 usage_limit=None,
                 expires_at=_utcnow() + timedelta(days=1),
                 created_by_user_id=admin.id,
@@ -337,8 +337,8 @@ class TestRewardsServiceVouchers:
                     description="Second",
                     discount_type=VoucherDiscountType.FIXED,
                     discount_value=20.0,
-                    min_order_amount_paise=0,
-                    max_discount_amount_paise=None,
+                    min_order_amount=0,
+                    max_discount_amount=None,
                     usage_limit=None,
                     expires_at=_utcnow() + timedelta(days=1),
                     created_by_user_id=admin.id,
@@ -362,8 +362,8 @@ class TestRewardsServiceVouchers:
                     description="Bad",
                     discount_type=VoucherDiscountType.FIXED,
                     discount_value=10.0,
-                    min_order_amount_paise=0,
-                    max_discount_amount_paise=None,
+                    min_order_amount=0,
+                    max_discount_amount=None,
                     usage_limit=0,   # invalid
                     expires_at=_utcnow() + timedelta(days=1),
                     created_by_user_id=admin.id,
@@ -386,8 +386,8 @@ class TestRewardsServiceVouchers:
                 description="List test",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=5.0,
-                min_order_amount_paise=0,
-                max_discount_amount_paise=None,
+                min_order_amount=0,
+                max_discount_amount=None,
                 usage_limit=None,
                 expires_at=_utcnow() + timedelta(days=5),
                 created_by_user_id=admin.id,
@@ -419,7 +419,7 @@ class TestRewardsServiceVouchers:
                 vendor_id=admin.id,
                 slot_id=slot.id,
                 status=OrderStatus.PLACED,
-                total_amount=5000,  # 50 rupees in paise
+                total_amount=50,  # rupees (was 5000 paise)
             )
             db.add(order)
             db.flush()
@@ -429,17 +429,17 @@ class TestRewardsServiceVouchers:
                 code="FLAT50",
                 description="Flat 50 off",
                 discount_type=VoucherDiscountType.FIXED,
-                discount_value=500,  # 500 paise = 5 rupees
-                min_order_amount_paise=1000,
-                max_discount_amount_paise=None,
+                discount_value=5,  # rupees (was 500 paise)
+                min_order_amount=10,  # rupees (was 1000 paise)
+                max_discount_amount=None,
                 usage_limit=10,
                 expires_at=_utcnow() + timedelta(days=1),
                 created_by_user_id=admin.id,
                 db=db,
             )
             result = redeem_voucher("FLAT50", student.id, order.id, db)
-            assert result["discount_amount_paise"] == 500
-            assert result["updated_order_total_paise"] == 4500
+            assert float(result["discount_amount"]) == 5.0  # rupees (was 500 paise)
+            assert float(result["updated_order_total"]) == 45.0  # 50 - 5 (was 4500 paise)
         finally:
             engine.dispose()
 
@@ -464,7 +464,7 @@ class TestRewardsServiceVouchers:
                 vendor_id=admin.id,
                 slot_id=slot.id,
                 status=OrderStatus.PLACED,
-                total_amount=10000,  # 100 rupees in paise
+                total_amount=100,  # rupees (was 10000 paise)
             )
             db.add(order)
             db.flush()
@@ -475,16 +475,16 @@ class TestRewardsServiceVouchers:
                 description="10% off",
                 discount_type=VoucherDiscountType.PERCENTAGE,
                 discount_value=10.0,  # 10%
-                min_order_amount_paise=1000,
-                max_discount_amount_paise=2000,  # max 20 rupees
+                min_order_amount=10,  # rupees (was 1000 paise)
+                max_discount_amount=20,  # rupees (was 2000 paise)
                 usage_limit=None,
                 expires_at=_utcnow() + timedelta(days=1),
                 created_by_user_id=admin.id,
                 db=db,
             )
             result = redeem_voucher("PCT10", student.id, order.id, db)
-            # 10% of 10000 = 1000, which is < 2000 cap
-            assert result["discount_amount_paise"] == 1000
+            # 10% of ₹100 = ₹10, which is < ₹20 cap
+            assert float(result["discount_amount"]) == 10.0
         finally:
             engine.dispose()
 
@@ -511,7 +511,7 @@ class TestRewardsServiceVouchers:
                 description="Inactive voucher",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=100.0,
-                min_order_amount_paise=0,
+                min_order_amount=0,
                 expires_at=_utcnow() + timedelta(days=1),
                 created_by_user_id=admin.id,
                 is_active=0,  # inactive
@@ -538,7 +538,7 @@ class TestRewardsServiceVouchers:
                 description="Expired voucher",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=100.0,
-                min_order_amount_paise=0,
+                min_order_amount=0,
                 expires_at=_utcnow() - timedelta(hours=1),  # already expired
                 created_by_user_id=admin.id,
                 is_active=1,
@@ -565,7 +565,7 @@ class TestRewardsServiceVouchers:
                 description="Max use voucher",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=100.0,
-                min_order_amount_paise=0,
+                min_order_amount=0,
                 expires_at=_utcnow() + timedelta(days=1),
                 created_by_user_id=admin.id,
                 is_active=1,
@@ -595,8 +595,8 @@ class TestRewardsServiceVouchers:
                 description="Original desc",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=10.0,
-                min_order_amount_paise=0,
-                max_discount_amount_paise=None,
+                min_order_amount=0,
+                max_discount_amount=None,
                 usage_limit=None,
                 expires_at=_utcnow() + timedelta(days=5),
                 created_by_user_id=admin.id,
@@ -632,8 +632,8 @@ class TestRewardsServiceVouchers:
                 description="desc",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=10.0,
-                min_order_amount_paise=0,
-                max_discount_amount_paise=None,
+                min_order_amount=0,
+                max_discount_amount=None,
                 usage_limit=None,
                 expires_at=_utcnow() + timedelta(days=5),
                 created_by_user_id=admin.id,
@@ -658,8 +658,8 @@ class TestRewardsServiceVouchers:
                 description="To deactivate",
                 discount_type=VoucherDiscountType.FIXED,
                 discount_value=10.0,
-                min_order_amount_paise=0,
-                max_discount_amount_paise=None,
+                min_order_amount=0,
+                max_discount_amount=None,
                 usage_limit=None,
                 expires_at=_utcnow() + timedelta(days=5),
                 created_by_user_id=admin.id,
@@ -1355,8 +1355,8 @@ class TestRewardsRouterEndpoints:
                     "description": "Endpoint test voucher",
                     "discount_type": "fixed",
                     "discount_value": 100.0,
-                    "min_order_amount_paise": 0,
-                    "max_discount_amount_paise": None,
+                    "min_order_amount": 0,
+                    "max_discount_amount": None,
                     "usage_limit": None,
                     "expires_at": (_utcnow() + timedelta(days=30)).isoformat(),
                 },

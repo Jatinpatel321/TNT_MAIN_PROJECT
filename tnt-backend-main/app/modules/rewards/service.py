@@ -218,8 +218,8 @@ def create_voucher(
     description: str,
     discount_type: VoucherDiscountType,
     discount_value: float,
-    min_order_amount_paise: int,
-    max_discount_amount_paise: int | None,
+    min_order_amount: float,
+    max_discount_amount: float | None,
     usage_limit: int | None,
     expires_at: datetime,
     created_by_user_id: int,
@@ -244,8 +244,8 @@ def create_voucher(
         description=description,
         discount_type=discount_type,
         discount_value=discount_value,
-        min_order_amount_paise=min_order_amount_paise,
-        max_discount_amount_paise=max_discount_amount_paise,
+        min_order_amount=min_order_amount,
+        max_discount_amount=max_discount_amount,
         usage_limit=usage_limit,
         expires_at=expires_at,
         created_by_user_id=created_by_user_id,
@@ -269,8 +269,8 @@ def update_voucher(
     db: Session,
     description: str | None = None,
     discount_value: float | None = None,
-    min_order_amount_paise: int | None = None,
-    max_discount_amount_paise: int | None = None,
+    min_order_amount: float | None = None,
+    max_discount_amount: float | None = None,
     usage_limit: int | None = None,
     expires_at: datetime | None = None,
     is_active: bool | None = None,
@@ -285,10 +285,10 @@ def update_voucher(
         if discount_value <= 0:
             raise ValueError("Discount value must be greater than 0")
         voucher.discount_value = discount_value
-    if min_order_amount_paise is not None:
-        voucher.min_order_amount_paise = min_order_amount_paise
-    if max_discount_amount_paise is not None:
-        voucher.max_discount_amount_paise = max_discount_amount_paise
+    if min_order_amount is not None:
+        voucher.min_order_amount = min_order_amount
+    if max_discount_amount is not None:
+        voucher.max_discount_amount = max_discount_amount
     if usage_limit is not None:
         if usage_limit < 1:
             raise ValueError("Usage limit must be at least 1")
@@ -338,27 +338,31 @@ def redeem_voucher(code: str, user_id: int, order_id: int, db: Session) -> dict:
     if existing_redemption:
         raise ValueError("Voucher already redeemed for this order")
 
-    if int(order.total_amount or 0) < int(voucher.min_order_amount_paise or 0):
+    from decimal import Decimal
+
+    order_total = Decimal(str(order.total_amount or 0))  # rupees
+    if order_total < Decimal(str(voucher.min_order_amount or 0)):
         raise ValueError("Order does not meet minimum amount for voucher")
 
     if voucher.discount_type == VoucherDiscountType.FIXED:
-        discount_amount = int(voucher.discount_value)
+        discount_amount = Decimal(str(voucher.discount_value))  # rupees
     else:
-        discount_amount = int((order.total_amount * voucher.discount_value) / 100)
-        if voucher.max_discount_amount_paise is not None:
-            discount_amount = min(discount_amount, int(voucher.max_discount_amount_paise))
+        # discount_value is a percentage here; /100 is percent math, not paise.
+        discount_amount = (order_total * Decimal(str(voucher.discount_value)) / 100).quantize(Decimal("0.01"))
+        if voucher.max_discount_amount is not None:
+            discount_amount = min(discount_amount, Decimal(str(voucher.max_discount_amount)))
 
-    discount_amount = min(discount_amount, int(order.total_amount or 0))
+    discount_amount = min(discount_amount, order_total)
     if discount_amount <= 0:
         raise ValueError("Voucher discount resolves to zero")
 
-    order.total_amount = int(order.total_amount or 0) - discount_amount
+    order.total_amount = order_total - discount_amount
 
     redemption = VoucherRedemption(
         voucher_id=voucher.id,
         user_id=user_id,
         order_id=order.id,
-        discount_amount_paise=discount_amount,
+        discount_amount=discount_amount,
     )
     db.add(redemption)
 
@@ -366,7 +370,7 @@ def redeem_voucher(code: str, user_id: int, order_id: int, db: Session) -> dict:
         user_id=user_id,
         redemption_type=RedemptionType.DISCOUNT_FIXED,
         points_used=0,
-        value=discount_amount / 100,
+        value=float(discount_amount),
         description=f"Voucher {voucher.code} redeemed",
         order_id=order.id,
     )
@@ -376,7 +380,7 @@ def redeem_voucher(code: str, user_id: int, order_id: int, db: Session) -> dict:
         user_id=user_id,
         reward_type=RewardType.VOUCHER_REDEMPTION,
         points=0,
-        description=f"Voucher {voucher.code} redeemed for ₹{discount_amount / 100:.2f}",
+        description=f"Voucher {voucher.code} redeemed for ₹{discount_amount:.2f}",
         order_id=order.id,
     )
     db.add(reward_transaction)
@@ -396,16 +400,18 @@ def redeem_voucher(code: str, user_id: int, order_id: int, db: Session) -> dict:
     return {
         "voucher_id": voucher.id,
         "code": voucher.code,
-        "discount_amount_paise": discount_amount,
-        "updated_order_total_paise": order.total_amount,
+        "discount_amount": float(discount_amount),
+        "updated_order_total": float(order.total_amount),
     }
 
 
 def redeem_points_for_order(user_id: int, order_id: int, points_to_redeem: float, db: Session) -> dict:
     """Redeem points at checkout and apply discount directly to the order.
     
-    10 points = 1 INR (100 paise) discount.
+    10 points = ₹1 discount.
     """
+    from decimal import Decimal
+
     from app.modules.rewards.model import RewardPoints, RewardRedemption, RedemptionType, RewardTransaction, RewardType
     from app.modules.orders.model import Order
 
@@ -418,23 +424,24 @@ def redeem_points_for_order(user_id: int, order_id: int, points_to_redeem: float
     if not reward_points or reward_points.points < points_to_redeem:
         raise ValueError("Insufficient points")
 
-    # Calculate discount value: 1 point = 10 paise, so points_to_redeem * 10 paise = points_to_redeem * 10 in paise
-    discount_amount_paise = int(points_to_redeem * 10)
-    discount_amount_paise = min(discount_amount_paise, int(order.total_amount or 0))
+    # 10 points = ₹1 → discount in rupees = points / 10
+    order_total = Decimal(str(order.total_amount or 0))
+    discount_amount = (Decimal(str(points_to_redeem)) / 10).quantize(Decimal("0.01"))
+    discount_amount = min(discount_amount, order_total)
 
-    if discount_amount_paise <= 0:
+    if discount_amount <= 0:
         raise ValueError("Points discount resolves to zero")
 
     # Deduct discount
-    order.total_amount = int(order.total_amount or 0) - discount_amount_paise
+    order.total_amount = order_total - discount_amount
 
     # Create redemption record
     redemption = RewardRedemption(
         user_id=user_id,
         redemption_type=RedemptionType.DISCOUNT_FIXED,
         points_used=points_to_redeem,
-        value=discount_amount_paise / 100.0,
-        description=f"Redeemed {points_to_redeem} points for discount of ₹{discount_amount_paise / 100.0:.2f}",
+        value=float(discount_amount),
+        description=f"Redeemed {points_to_redeem} points for discount of ₹{discount_amount:.2f}",
         order_id=order_id
     )
     db.add(redemption)
@@ -444,7 +451,7 @@ def redeem_points_for_order(user_id: int, order_id: int, points_to_redeem: float
         user_id=user_id,
         reward_type=RewardType.VOUCHER_REDEMPTION,
         points=-points_to_redeem,
-        description=f"Redeemed {points_to_redeem} points at checkout for ₹{discount_amount_paise / 100.0:.2f} discount",
+        description=f"Redeemed {points_to_redeem} points at checkout for ₹{discount_amount:.2f} discount",
         order_id=order_id
     )
     db.add(transaction)
@@ -458,7 +465,7 @@ def redeem_points_for_order(user_id: int, order_id: int, points_to_redeem: float
     from app.modules.ledger.model import LedgerType, LedgerSource
     add_ledger_entry(
         order_id=order.id,
-        amount=discount_amount_paise,
+        amount=discount_amount,
         entry_type=LedgerType.DEBIT,
         source=LedgerSource.VOUCHER,  # Safe fallback matching model enum definition
         db=db,
@@ -468,8 +475,8 @@ def redeem_points_for_order(user_id: int, order_id: int, points_to_redeem: float
     db.commit()
     return {
         "points_used": points_to_redeem,
-        "discount_amount_paise": discount_amount_paise,
-        "updated_order_total_paise": order.total_amount
+        "discount_amount": float(discount_amount),
+        "updated_order_total": float(order.total_amount)
     }
 
 

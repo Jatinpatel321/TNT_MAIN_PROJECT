@@ -73,7 +73,7 @@ def seed_data(test_db_session):
         slot_id=slot.id,
         vendor_id=vendor.id,
         status=OrderStatus.PENDING,
-        total_amount=8000,
+        total_amount=80,  # rupees (was 8000 paise)
         created_at=utcnow_naive(),
     )
     completion_order = Order(
@@ -81,7 +81,7 @@ def seed_data(test_db_session):
         slot_id=slot.id,
         vendor_id=vendor.id,
         status=OrderStatus.CONFIRMED,
-        total_amount=10000,
+        total_amount=100,  # rupees (was 10000 paise)
         created_at=utcnow_naive(),
     )
     test_db_session.add_all([voucher_order, completion_order])
@@ -139,8 +139,8 @@ def test_voucher_crud_redeem_and_expiry(client, seed_data, auth_context, test_db
             "description": "Ten percent off",
             "discount_type": "percentage",
             "discount_value": 10,
-            "min_order_amount_paise": 5000,
-            "max_discount_amount_paise": 1000,
+            "min_order_amount": 50,  # rupees (was 5000 paise)
+            "max_discount_amount": 10,  # rupees (was 1000 paise)
             "usage_limit": 1,
             "expires_at": expiry,
         },
@@ -163,8 +163,8 @@ def test_voucher_crud_redeem_and_expiry(client, seed_data, auth_context, test_db
     redeem_resp = client.post(f"/rewards/vouchers/SAVE10/redeem", json={"order_id": voucher_order.id})
     assert redeem_resp.status_code == 200
     redeem_body = redeem_resp.json()
-    assert redeem_body["discount_amount_paise"] == 800
-    assert redeem_body["updated_order_total_paise"] == 7200
+    assert float(redeem_body["discount_amount"]) == 8.0  # 10% of ₹80 (was 800 paise)
+    assert float(redeem_body["updated_order_total"]) == 72.0  # 80 - 8 (was 7200 paise)
 
     duplicate_redeem = client.post(f"/rewards/vouchers/SAVE10/redeem", json={"order_id": voucher_order.id})
     assert duplicate_redeem.status_code == 400
@@ -175,7 +175,7 @@ def test_voucher_crud_redeem_and_expiry(client, seed_data, auth_context, test_db
         .first()
     )
     assert voucher_ledger is not None
-    assert voucher_ledger.amount == 800
+    assert float(voucher_ledger.amount) == 8.0  # rupees (was 800 paise)
 
     auth_context.update({"id": admin.id, "phone": admin.phone, "role": admin.role.value})
 
@@ -185,8 +185,8 @@ def test_voucher_crud_redeem_and_expiry(client, seed_data, auth_context, test_db
             "code": "OLD",
             "description": "Expired",
             "discount_type": "fixed",
-            "discount_value": 100,
-            "min_order_amount_paise": 0,
+            "discount_value": 1,  # rupees (was 100 paise)
+            "min_order_amount": 0,
             "expires_at": (utcnow_naive() - timedelta(days=1)).isoformat(),
         },
     )

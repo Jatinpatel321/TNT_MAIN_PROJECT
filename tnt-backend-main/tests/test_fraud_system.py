@@ -267,7 +267,7 @@ def test_detect_coupon_abuse(db_session, seed):
             voucher_id=v.id,
             user_id=student.id,
             order_id=seed["order"].id,
-            discount_amount_paise=5000,
+            discount_amount=50,  # rupees (was 5000 paise)
             redeemed_at=utcnow_naive() - timedelta(minutes=5),
         )
         db_session.add(red)

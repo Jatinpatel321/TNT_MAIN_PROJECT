@@ -5,7 +5,7 @@ from __future__ import annotations
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint,
+    Boolean, Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint,
 )
 
 from app.core.time_utils import utcnow_naive
@@ -63,5 +63,5 @@ class PrintCostMatrix(Base):
     print_type = Column(String(20), nullable=False)   # bw | color
     paper_size = Column(String(20), nullable=False)   # A4 | A3
     duplex = Column(Boolean, default=False, nullable=False)
-    price_per_page_paise = Column(Integer, nullable=False)
+    price_per_page = Column(Numeric(10, 2), nullable=False)  # rupees
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

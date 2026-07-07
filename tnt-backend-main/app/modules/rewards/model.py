@@ -95,9 +95,10 @@ class Voucher(Base):
     code = Column(String, nullable=False, unique=True, index=True)
     description = Column(String, nullable=False)
     discount_type = Column(Enum(VoucherDiscountType, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    discount_value = Column(Float, nullable=False)
-    min_order_amount_paise = Column(Integer, nullable=False, default=0)
-    max_discount_amount_paise = Column(Integer, nullable=True)
+    # For FIXED vouchers discount_value is rupees; for PERCENTAGE it is a percent.
+    discount_value = Column(Numeric(10, 2), nullable=False)
+    min_order_amount = Column(Numeric(10, 2), nullable=False, default=0)  # rupees
+    max_discount_amount = Column(Numeric(10, 2), nullable=True)  # rupees
     usage_limit = Column(Integer, nullable=True)
     times_redeemed = Column(Integer, nullable=False, default=0)
     expires_at = Column(DateTime, nullable=False)
@@ -114,7 +115,7 @@ class VoucherRedemption(Base):
     voucher_id = Column(Integer, ForeignKey("vouchers.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
-    discount_amount_paise = Column(Integer, nullable=False)
+    discount_amount = Column(Numeric(10, 2), nullable=False)  # rupees
     redeemed_at = Column(DateTime, default=utcnow_naive)
 
 
