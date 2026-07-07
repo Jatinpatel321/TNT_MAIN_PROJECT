@@ -1,0 +1,122 @@
+........................................................................ [ 21%]
+........................................................................ [ 43%]
+........................................................................ [ 65%]
+........................................................................ [ 86%]
+............................................                             [100%]
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.2-final-0 _______________
+
+Name                                                        Stmts   Miss  Cover   Missing
+-----------------------------------------------------------------------------------------
+app\__init__.py                                                 0      0   100%
+app\api\__init__.py                                             0      0   100%
+app\api\v1.py                                                  43      0   100%
+app\core\__init__.py                                            0      0   100%
+app\core\config.py                                             33      2    94%   14, 19
+app\core\db_transaction.py                                     60      9    85%   59-61, 67-68, 98-102
+app\core\deps.py                                                6      0   100%
+app\core\emergency.py                                          18      5    72%   13-14, 24-27
+app\core\faculty_policy.py                                     28      5    82%   25-26, 41-44
+app\core\file_upload.py                                        14      9    36%   10-22
+app\core\file_upload_stationery.py                             13      8    38%   10-21
+app\core\load_insights.py                                      19      2    89%   8, 20
+app\core\logging_setup.py                                      19      6    68%   9-20, 29
+app\core\observability.py                                      91     12    87%   69, 78, 91, 98-102, 129-142
+app\core\rate_limit.py                                         58      3    95%   127, 200-201
+app\core\rate_limit_middleware.py                              28      1    96%   74
+app\core\razorpay_client.py                                     3      0   100%
+app\core\razorpay_webhook.py                                    9      0   100%
+app\core\redis.py                                               2      0   100%
+app\core\security.py                                           75     22    71%   52, 56-57, 114-137
+app\core\sms.py                                                80     16    80%   56-59, 82-85, 100-101, 123, 179-186, 194
+app\core\startup_checks.py                                     49     26    47%   13, 16, 20, 27, 35, 37, 40-49, 53-69
+app\core\time_utils.py                                          3      0   100%
+app\core\university_policy.py                                  23      5    78%   28-31, 54-55
+app\database\__init__.py                                        6      0   100%
+app\database\base.py                                            2      0   100%
+app\database\init_db.py                                        20      1    95%   26
+app\database\session.py                                        18      5    72%   17, 27-31
+app\main.py                                                   124      8    94%   48, 134, 137-138, 158-159, 162-163
+app\modules\__init__.py                                         0      0   100%
+app\modules\admin\router.py                                   138     19    86%   81-82, 94-101, 113, 122, 320, 331, 333, 340, 353, 355, 357, 359, 361
+app\modules\ai_intelligence\__init__.py                         0      0   100%
+app\modules\ai_intelligence\learning\preference_engine.py      97     79    19%   29-32, 50-68, 83-105, 110-127, 132-148, 162-219, 235-318
+app\modules\ai_intelligence\learning\usage_patterns.py        121     19    84%   61-62, 64-65, 67-68, 94, 100, 103-108, 134, 138, 165, 198, 298, 300
+app\modules\ai_intelligence\planners\demand_planner.py         69     52    25%   21-35, 47-65, 75-95, 105-113, 123-156, 161-176, 182-204
+app\modules\ai_intelligence\planners\eta_engine.py             58     42    28%   22-49, 59-71, 76-87, 92-114, 119-130, 135-136
+app\modules\ai_intelligence\planners\reorder_engine.py         57     40    30%   23-54, 62-82, 87-103, 108-129, 135-148, 153
+app\modules\ai_intelligence\planners\slot_planner.py           74     55    26%   22-37, 46-60, 65-74, 80-99, 104-118, 123-139, 144-159, 164-176, 180-196
+app\modules\ai_intelligence\planners\vendor_ranker.py          91     69    24%   23-47, 52-79, 85-93, 96-102, 109-126, 131-146, 152-173, 179-192, 197-201, 206-217
+app\modules\ai_intelligence\router.py                          60     18    70%   22-23, 33-34, 43-44, 55-56, 65-66, 75-76, 85-86, 95-96, 106-107
+app\modules\ai_intelligence\schemas.py                         17      0   100%
+app\modules\ai_intelligence\service.py                        207    110    47%   36, 40-41, 46-79, 86-87, 91-92, 96-97, 101-102, 106-121, 126, 181, 227-237, 266-298, 312-346, 351-374, 378-400, 404-428, 432-450
+app\modules\ai_intelligence\signals.py                         64     64     0%   1-191
+app\modules\ai_intelligence\utils\scoring.py                   64     48    25%   15-32, 39-47, 57-71, 84-114, 120-140
+app\modules\auth\__init__.py                                    0      0   100%
+app\modules\auth\otp_service.py                                53     40    25%   34-97, 101-122
+app\modules\auth\router.py                                     28      9    68%   36-59
+app\modules\auth\schemas.py                                     5      0   100%
+app\modules\auth\service.py                                     0      0   100%
+app\modules\cart\__init__.py                                    0      0   100%
+app\modules\cart\router.py                                    134     20    85%   38, 43-44, 65, 92, 106, 110, 112, 116, 127-129, 155, 161, 177, 191, 206, 215-216, 233
+app\modules\complaints\__init__.py                              0      0   100%
+app\modules\complaints\model.py                                29      0   100%
+app\modules\complaints\router.py                               95     15    84%   33, 39, 65, 97, 130, 134, 138, 142, 160, 164, 168, 184, 188, 192, 195
+app\modules\feedback\__init__.py                                0      0   100%
+app\modules\feedback\model.py                                  15      0   100%
+app\modules\feedback\router.py                                 55      6    89%   31, 35, 67, 99, 105, 120
+app\modules\group_cart\__init__.py                              0      0   100%
+app\modules\group_cart\group_service.py                        41      8    80%   94-106
+app\modules\group_cart\model.py                                74      0   100%
+app\modules\group_cart\router.py                               52      1    98%   179
+app\modules\group_cart\service.py                             236     35    85%   42, 47, 55, 96, 104, 116, 121, 129, 169, 174, 187-196, 225, 230, 241, 248-251, 292, 309, 342, 388, 402-404, 426, 438, 447-449, 453
+app\modules\ledger\model.py                                    21      0   100%
+app\modules\ledger\router.py                                    9      0   100%
+app\modules\ledger\service.py                                   5      0   100%
+app\modules\menu\model.py                                      11      0   100%
+app\modules\menu\router.py                                     50      3    94%   88, 95, 99
+app\modules\notifications\model.py                             11      0   100%
+app\modules\notifications\router.py                            21      0   100%
+app\modules\notifications\service.py                           15      2    87%   31-32
+app\modules\orders\checkout_service.py                         56      4    93%   28, 36, 72, 76
+app\modules\orders\history_model.py                            10      0   100%
+app\modules\orders\history_schemas.py                           4      0   100%
+app\modules\orders\item_schemas.py                              5      0   100%
+app\modules\orders\item_service.py                             18      2    89%   18, 22
+app\modules\orders\model.py                                    34      0   100%
+app\modules\orders\order_service.py                           163     60    63%   59, 67, 75, 171-174, 199-200, 209-210, 263-268, 277, 286, 288, 315-394
+app\modules\orders\qr_service.py                               33      6    82%   16, 20, 23, 34, 37, 41
+app\modules\orders\reorder_service.py                          75     10    87%   22, 42, 60, 65, 72, 87, 136-138, 152
+app\modules\orders\router.py                                   53      4    92%   46, 52, 92, 120
+app\modules\orders\schemas.py                                  14      0   100%
+app\modules\orders\service.py                                  30      3    90%   15, 44, 60
+app\modules\orders\state_machine.py                            10      0   100%
+app\modules\orders\ws_router.py                               119     89    25%   79-81, 84-87, 90-93, 97-98, 109-117, 126-139, 144-145, 169-248
+app\modules\payments\__init__.py                                0      0   100%
+app\modules\payments\model.py                                  24      0   100%
+app\modules\payments\payment_service.py                         9      1    89%   53
+app\modules\payments\router.py                                 16      1    94%   40
+app\modules\payments\service.py                               113      9    92%   29, 54, 158, 162, 167, 189, 197, 202, 246
+app\modules\payments\webhook.py                                38      0   100%
+app\modules\rewards\__init__.py                                 0      0   100%
+app\modules\rewards\model.py                                  108      0   100%
+app\modules\rewards\router.py                                  94      9    90%   133-134, 218-219, 231-232, 253, 271-272
+app\modules\rewards\service.py                                219     41    81%   41-42, 65-66, 71, 79, 82, 87, 91-92, 178, 230, 232, 234, 240, 280, 285-287, 289, 291, 293-295, 297-299, 301, 311, 321, 323, 325, 331, 339, 342, 345, 353, 407, 430, 432, 434
+app\modules\slots\model.py                                     16      0   100%
+app\modules\slots\router.py                                    45      2    96%   40, 74
+app\modules\slots\schemas.py                                   12      0   100%
+app\modules\slots\service.py                                   37      3    92%   23, 32, 46
+app\modules\stationery\job_model.py                            24      0   100%
+app\modules\stationery\payment_router.py                       72     12    83%   32, 37, 40, 46-49, 93, 97, 100, 103, 115
+app\modules\stationery\router.py                               58      5    91%   25, 54, 79, 102, 119
+app\modules\stationery\service_model.py                        10      0   100%
+app\modules\users\__init__.py                                   1      0   100%
+app\modules\users\model.py                                     25      0   100%
+app\modules\users\router.py                                    60     14    77%   14-29, 39, 55, 59, 69, 93, 121
+app\modules\users\schemas.py                                   37      0   100%
+app\modules\vendors\router.py                                  57      4    93%   37, 90, 119, 151
+app\modules\vendors\schemas.py                                  9      0   100%
+-----------------------------------------------------------------------------------------
+TOTAL                                                        4629   1178    75%
+Required test coverage of 70% reached. Total coverage: 74.55%
+332 passed in 14.60s

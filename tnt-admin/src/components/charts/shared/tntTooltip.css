@@ -1,0 +1,7 @@
+.tnt-chart-tooltip{background-color:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:160px;box-shadow:0 12px 30px rgba(0,0,0,0.25)}
+.tnt-chart-tooltip__title{font-size:12px;color:var(--text-secondary);margin-bottom:6px}
+.tnt-chart-tooltip__row{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);margin-top:4px}
+.tnt-chart-tooltip__dot{width:8px;height:8px;border-radius:999px;flex:0 0 auto}
+.tnt-chart-tooltip__name{color:var(--text-secondary)}
+.tnt-chart-tooltip__value{color:var(--text-primary);font-weight:600;margin-left:auto}
+

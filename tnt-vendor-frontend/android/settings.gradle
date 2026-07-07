@@ -1,0 +1,11 @@
+rootProject.name = 'TNTVendorApp'
+
+apply from: new File(["node", "--print", "require.resolve('expo-modules-autolinking/package.json')"].execute(null, rootDir).text.trim(), "../scripts/android/autolinking_implementation.gradle")
+useExpoModules()
+
+apply from: file("../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+
+include ':app'
+include ':baseReactShim'
+project(':baseReactShim').projectDir = new File(rootProject.projectDir, 'baseReactShim')
+includeBuild('../node_modules/@react-native/gradle-plugin')
