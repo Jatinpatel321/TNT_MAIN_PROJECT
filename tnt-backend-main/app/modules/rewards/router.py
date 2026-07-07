@@ -71,8 +71,8 @@ class VoucherCreateRequest(BaseModel):
     description: str
     discount_type: VoucherDiscountType
     discount_value: float
-    min_order_amount_paise: int = 0
-    max_discount_amount_paise: Optional[int] = None
+    min_order_amount: float = 0  # rupees
+    max_discount_amount: Optional[float] = None  # rupees
     usage_limit: Optional[int] = None
     expires_at: str
 
@@ -80,8 +80,8 @@ class VoucherCreateRequest(BaseModel):
 class VoucherUpdateRequest(BaseModel):
     description: Optional[str] = None
     discount_value: Optional[float] = None
-    min_order_amount_paise: Optional[int] = None
-    max_discount_amount_paise: Optional[int] = None
+    min_order_amount: Optional[float] = None  # rupees
+    max_discount_amount: Optional[float] = None  # rupees
     usage_limit: Optional[int] = None
     expires_at: Optional[str] = None
     is_active: Optional[bool] = None
@@ -175,8 +175,8 @@ def create_voucher_endpoint(
             description=request.description,
             discount_type=request.discount_type,
             discount_value=request.discount_value,
-            min_order_amount_paise=request.min_order_amount_paise,
-            max_discount_amount_paise=request.max_discount_amount_paise,
+            min_order_amount=request.min_order_amount,
+            max_discount_amount=request.max_discount_amount,
             usage_limit=request.usage_limit,
             expires_at=datetime.fromisoformat(request.expires_at),
             created_by_user_id=user["id"],
@@ -202,8 +202,8 @@ def list_vouchers_endpoint(
             "description": voucher.description,
             "discount_type": voucher.discount_type.value,
             "discount_value": voucher.discount_value,
-            "min_order_amount_paise": voucher.min_order_amount_paise,
-            "max_discount_amount_paise": voucher.max_discount_amount_paise,
+            "min_order_amount": voucher.min_order_amount,
+            "max_discount_amount": voucher.max_discount_amount,
             "usage_limit": voucher.usage_limit,
             "times_redeemed": voucher.times_redeemed,
             "expires_at": voucher.expires_at.isoformat(),
@@ -228,8 +228,8 @@ def update_voucher_endpoint(
             db=db,
             description=request.description,
             discount_value=request.discount_value,
-            min_order_amount_paise=request.min_order_amount_paise,
-            max_discount_amount_paise=request.max_discount_amount_paise,
+            min_order_amount=request.min_order_amount,
+            max_discount_amount=request.max_discount_amount,
             usage_limit=request.usage_limit,
             expires_at=datetime.fromisoformat(request.expires_at) if request.expires_at else None,
             is_active=request.is_active,

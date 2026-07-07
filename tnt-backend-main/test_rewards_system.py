@@ -85,7 +85,7 @@ def seed_data(test_db_session):
 
     completed_order = Order(
         user_id=student.id, slot_id=slot.id, vendor_id=vendor.id,
-        status=OrderStatus.PICKED, total_amount=10000,
+        status=OrderStatus.PICKED, total_amount=100,  # rupees (was 10000 paise)
     )
     test_db_session.add(completed_order)
     test_db_session.commit()
@@ -316,8 +316,8 @@ def test_voucher_crud_and_redeem(client, seed_data, auth_context, test_db_sessio
         "description": "20% off test voucher",
         "discount_type": "percentage",
         "discount_value": 20,
-        "min_order_amount_paise": 5000,
-        "max_discount_amount_paise": 3000,
+        "min_order_amount": 50,  # rupees (was 5000 paise)
+        "max_discount_amount": 30,  # rupees (was 3000 paise)
         "usage_limit": 10,
         "expires_at": expiry,
     })
@@ -331,7 +331,7 @@ def test_voucher_crud_and_redeem(client, seed_data, auth_context, test_db_sessio
 
     redeem_resp = client.post("/rewards/vouchers/TEST20/redeem", json={"order_id": order.id})
     assert redeem_resp.status_code == 200
-    assert redeem_resp.json()["discount_amount_paise"] == 2000
+    assert float(redeem_resp.json()["discount_amount"]) == 20.0  # 20% of ₹100 (was 2000 paise)
 
 
 def test_initialize_rules_admin_only(client, seed_data, auth_context):

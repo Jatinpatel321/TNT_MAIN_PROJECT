@@ -112,12 +112,6 @@ AI_RECOMMENDATIONS_TABLE = Table(
 )
 
 
-def rupees(value: float) -> int:
-	"""Return integer paise for the supplied rupee price."""
-
-	return int(round(value * 100))
-
-
 NOW = utcnow_naive()
 
 
@@ -1100,7 +1094,7 @@ def seed_menu(session: Session, vendor_map: Dict[str, User]) -> Dict[str, MenuIt
 			vendor_id=vendor.id,
 			name=payload["name"],
 			description=description,
-			price=rupees(payload["price"]),
+			price=payload["price"],  # rupees
 			image_url=payload["image_url"],
 			is_available=True,
 		)
@@ -1118,7 +1112,7 @@ def seed_stationery(session: Session, vendor_map: Dict[str, User]) -> Dict[str, 
 		service = StationeryService(
 			vendor_id=vendor.id,
 			name=payload["name"],
-			price_per_unit=rupees(payload["price"]),
+			price_per_unit=payload["price"],  # rupees
 			unit=payload["unit"],
 			is_available=True,
 		)
@@ -1133,7 +1127,7 @@ def seed_stationery(session: Session, vendor_map: Dict[str, User]) -> Dict[str, 
 				"description": payload["description"],
 				"category": payload["category"],
 				"image_url": payload["image_url"],
-				"price": rupees(payload["price"]),
+				"price": payload["price"],  # rupees
 				"stock": payload["stock"],
 			}
 		)
@@ -1455,11 +1449,11 @@ REWARD_REDEMPTION_FIXTURES: Sequence[Dict[str, Any]] = (
 )
 
 VOUCHER_FIXTURES: Sequence[Dict[str, Any]] = (
-	{"code": "WELCOME10", "description": "Welcome discount — 10% off first order!", "discount_type": VoucherDiscountType.PERCENTAGE, "discount_value": 10.0, "min_order_amount_paise": 5000, "max_discount_amount_paise": 2000, "usage_limit": 100, "days_until_expiry": 30},
-	{"code": "SAVE25", "description": "Flat Rs 25 off on orders above Rs 50", "discount_type": VoucherDiscountType.FIXED, "discount_value": 2500, "min_order_amount_paise": 5000, "usage_limit": 50, "days_until_expiry": 15},
-	{"code": "CAMPUS20", "description": "20% off for campus foodies!", "discount_type": VoucherDiscountType.PERCENTAGE, "discount_value": 20.0, "min_order_amount_paise": 10000, "max_discount_amount_paise": 5000, "usage_limit": 30, "days_until_expiry": 20},
-	{"code": "LUNCH15", "description": "Rs 15 off lunch orders", "discount_type": VoucherDiscountType.FIXED, "discount_value": 1500, "min_order_amount_paise": 3000, "usage_limit": 200, "days_until_expiry": 60},
-	{"code": "FIRST50", "description": "50% off first stationery order (max Rs 100)", "discount_type": VoucherDiscountType.PERCENTAGE, "discount_value": 50.0, "min_order_amount_paise": 2000, "max_discount_amount_paise": 10000, "usage_limit": 25, "days_until_expiry": 45},
+	{"code": "WELCOME10", "description": "Welcome discount — 10% off first order!", "discount_type": VoucherDiscountType.PERCENTAGE, "discount_value": 10.0, "min_order_amount": 50, "max_discount_amount": 20, "usage_limit": 100, "days_until_expiry": 30},
+	{"code": "SAVE25", "description": "Flat Rs 25 off on orders above Rs 50", "discount_type": VoucherDiscountType.FIXED, "discount_value": 25, "min_order_amount": 50, "usage_limit": 50, "days_until_expiry": 15},
+	{"code": "CAMPUS20", "description": "20% off for campus foodies!", "discount_type": VoucherDiscountType.PERCENTAGE, "discount_value": 20.0, "min_order_amount": 100, "max_discount_amount": 50, "usage_limit": 30, "days_until_expiry": 20},
+	{"code": "LUNCH15", "description": "Rs 15 off lunch orders", "discount_type": VoucherDiscountType.FIXED, "discount_value": 15, "min_order_amount": 30, "usage_limit": 200, "days_until_expiry": 60},
+	{"code": "FIRST50", "description": "50% off first stationery order (max Rs 100)", "discount_type": VoucherDiscountType.PERCENTAGE, "discount_value": 50.0, "min_order_amount": 20, "max_discount_amount": 100, "usage_limit": 25, "days_until_expiry": 45},
 )
 
 
@@ -1532,8 +1526,8 @@ def seed_rewards(session: Session, users: Dict[str, User], orders: Dict[str, Ord
 			description=payload["description"],
 			discount_type=payload["discount_type"],
 			discount_value=payload["discount_value"],
-			min_order_amount_paise=payload["min_order_amount_paise"],
-			max_discount_amount_paise=payload.get("max_discount_amount_paise"),
+			min_order_amount=payload["min_order_amount"],
+			max_discount_amount=payload.get("max_discount_amount"),
 			usage_limit=payload.get("usage_limit"),
 			times_redeemed=0,
 			expires_at=NOW + timedelta(days=payload["days_until_expiry"]),

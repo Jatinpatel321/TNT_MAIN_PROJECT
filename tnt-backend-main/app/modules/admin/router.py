@@ -1722,7 +1722,7 @@ def list_print_costs(
             "print_type": r.print_type,
             "paper_size": r.paper_size,
             "duplex": r.duplex,
-            "price_per_page_paise": r.price_per_page_paise,
+            "price_per_page": r.price_per_page,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
         }
         for r in rows
@@ -1744,9 +1744,9 @@ def upsert_print_cost(
     if paper_size not in ("A4", "A3"):
         raise HTTPException(status_code=400, detail="paper_size must be A4 or A3")
     try:
-        price = int(payload.get("price_per_page_paise"))
+        price = float(payload.get("price_per_page"))
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="price_per_page_paise must be an integer")
+        raise HTTPException(status_code=400, detail="price_per_page must be a number (rupees)")
     if price < 0:
         raise HTTPException(status_code=400, detail="price cannot be negative")
     duplex = bool(payload.get("duplex", False))
@@ -1759,11 +1759,11 @@ def upsert_print_cost(
         PrintCostMatrix.duplex == duplex,
     ).first()
     if row:
-        row.price_per_page_paise = price
+        row.price_per_page = price
     else:
         row = PrintCostMatrix(
             vendor_id=vendor_id, print_type=print_type, paper_size=paper_size,
-            duplex=duplex, price_per_page_paise=price,
+            duplex=duplex, price_per_page=price,
         )
         db.add(row)
     db.commit()

@@ -490,7 +490,7 @@ class TestRewardsVoucherService:
                 "description": "Save 50 rupees",
                 "discount_type": "percentage",
                 "discount_value": 10.0,
-                "min_order_amount_paise": 0,
+                "min_order_amount": 0,
                 "expires_at": "2030-12-31T23:59:59",
             })
             assert r.status_code in (200, 201)
@@ -558,7 +558,7 @@ class TestRewardsVoucherService:
                 description="Save 10%",
                 discount_type=VoucherDiscountType.PERCENTAGE,
                 discount_value=10.0,
-                min_order_amount_paise=0,
+                min_order_amount=0,
                 expires_at=_utcnow() + timedelta(days=30),
                 is_active=True,
                 created_by_user_id=admin.id,

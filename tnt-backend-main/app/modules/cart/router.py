@@ -143,7 +143,7 @@ def _checkout_order_from_cart(
                 order_id=order.id,
                 db=db,
             )
-            discount_amount = result.get("discount_amount_paise", 0)
+            discount_amount = result.get("discount_amount", 0)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Voucher error: {str(e)}")
 
@@ -158,7 +158,7 @@ def _checkout_order_from_cart(
                 points_to_redeem=points_to_redeem,
                 db=db
             )
-            points_discount_amount = res.get("discount_amount_paise", 0)
+            points_discount_amount = res.get("discount_amount", 0)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Rewards error: {str(e)}")
 
