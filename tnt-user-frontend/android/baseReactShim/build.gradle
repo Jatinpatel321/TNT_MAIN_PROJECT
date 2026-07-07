@@ -1,0 +1,27 @@
+plugins {
+  id 'com.android.library'
+}
+
+android {
+  namespace 'com.facebook.react'
+  compileSdk rootProject.ext.get("compileSdkVersion")
+
+  defaultConfig {
+    minSdk rootProject.ext.get("minSdkVersion")
+    targetSdk rootProject.ext.get("targetSdkVersion")
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_11
+    targetCompatibility JavaVersion.VERSION_11
+  }
+}
+
+dependencies {
+  if (rootProject.findProject(':ReactAndroid') != null) {
+    compileOnly project(':ReactAndroid')
+  } else {
+    def rnVersion = rootProject.ext.has("reactNativeVersion") ? rootProject.ext.get("reactNativeVersion") : "0.73.7"
+    compileOnly("com.facebook.react:react-android:$rnVersion")
+  }
+}

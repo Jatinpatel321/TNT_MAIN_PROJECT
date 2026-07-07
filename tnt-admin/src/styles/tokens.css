@@ -1,0 +1,86 @@
+/* ─── TNT ENTERPRISE LIGHT — Design Tokens ────────────────────────────── */
+/*  Premium color system inspired by Linear, Stripe, Notion and Vercel       */
+/*  Light Mode Only — No Dark Theme Support                                  */
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Backgrounds */
+  --bg-base: #F7F8FC;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #F3F5F9;
+  --bg-overlay: #E9EDF5;
+
+  /* Typography */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-tertiary: #9CA3AF;
+
+  /* Borders */
+  --border-default: #E5E7EB;
+  --border-strong: #D1D5DB;
+
+  /* Brand — Primary (Indigo) */
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-soft: rgba(79,70,229,0.10);
+
+  /* TNT Brand — Orange only for branding */
+  --tnt-orange: #E85D24;
+  --tnt-orange-hover: #F97316;
+  --tnt-orange-soft: rgba(232,93,36,0.10);
+
+  /* KPI Metric Colors */
+  --metric-users: #4F46E5;
+  --metric-orders: #2563EB;
+  --metric-revenue: #22C55E;
+  --metric-vendors: #F59E0B;
+  --metric-alerts: #EF4444;
+
+  /* Status */
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #2563EB;
+
+  /* Chart Palette */
+  --chart-1: #4F46E5;
+  --chart-2: #2563EB;
+  --chart-3: #22C55E;
+  --chart-4: #F59E0B;
+  --chart-5: #EF4444;
+
+  /* Sidebar — White */
+  --sidebar-bg: #FFFFFF;
+  --sidebar-border: #E5E7EB;
+  --sidebar-active-bg: rgba(79,70,229,0.10);
+  --sidebar-active-text: #4F46E5;
+  --sidebar-hover-bg: #F3F5F9;
+  --sidebar-text: #6B7280;
+  --sidebar-text-hover: #111827;
+
+  /* TopBar */
+  --topbar-bg: #FFFFFF;
+  --topbar-border: #E5E7EB;
+
+  /* Cards */
+  --card-bg: #FFFFFF;
+  --card-border: #E5E7EB;
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 8px 24px rgba(0,0,0,0.04);
+
+  /* Tables */
+  --table-header-bg: #F8FAFC;
+  --table-row-hover: #F3F5F9;
+  --table-border: #E5E7EB;
+
+  /* Badge Status Colors */
+  --status-placed: #2563EB;
+  --status-confirmed: #F59E0B;
+  --status-preparing: #E85D24;
+  --status-ready: #22C55E;
+  --status-picked-up: #14B8A6;
+  --status-cancelled: #EF4444;
+  --status-fraud: #991B1B;
+  --status-approved: #22C55E;
+  --status-pending: #F59E0B;
+  --status-rejected: #EF4444;
+}

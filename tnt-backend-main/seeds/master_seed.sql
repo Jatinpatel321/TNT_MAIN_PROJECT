@@ -1,0 +1,16 @@
+\i 01_users_seed.sql
+\i 02_vendors_seed.sql
+\i 03_menu_seed.sql
+\i 04_stationery_seed.sql
+\i 05_slots_seed.sql
+\i 06_orders_seed.sql
+\i 07_payments_seed.sql
+\i 08_rewards_seed.sql
+\i 09_notifications_seed.sql
+\i 10_feedback_seed.sql
+\i 11_complaints_seed.sql
+\i 12_admin_seed.sql
+\i 13_groups_seed.sql
+\i 14_vendor_financials_seed.sql
+\i 15_ai_seed.sql
+\i 16_calendar_seed.sql
