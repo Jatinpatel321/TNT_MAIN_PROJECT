@@ -206,7 +206,7 @@ def place_order(
     return {
         "order_id": order.id,
         "status": order.status,
-        "total_amount": total_amount,
+        "total_amount": float(total_amount),
         "eta_minutes": eta_minutes,
         "pickup_load_label": get_load_label(slot.current_orders, slot.max_orders),
         "express_pickup_eligible": is_express_pickup_eligible(slot.current_orders, slot.max_orders),
