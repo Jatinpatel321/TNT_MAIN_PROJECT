@@ -27,6 +27,13 @@ def _get_vendor(db: Session, user: dict) -> Vendor:
     return vendor
 
 
+def _require_owner(user: dict) -> None:
+    # Staff tokens resolve to the owner's vendor context in get_current_user,
+    # so vendor_role is the only signal separating staff from the owner here.
+    if user.get("vendor_role") == "vendor_staff":
+        raise HTTPException(status_code=403, detail="Only the vendor owner can manage staff")
+
+
 @router.get("/", summary="Get vendor profile")
 def get_profile(
     db: Session = Depends(get_db),
@@ -69,6 +76,7 @@ def add_staff(
     user=Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Add a new staff member with role-based permissions."""
+    _require_owner(user)
     vendor = _get_vendor(db, user)
     service = VendorProfileService(db)
     try:
@@ -85,6 +93,7 @@ def update_staff(
     user=Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Update staff member details and permissions."""
+    _require_owner(user)
     vendor = _get_vendor(db, user)
     service = VendorProfileService(db)
 
@@ -132,6 +141,7 @@ def delete_staff(
     user=Depends(get_current_user),
 ) -> Dict[str, Any]:
     """Remove a staff member."""
+    _require_owner(user)
     vendor = _get_vendor(db, user)
     service = VendorProfileService(db)
     try:
