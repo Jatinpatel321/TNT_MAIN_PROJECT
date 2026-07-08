@@ -80,7 +80,9 @@ def seed_data(test_db_session):
         user_id=student.id,
         slot_id=slot.id,
         vendor_id=vendor.id,
-        status=OrderStatus.CONFIRMED,
+        # PREPARING is the state /ready transitions from (CONFIRMED must go
+        # through PREPARING first in the canonical machine)
+        status=OrderStatus.PREPARING,
         total_amount=100,  # rupees (was 10000 paise)
         created_at=utcnow_naive(),
     )
@@ -232,7 +234,8 @@ def test_offpeak_bonus_policy_and_award_on_completion(client, seed_data, auth_co
     assert points_resp.status_code == 200
     points = points_resp.json()
 
-    assert points["current_points"] == 115.0
+    # Rs100 order x 5 points/rupee (default ORDER_COMPLETION rule) + 15 off-peak bonus
+    assert points["current_points"] == 515.0
     reward_types = {row["reward_type"] for row in points["recent_transactions"]}
     assert "order_completion" in reward_types
     assert "off_peak_bonus" in reward_types

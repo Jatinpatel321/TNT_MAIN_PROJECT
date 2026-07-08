@@ -89,6 +89,7 @@ def seed_data(test_db_session):
         price=12900,
         image_url="https://example.com/burger.png",
         is_available=True,
+        available_quantity=100,
     )
     test_db_session.add_all([slot, menu_item])
     test_db_session.commit()
@@ -254,7 +255,7 @@ class TestFullLifecycleWithPreparing:
 
         # Try going directly READY (skip PREPARING) — should fail
         r = client.post(f"/orders/{order_id}/ready")
-        assert r.status_code == 422
+        assert r.status_code == 400
 
 
 # ─── Timeline tests ──────────────────────────────────────────────────────────
@@ -372,7 +373,7 @@ class TestMyOrders:
 
         r = client.get("/orders/my")
         assert r.status_code == 200
-        orders = r.json()
+        orders = r.json()["items"]
         assert len(orders) >= 1
         order = orders[0]
         assert "eta_minutes" in order
@@ -390,7 +391,7 @@ class TestMyOrders:
 
         r = client.get("/orders/my")
         assert r.status_code == 200
-        orders = r.json()
+        orders = r.json()["items"]
         assert any(o.get("vendor_name") for o in orders)
 
 

@@ -79,6 +79,7 @@ def seed_data(test_db_session):
         price=120,
         image_url="https://example.com/a1.png",
         is_available=True,
+        available_quantity=100,
     )
     item_a2 = MenuItem(
         vendor_id=vendor_a.id,
@@ -87,6 +88,7 @@ def seed_data(test_db_session):
         price=80,
         image_url="https://example.com/a2.png",
         is_available=True,
+        available_quantity=100,
     )
     item_b1 = MenuItem(
         vendor_id=vendor_b.id,
@@ -95,6 +97,7 @@ def seed_data(test_db_session):
         price=90,
         image_url="https://example.com/b1.png",
         is_available=True,
+        available_quantity=100,
     )
 
     test_db_session.add_all([slot, item_a1, item_a2, item_b1])

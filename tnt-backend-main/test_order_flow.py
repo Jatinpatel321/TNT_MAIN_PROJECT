@@ -69,6 +69,7 @@ def seed_data(test_db_session):
         price=120,
         image_url="https://example.com/item.png",
         is_available=True,
+        available_quantity=100,  # column default 0 means out of stock
     )
     test_db_session.add_all([slot, menu_item])
     test_db_session.commit()
@@ -122,12 +123,16 @@ def test_order_lifecycle_flow(client, test_db_session, seed_data, auth_context):
 
     my_orders_resp = client.get("/orders/my")
     assert my_orders_resp.status_code == 200
-    assert any(order["id"] == order_id for order in my_orders_resp.json())
+    assert any(order["id"] == order_id for order in my_orders_resp.json()["items"])
 
     auth_context.update({"id": vendor.id, "phone": vendor.phone, "role": vendor.role.value})
 
     confirm_resp = client.post(f"/orders/{order_id}/confirm")
     assert confirm_resp.status_code == 200
+
+    # PREPARING is a required step — CONFIRMED cannot jump straight to READY
+    preparing_resp = client.post(f"/orders/{order_id}/preparing")
+    assert preparing_resp.status_code == 200
 
     complete_resp = client.post(f"/orders/{order_id}/ready")
     assert complete_resp.status_code == 200
