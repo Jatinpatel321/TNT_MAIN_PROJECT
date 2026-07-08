@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Boolean, Text
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Boolean, Text
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base
@@ -34,12 +34,12 @@ class DiscountCampaign(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     offer_type = Column(Enum(OfferType, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    discount_value = Column(Float, nullable=True)  # percentage or fixed amount
-    min_order_amount = Column(Float, nullable=True)
-    max_discount_amount = Column(Float, nullable=True)
+    discount_value = Column(Numeric(10, 2), nullable=True)  # percentage or fixed amount
+    min_order_amount = Column(Numeric(10, 2), nullable=True)
+    max_discount_amount = Column(Numeric(10, 2), nullable=True)
     is_combo = Column(Boolean, default=False)
     combo_items = Column(Text, nullable=True)  # JSON array of item IDs
-    combo_price = Column(Float, nullable=True)
+    combo_price = Column(Numeric(10, 2), nullable=True)
     is_off_peak = Column(Boolean, default=False)
     off_peak_start = Column(Integer, nullable=True)  # Hour (0-23)
     off_peak_end = Column(Integer, nullable=True)    # Hour (0-23)
@@ -64,9 +64,9 @@ class VendorOffer(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     discount_type = Column(Enum(OfferType, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    discount_value = Column(Float, nullable=False)
-    min_order_amount = Column(Float, nullable=True)
-    max_discount_amount = Column(Float, nullable=True)
+    discount_value = Column(Numeric(10, 2), nullable=False)
+    min_order_amount = Column(Numeric(10, 2), nullable=True)
+    max_discount_amount = Column(Numeric(10, 2), nullable=True)
     is_dynamic = Column(Boolean, default=False)  # AI-suggested discount
     ai_confidence = Column(Float, nullable=True)
     expires_at = Column(DateTime, nullable=True)

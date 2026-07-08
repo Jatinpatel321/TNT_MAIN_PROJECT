@@ -1378,7 +1378,7 @@ def list_settlements(
             "period_start": r.period_start.isoformat() if r.period_start else None,
             "period_end": r.period_end.isoformat() if r.period_end else None,
             "total_amount": float(r.total_amount),
-            "total_fees": r.total_fees,
+            "total_fees": float(r.total_fees) if r.total_fees is not None else None,
             "net_amount": float(r.net_amount),
             "order_count": r.order_count,
             "status": r.status.value if hasattr(r.status, "value") else r.status,

@@ -82,7 +82,7 @@ class RedemptionRule(Base):
     redemption_type = Column(Enum(RedemptionType, values_callable=lambda x: [e.value for e in x]), nullable=False, unique=True)
     min_points = Column(Float, nullable=False)
     max_discount_percentage = Column(Float, nullable=True)  # For percentage discounts
-    max_discount_amount = Column(Float, nullable=True)  # For fixed discounts
+    max_discount_amount = Column(Numeric(10, 2), nullable=True)  # For fixed discounts
     is_active = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
