@@ -212,7 +212,8 @@ class TestNotificationAPI:
         resp = client.get("/notifications/")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 2
+        assert data["total"] == 2
+        assert len(data["items"]) == 2
 
     def test_get_unread_count(self, student_client, test_db_session, seed):
         client, _ = student_client
@@ -233,8 +234,9 @@ class TestNotificationAPI:
         resp = client.get("/notifications/?unread_only=true")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 1
-        assert data[0]["is_read"] is False
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["is_read"] is False
 
     def test_filter_by_type(self, student_client, test_db_session, seed):
         client, _ = student_client
@@ -245,8 +247,9 @@ class TestNotificationAPI:
         resp = client.get("/notifications/?notification_type=delay_alert")
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 1
-        assert data[0]["notification_type"] == "delay_alert"
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["notification_type"] == "delay_alert"
 
     def test_mark_as_read(self, student_client, test_db_session, seed):
         client, _ = student_client
@@ -302,7 +305,7 @@ class TestNotificationAPI:
 
         resp = client.get("/notifications/")
         data = resp.json()
-        found = [x for x in data if x["title"] == "Order Ready"]
+        found = [x for x in data["items"] if x["title"] == "Order Ready"]
         assert len(found) == 1
         assert found[0]["notification_type"] == "order_ready"
         assert found[0]["reference_id"] == seed["order"].id
