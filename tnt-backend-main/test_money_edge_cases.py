@@ -194,29 +194,21 @@ def test_razorpay_initiate_amount_boundary(test_db_session, monkeypatch, rupees,
 # ---------------------------------------------------------------------------
 
 def test_equal_split_whole_rupee_total_conserves_sum(test_db_session):
+    # Paise-precise splitting: Rs100 / 3 isn't evenly divisible in any unit,
+    # so the extra paisa lands on the first member (33.34/33.33/33.33), not
+    # a whole extra rupee as the old whole-rupee-only split used to give.
     svc = GroupCartService(test_db_session)
     result = svc._equal_split([1, 2, 3], Decimal("100"))
     assert sum(result.values()) == Decimal("100")
-    assert set(result.values()) == {Decimal("34"), Decimal("33")}
+    assert sorted(result.values()) == [Decimal("33.33"), Decimal("33.33"), Decimal("33.34")]
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Known gap surfaced by the rupees migration: _equal_split's remainder "
-        "distribution assumes an integer total_amount (uses `idx < remainder` "
-        "where remainder used to be an int in [0, n)). With Numeric/Decimal "
-        "totals that aren't evenly divisible by member count and carry cents "
-        "(e.g. an order total of Rs100.01, now possible since menu prices are "
-        "no longer paise-integers), `remainder` becomes a Decimal like 1.01 and "
-        "the comparison silently fabricates money: splitting Rs100.01 three ways "
-        "sums to Rs101, not Rs100.01. Flagged for the user to decide on a fix "
-        "(e.g. distribute the fractional remainder in whole paise/cents rather "
-        "than whole rupees) rather than silently changing group-cart payment "
-        "business logic during a money-unit migration."
-    ),
-    strict=True,
-)
 def test_equal_split_fractional_total_conserves_sum(test_db_session):
+    # _equal_split now distributes the remainder in integer paise (not whole
+    # rupees), so a total that isn't evenly divisible among members no longer
+    # fabricates or loses money: splitting Rs100.01 three ways must still sum
+    # to exactly Rs100.01.
     svc = GroupCartService(test_db_session)
     result = svc._equal_split([1, 2, 3], Decimal("100.01"))
     assert sum(result.values()) == Decimal("100.01")
+    assert sorted(result.values()) == [Decimal("33.33"), Decimal("33.34"), Decimal("33.34")]
