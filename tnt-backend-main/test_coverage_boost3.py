@@ -11,6 +11,7 @@ Third coverage boost targeting remaining gaps:
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, UTC, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -1248,14 +1249,18 @@ class TestPaymentsServicePaths:
             db.commit()
 
             client = _make_client(db, student)
-            r = client.post(
-                f"/payments/razorpay/verify/{payment.id}",
-                params={
-                    "razorpay_payment_id": "pay_bad",
-                    "razorpay_signature": "bad_sig",
-                },
-            )
-            assert r.status_code in (400, 422)
+            # A gateway secret must be configured for the HMAC comparison
+            # itself to run (unset secret -> 503 misconfiguration guard).
+            with patch.dict(os.environ, {"RAZORPAY_KEY_SECRET": "test_secret"}):
+                r = client.post(
+                    f"/payments/razorpay/verify/{payment.id}",
+                    params={
+                        "razorpay_payment_id": "pay_bad",
+                        "razorpay_signature": "bad_sig",
+                    },
+                )
+            assert r.status_code == 400
+            assert r.json()["detail"] == "Invalid payment signature"
         finally:
             _clear()
             engine.dispose()
