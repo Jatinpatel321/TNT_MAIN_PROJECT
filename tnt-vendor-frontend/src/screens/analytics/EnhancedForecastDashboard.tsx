@@ -187,7 +187,7 @@ function ShortTermView({forecast, getConfidenceColor}: any) {
         />
         <MetricCard
           label="Revenue"
-          value={`$${forecast.total_revenue?.toFixed(2)}`}
+          value={`₹${forecast.total_revenue?.toFixed(2)}`}
           icon="💰"
           color="#F59E0B"
         />
@@ -300,7 +300,7 @@ function DailyView({forecast, getConfidenceColor}: any) {
         />
         <MetricCard
           label="Revenue"
-          value={`$${(forecast.summary?.total_revenue / 1000)?.toFixed(1)}K`}
+          value={`₹${(forecast.summary?.total_revenue / 1000)?.toFixed(1)}K`}
           icon="💰"
           color="#F59E0B"
         />
@@ -383,7 +383,7 @@ function DailyView({forecast, getConfidenceColor}: any) {
                 <Text style={styles.dayMetricLabel}>Orders</Text>
               </View>
               <View style={styles.dayMetric}>
-                <Text style={styles.dayMetricValue}>${(day.predicted_revenue / 1000)?.toFixed(1)}K</Text>
+                <Text style={styles.dayMetricValue}>₹{(day.predicted_revenue / 1000)?.toFixed(1)}K</Text>
                 <Text style={styles.dayMetricLabel}>Revenue</Text>
               </View>
               <View style={styles.dayMetric}>
@@ -433,7 +433,7 @@ function WeeklyView({forecast, getConfidenceColor}: any) {
         />
         <MetricCard
           label="Revenue"
-          value={`$${(forecast.summary?.total_revenue / 1000)?.toFixed(1)}K`}
+          value={`₹${(forecast.summary?.total_revenue / 1000)?.toFixed(1)}K`}
           icon="💰"
           color="#F59E0B"
         />
@@ -487,7 +487,7 @@ function WeeklyView({forecast, getConfidenceColor}: any) {
                 <Text style={styles.weekMetricLabel}>Orders</Text>
               </View>
               <View style={styles.weekMetric}>
-                <Text style={styles.weekMetricValue}>${(week.predicted_revenue / 1000)?.toFixed(1)}K</Text>
+                <Text style={styles.weekMetricValue}>₹{(week.predicted_revenue / 1000)?.toFixed(1)}K</Text>
                 <Text style={styles.weekMetricLabel}>Revenue</Text>
               </View>
             </View>
@@ -533,7 +533,7 @@ function MonthlyView({forecast, getConfidenceColor}: any) {
         />
         <MetricCard
           label="Revenue"
-          value={`$${(forecast.summary?.total_revenue / 1000)?.toFixed(1)}K`}
+          value={`₹${(forecast.summary?.total_revenue / 1000)?.toFixed(1)}K`}
           icon="💰"
           color="#F59E0B"
         />
@@ -586,7 +586,7 @@ function MonthlyView({forecast, getConfidenceColor}: any) {
                 <Text style={styles.monthMetricLabel}>Orders</Text>
               </View>
               <View style={styles.monthMetric}>
-                <Text style={styles.monthMetricValue}>${(month.predicted_revenue / 1000)?.toFixed(1)}K</Text>
+                <Text style={styles.monthMetricValue}>₹{(month.predicted_revenue / 1000)?.toFixed(1)}K</Text>
                 <Text style={styles.monthMetricLabel}>Revenue</Text>
               </View>
               <View style={styles.monthMetric}>
