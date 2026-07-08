@@ -2,16 +2,36 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.time_utils import utcnow_naive
 from app.modules.users.model import User, UserRole
 from app.modules.vendors.model import Vendor, VendorStatus
 from app.modules.orders.model import Order, OrderStatus
 from app.modules.payments.model import Payment, PaymentStatus
+from app.modules.slots.model import Slot, SlotStatus
 from app.modules.vendors.settlement_models import VendorWallet, VendorTransaction, VendorSettlement
-from app.core.security import create_access_token
+from app.modules.vendors.auth_service import _create_access_token as create_access_token
+
+
+def _make_slot(db: Session, owner_id: int) -> Slot:
+    start = utcnow_naive() + timedelta(hours=1)
+    slot = Slot(
+        vendor_id=owner_id,
+        start_time=start,
+        end_time=start + timedelta(hours=1),
+        max_orders=50,
+        current_orders=0,
+        status=SlotStatus.AVAILABLE,
+    )
+    db.add(slot)
+    db.commit()
+    db.refresh(slot)
+    return slot
 
 
 class TestSettlementsAPI:
@@ -19,7 +39,7 @@ class TestSettlementsAPI:
 
     def _create_vendor_with_payments(self, db: Session) -> Vendor:
         """Helper to create vendor with payments."""
-        user = User(phone="+919999999101", role=UserRole.VENDOR, is_active=True)
+        user = User(phone="+919999999101", role=UserRole.VENDOR, is_active=True, is_approved=True)
         db.add(user)
         db.commit()
 
@@ -34,11 +54,14 @@ class TestSettlementsAPI:
         db.commit()
         db.refresh(vendor)
 
-        # Create orders and payments
+        slot = _make_slot(db, user.id)
+
+        # Create orders and payments (settlement queries key on the owner user id)
         for i in range(3):
             order = Order(
-                vendor_id=vendor.vendor_id,
+                vendor_id=user.id,
                 user_id=user.id,
+                slot_id=slot.id,
                 total_amount=100 + i * 50,
                 status=OrderStatus.COMPLETED,
             )
@@ -48,7 +71,7 @@ class TestSettlementsAPI:
 
             payment = Payment(
                 order_id=order.id,
-                amount=order.total_amount * 100,
+                amount=order.total_amount,  # rupees
                 status=PaymentStatus.SUCCESS,
                 razorpay_payment_id=f"pay_{200000 + i}",
             )
@@ -94,9 +117,9 @@ class TestSettlementsAPI:
         """Test getting settlements."""
         vendor = self._create_vendor_with_payments(db)
 
-        # Create wallet
+        # Create wallet (settlement queries key on the owner user id)
         wallet = VendorWallet(
-            vendor_id=vendor.vendor_id,
+            vendor_id=vendor.owner_id,
             total_earned=1000.0,
             total_pending=300.0,
             total_settled=700.0,
@@ -107,9 +130,9 @@ class TestSettlementsAPI:
 
         # Create settlement
         settlement = VendorSettlement(
-            vendor_id=vendor.vendor_id,
-            period_start="2024-01-01",
-            period_end="2024-01-31",
+            vendor_id=vendor.owner_id,
+            period_start=datetime(2024, 1, 1),
+            period_end=datetime(2024, 1, 31),
             total_amount=5000.0,
             total_fees=100.0,
             net_amount=4900.0,
@@ -137,9 +160,11 @@ class TestSettlementsAPI:
         vendor = self._create_vendor_with_payments(db)
 
         # Create refunded payment
+        slot = _make_slot(db, vendor.owner_id)
         order = Order(
-            vendor_id=vendor.vendor_id,
+            vendor_id=vendor.owner_id,
             user_id=vendor.owner_id,
+            slot_id=slot.id,
             total_amount=200,
             status=OrderStatus.COMPLETED,
         )
@@ -149,7 +174,7 @@ class TestSettlementsAPI:
 
         payment = Payment(
             order_id=order.id,
-            amount=20000,
+            amount=200,  # rupees
             status=PaymentStatus.REFUNDED,
             razorpay_payment_id="pay_refund_test",
             razorpay_refund_id="refund_123",
@@ -192,7 +217,7 @@ class TestSettlementsAPI:
 
     def test_wallet_auto_creation(self, client: TestClient, db: Session):
         """Test wallet is auto-created on first access."""
-        user = User(phone="+919999999102", role=UserRole.VENDOR, is_active=True)
+        user = User(phone="+919999999102", role=UserRole.VENDOR, is_active=True, is_approved=True)
         db.add(user)
         db.commit()
 
@@ -215,8 +240,8 @@ class TestSettlementsAPI:
         data = response.json()
         assert "wallet" in data
 
-        # Verify wallet was created
-        wallet = db.query(VendorWallet).filter(VendorWallet.vendor_id == vendor.vendor_id).first()
+        # Verify wallet was created (keyed on the owner user id)
+        wallet = db.query(VendorWallet).filter(VendorWallet.vendor_id == vendor.owner_id).first()
         assert wallet is not None
 
 

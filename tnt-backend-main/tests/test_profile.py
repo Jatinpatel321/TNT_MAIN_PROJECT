@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.modules.users.model import User, UserRole
 from app.modules.vendors.model import Vendor, VendorStaff, VendorStatus
 from app.modules.vendors.profile_models import VendorProfile, VendorStaffPermission
-from app.core.security import create_access_token
+from app.modules.vendors.auth_service import _create_access_token as create_access_token
 
 
 class TestVendorProfileAPI:
@@ -294,7 +294,9 @@ class TestStaffManagementAPI:
         assert "owner_permissions" in data
         assert "staff_defaults" in data
         assert "manager_defaults" in data
-        assert len(data["owner_permissions"]) == 22  # Total permissions
+        # Owner always holds the full permission catalog
+        from app.modules.vendors.profile_service import OWNER_PERMISSIONS
+        assert sorted(data["owner_permissions"]) == sorted(OWNER_PERMISSIONS)
 
 
 class TestVendorProfileModel:
