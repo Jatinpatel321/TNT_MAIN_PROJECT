@@ -90,6 +90,7 @@ def seed_data(test_db_session):
         price=100,
         image_url="https://example.com/item.png",
         is_available=True,
+        available_quantity=100,
     )
     test_db_session.add_all([slot, menu_item])
     test_db_session.commit()
@@ -282,8 +283,8 @@ class TestStateMachineIntegration:
         # Try vendor marking READY directly from PLACED (skipping CONFIRM)
         auth_context.update({"id": vendor.id, "phone": vendor.phone, "role": vendor.role.value})
         r = client.post(f"/orders/{order_id}/ready")
-        # validate_transition(PLACED → READY) → 422
-        assert r.status_code == 422
+        # Invalid transitions surface uniformly as 400 (state conflict)
+        assert r.status_code == 400
 
     # ── Terminal: cancel PICKED raises 400 ───────────────────────────────────
 

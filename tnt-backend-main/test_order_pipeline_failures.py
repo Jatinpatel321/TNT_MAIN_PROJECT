@@ -80,6 +80,7 @@ def seed_data(test_db_session):
         price=100,
         image_url="https://example.com/item.png",
         is_available=True,
+        available_quantity=100,
     )
 
     test_db_session.add_all([slot, item])
@@ -160,7 +161,7 @@ def test_slot_full_during_booking_rejected(client, seed_data, test_db_session):
         json=[{"menu_item_id": item.id, "quantity": 1}],
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Slot full"
+    assert response.json()["detail"] == "Slot is full — cannot book"
 
 
 def test_vendor_disabled_mid_flow_rejected(client, seed_data, test_db_session):
