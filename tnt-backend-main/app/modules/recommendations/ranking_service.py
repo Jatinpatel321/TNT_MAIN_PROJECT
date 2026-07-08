@@ -816,7 +816,7 @@ class RecommendationRankingService:
         ranked_offers = []
         for o_data in offers:
             vendor_id = o_data.get("vendor_id")
-            discount_val = o_data.get("discount_value") or 10.0
+            discount_val = float(o_data.get("discount_value") or 10.0)
 
             # Find user affinity for this vendor's menu items
             menu_items = self.db.query(MenuItem).filter(MenuItem.vendor_id == vendor_id).all()
@@ -903,9 +903,9 @@ class RecommendationRankingService:
                 "title": off.title,
                 "description": off.description,
                 "discount_type": off.discount_type.value if hasattr(off.discount_type, "value") else off.discount_type,
-                "discount_value": off.discount_value,
-                "min_order_amount": off.min_order_amount,
-                "max_discount_amount": off.max_discount_amount,
+                "discount_value": float(off.discount_value) if off.discount_value is not None else None,
+                "min_order_amount": float(off.min_order_amount) if off.min_order_amount is not None else None,
+                "max_discount_amount": float(off.max_discount_amount) if off.max_discount_amount is not None else None,
                 "expires_at": off.expires_at.isoformat() if off.expires_at else None,
             })
 
@@ -985,9 +985,9 @@ class RecommendationRankingService:
                 "title": off.title,
                 "description": off.description,
                 "discount_type": getattr(off.discount_type, "value", off.discount_type),
-                "discount_value": off.discount_value,
-                "min_order_amount": off.min_order_amount,
-                "max_discount_amount": off.max_discount_amount,
+                "discount_value": float(off.discount_value) if off.discount_value is not None else None,
+                "min_order_amount": float(off.min_order_amount) if off.min_order_amount is not None else None,
+                "max_discount_amount": float(off.max_discount_amount) if off.max_discount_amount is not None else None,
                 "expires_at": off.expires_at.isoformat() if off.expires_at else None,
                 "score": round(score, 2),
                 "base_score": round(base_score, 2),

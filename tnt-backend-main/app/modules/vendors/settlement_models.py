@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, String, Boolean, Text
+from sqlalchemy import Column, DateTime, Enum, Float, ForeignKey, Integer, Numeric, String, Boolean, Text
 
 from app.core.time_utils import utcnow_naive
 from app.database.base import Base
@@ -30,11 +30,11 @@ class VendorWallet(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     vendor_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    total_earned = Column(Float, default=0.0)
-    total_pending = Column(Float, default=0.0)
-    total_settled = Column(Float, default=0.0)
-    total_refunded = Column(Float, default=0.0)
-    balance = Column(Float, default=0.0)
+    total_earned = Column(Numeric(10, 2), default=0)
+    total_pending = Column(Numeric(10, 2), default=0)
+    total_settled = Column(Numeric(10, 2), default=0)
+    total_refunded = Column(Numeric(10, 2), default=0)
+    balance = Column(Numeric(10, 2), default=0)
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
@@ -48,9 +48,9 @@ class VendorTransaction(Base):
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
     payment_id = Column(Integer, ForeignKey("payments.id"), nullable=True)
     transaction_type = Column(Enum(TransactionType, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    amount = Column(Float, nullable=False)
-    fee = Column(Float, default=0.0)
-    net_amount = Column(Float, nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    fee = Column(Numeric(10, 2), default=0)
+    net_amount = Column(Numeric(10, 2), nullable=False)
     description = Column(String(255), nullable=True)
     payment_method = Column(String(50), nullable=True)
     is_online = Column(Boolean, default=False)
@@ -66,12 +66,12 @@ class VendorSettlement(Base):
     vendor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     period_start = Column(DateTime, nullable=False)
     period_end = Column(DateTime, nullable=False)
-    total_amount = Column(Float, nullable=False)
-    total_fees = Column(Float, default=0.0)
-    net_amount = Column(Float, nullable=False)
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    total_fees = Column(Numeric(10, 2), default=0)
+    net_amount = Column(Numeric(10, 2), nullable=False)
     order_count = Column(Integer, default=0)
-    online_payments = Column(Float, default=0.0)
-    refunds = Column(Float, default=0.0)
+    online_payments = Column(Numeric(10, 2), default=0)
+    refunds = Column(Numeric(10, 2), default=0)
     status = Column(Enum(SettlementStatus, values_callable=lambda x: [e.value for e in x]), default=SettlementStatus.PENDING)
     settled_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utcnow_naive)

@@ -150,9 +150,9 @@ class VendorRetentionService:
                 "title": o.title,
                 "description": o.description,
                 "discount_type": o.discount_type.value,
-                "discount_value": o.discount_value,
-                "min_order_amount": o.min_order_amount,
-                "max_discount_amount": o.max_discount_amount,
+                "discount_value": float(o.discount_value) if o.discount_value is not None else None,
+                "min_order_amount": float(o.min_order_amount) if o.min_order_amount is not None else None,
+                "max_discount_amount": float(o.max_discount_amount) if o.max_discount_amount is not None else None,
                 "is_dynamic": o.is_dynamic,
                 "ai_confidence": o.ai_confidence,
                 "is_active": o.is_active,
@@ -218,12 +218,12 @@ class VendorRetentionService:
                 "name": c.name,
                 "description": c.description,
                 "offer_type": c.offer_type.value,
-                "discount_value": c.discount_value,
-                "min_order_amount": c.min_order_amount,
-                "max_discount_amount": c.max_discount_amount,
+                "discount_value": float(c.discount_value) if c.discount_value is not None else None,
+                "min_order_amount": float(c.min_order_amount) if c.min_order_amount is not None else None,
+                "max_discount_amount": float(c.max_discount_amount) if c.max_discount_amount is not None else None,
                 "is_combo": c.is_combo,
                 "combo_items": json.loads(c.combo_items) if c.combo_items else [],
-                "combo_price": c.combo_price,
+                "combo_price": float(c.combo_price) if c.combo_price is not None else None,
                 "is_off_peak": c.is_off_peak,
                 "off_peak_start": c.off_peak_start,
                 "off_peak_end": c.off_peak_end,
@@ -264,7 +264,7 @@ class VendorRetentionService:
                     "id": c.id,
                     "name": c.name,
                     "offer_type": c.offer_type.value,
-                    "discount_value": c.discount_value,
+                    "discount_value": float(c.discount_value) if c.discount_value is not None else None,
                     "is_combo": c.is_combo,
                     "is_off_peak": c.is_off_peak,
                     "end_date": c.end_date.isoformat(),
@@ -277,7 +277,7 @@ class VendorRetentionService:
                     "id": o.id,
                     "title": o.title,
                     "discount_type": o.discount_type.value,
-                    "discount_value": o.discount_value,
+                    "discount_value": float(o.discount_value) if o.discount_value is not None else None,
                     "is_dynamic": o.is_dynamic,
                     "times_redeemed": o.times_redeemed,
                 }
@@ -388,10 +388,11 @@ class VendorRetentionService:
         if not offer or not offer.is_active:
             return {"success": False, "error": "Offer not found or inactive"}
 
-        # Calculate discount
-        discount = offer.discount_value
+        # Calculate discount (float: discount_value/max_discount_amount are now
+        # Numeric/Decimal, but this feeds arithmetic against Float reward columns)
+        discount = float(offer.discount_value)
         if offer.max_discount_amount:
-            discount = min(discount, offer.max_discount_amount)
+            discount = min(discount, float(offer.max_discount_amount))
 
         redemption = VendorOfferRedemption(
             offer_id=offer_id,

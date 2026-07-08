@@ -99,11 +99,11 @@ class VendorSettlementService:
         return {
             "vendor_id": vendor_id,
             "wallet": {
-                "total_earned": round(wallet.total_earned, 2),
-                "total_pending": round(wallet.total_pending, 2),
-                "total_settled": round(wallet.total_settled, 2),
-                "total_refunded": round(wallet.total_refunded, 2),
-                "current_balance": round(wallet.balance, 2),
+                "total_earned": float(round(wallet.total_earned, 2)),
+                "total_pending": float(round(wallet.total_pending, 2)),
+                "total_settled": float(round(wallet.total_settled, 2)),
+                "total_refunded": float(round(wallet.total_refunded, 2)),
+                "current_balance": float(round(wallet.balance, 2)),
             },
             "today": {
                 "online_payments": round(today_online_rupees, 2),
@@ -208,9 +208,9 @@ class VendorSettlementService:
         return {
             "vendor_id": vendor_id,
             "wallet": {
-                "balance": round(wallet.balance, 2),
-                "pending": round(wallet.total_pending, 2),
-                "settled": round(wallet.total_settled, 2),
+                "balance": float(round(wallet.balance, 2)),
+                "pending": float(round(wallet.total_pending, 2)),
+                "settled": float(round(wallet.total_settled, 2)),
             },
             "pending_settlement": {
                 "period_start": start_date.isoformat(),
@@ -223,12 +223,12 @@ class VendorSettlementService:
                 {
                     "id": s.id,
                     "period": f"{s.period_start.strftime('%b %d')} - {s.period_end.strftime('%b %d, %Y')}",
-                    "total_amount": round(s.total_amount, 2),
-                    "total_fees": round(s.total_fees, 2),
-                    "net_amount": round(s.net_amount, 2),
+                    "total_amount": float(round(s.total_amount, 2)),
+                    "total_fees": float(round(s.total_fees, 2)),
+                    "net_amount": float(round(s.net_amount, 2)),
                     "order_count": s.order_count,
-                    "online_payments": round(s.online_payments, 2),
-                    "refunds": round(s.refunds, 2),
+                    "online_payments": float(round(s.online_payments, 2)),
+                    "refunds": float(round(s.refunds, 2)),
                     "status": s.status.value,
                     "settled_at": s.settled_at.isoformat() if s.settled_at else None,
                     "created_at": s.created_at.isoformat(),

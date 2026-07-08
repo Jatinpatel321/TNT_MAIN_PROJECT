@@ -63,7 +63,7 @@ def create_offer(
         "id": offer.id,
         "title": offer.title,
         "discount_type": offer.discount_type.value,
-        "discount_value": offer.discount_value,
+        "discount_value": float(offer.discount_value) if offer.discount_value is not None else None,
         "is_active": offer.is_active,
     }
 
