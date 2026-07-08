@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {LineChart, BarChart} from 'react-native-chart-kit';
 import {vendorApi} from '../../services/vendorApi';
+import {formatRupees} from '../../utils/format';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -208,7 +209,7 @@ export default function PerformanceIntelligenceDashboard() {
                   <Text style={styles.breakdownLabel}>Cancelled</Text>
                 </View>
                 <View style={styles.breakdownItem}>
-                  <Text style={styles.breakdownValue}>${metrics.breakdown.total_revenue}</Text>
+                  <Text style={styles.breakdownValue}>{formatRupees(metrics.breakdown.total_revenue)}</Text>
                   <Text style={styles.breakdownLabel}>Revenue</Text>
                 </View>
               </View>
