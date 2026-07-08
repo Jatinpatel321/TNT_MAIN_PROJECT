@@ -45,4 +45,15 @@ def _auto_fake_redis(monkeypatch):
     # notifications.service imports redis_client inside function body,
     # so it resolves from app.core.redis at call time — already patched above.
 
+    # Policy modules hold their own redis_client bindings (from-imports), and
+    # university_policy falls through to the LIVE database via SessionLocal on
+    # a cache miss — patch the bindings and pre-seed the cache with the
+    # default (disabled) policy so test outcomes never depend on whatever
+    # policy state the real deployment database happens to hold.
+    import json as _json
+    from app.core.university_policy import UNIVERSITY_POLICY_KEY, _DEFAULT_POLICY
+    monkeypatch.setattr("app.core.university_policy.redis_client", fake)
+    monkeypatch.setattr("app.core.faculty_policy.redis_client", fake)
+    fake.set(UNIVERSITY_POLICY_KEY, _json.dumps(_DEFAULT_POLICY))
+
     yield fake
