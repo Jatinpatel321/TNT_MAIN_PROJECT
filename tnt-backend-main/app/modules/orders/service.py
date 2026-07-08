@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.time_utils import utcnow_naive
@@ -70,8 +71,13 @@ def update_order_status(
             "order_invalid_transition order_id=%s from=%s to=%s",
             order.id, previous_status, new_status,
         )
-        raise ValueError(
-            f"Cannot transition from {previous_status} to {new_status}"
+        # Invalid transitions are client-triggerable state conflicts, not
+        # server faults — surface as 400 so every order endpoint agrees.
+        prev_val = previous_status.value if hasattr(previous_status, "value") else str(previous_status)
+        new_val = new_status.value if hasattr(new_status, "value") else str(new_status)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transition from {prev_val} to {new_val}",
         )
 
     order.status = new_status

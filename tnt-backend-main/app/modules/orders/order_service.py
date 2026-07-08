@@ -389,6 +389,11 @@ def cancel_order(user: dict, order_id: int, db: Session) -> dict:
     db_user = _require_user(user, db)
     order = _require_own_order(order_id, db_user, db)
 
+    if order.status == OrderStatus.CANCELLED:
+        # The state machine treats same-status updates as idempotent no-ops;
+        # re-cancelling must surface as a client error instead.
+        raise HTTPException(status_code=400, detail="Order is already cancelled")
+
     update_order_status(order, OrderStatus.CANCELLED, "student", db)
 
     notify_user(
@@ -509,6 +514,14 @@ def mark_order_ready(user: dict, order_id: int, db: Session) -> dict:
     order = _require_vendor_order(order_id, vendor, db)
 
     update_order_status(order, OrderStatus.READY, "vendor", db)
+
+    # Award order-completion (+ off-peak bonus) reward points. Best-effort:
+    # a rewards failure must never block order fulfillment.
+    try:
+        from app.modules.rewards.service import process_order_completion_rewards
+        process_order_completion_rewards(order.id, db)
+    except Exception:
+        logger.exception("order_rewards_award_failed order_id=%s", order.id)
 
     student = db.query(User).filter(User.id == order.user_id).first()
     notify_user(
