@@ -1,10 +1,12 @@
 from datetime import timedelta
+from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import and_
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.money import from_paise, to_paise
 from app.core.time_utils import utcnow_naive
 from app.modules.group_cart.model import (
     Group,
@@ -473,16 +475,23 @@ class GroupCartService:
 
         return self._equal_split(member_ids, total_amount)
 
-    def _equal_split(self, member_ids: list[int], total_amount: int) -> dict[int, int]:
+    def _equal_split(self, member_ids: list[int], total_amount) -> dict[int, Decimal]:
         if not member_ids:
             return {}
 
-        base_share = total_amount // len(member_ids)
-        remainder = total_amount % len(member_ids)
+        # Split in integer paise so the remainder distribution always lands on
+        # a clean int in [0, n) — doing it in rupees breaks when total_amount
+        # carries cents that aren't evenly divisible by member count (e.g.
+        # Rs100.01 split 3 ways used to sum to Rs101, fabricating Rs0.99).
+        total_paise = to_paise(total_amount)
+        n = len(member_ids)
+        base_share_paise = total_paise // n
+        remainder_paise = total_paise % n
 
         result = {}
         for idx, member_id in enumerate(member_ids):
-            result[member_id] = base_share + (1 if idx < remainder else 0)
+            share_paise = base_share_paise + (1 if idx < remainder_paise else 0)
+            result[member_id] = from_paise(share_paise)
         return result
 
     def get_payment_splits(self, group_id: int, user_id: int) -> List[GroupPaymentSplit]:
