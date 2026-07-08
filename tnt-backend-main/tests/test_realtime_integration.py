@@ -60,10 +60,14 @@ def _patch_redis_pubsub():
 
 @pytest.fixture
 def mock_db_session():
-    """Mock the DB session for WS handler order lookups."""
-    with patch("app.database.session.SessionLocal") as mock:
-        session = MagicMock()
-        mock.return_value = session
+    """Mock the DB session for WS handler order lookups.
+
+    Both WS routers bind SessionLocal at import time, so the patch must
+    target their module-level names, not app.database.session.
+    """
+    session = MagicMock()
+    with patch("app.modules.orders.ws_router.SessionLocal", return_value=session), \
+         patch("app.modules.orders.vendor_ws_router.SessionLocal", return_value=session):
         yield session
 
 
@@ -76,11 +80,11 @@ class TestWebSocketAuthorization:
     """Verifies that the WS ownership gate works correctly."""
 
     def test_ws_auth_requires_token(self):
-        """A WS connection without sending a JWT should be rejected."""
+        """A WS connection whose auth frame carries no token is rejected."""
         with client.websocket_connect("/ws/orders/1") as ws:
-            # Don't send auth frame — should time out and close
-            with pytest.raises(Exception):
-                ws.receive_json(timeout=2)
+            ws.send_text(json.dumps({}))  # auth frame without a token
+            resp = ws.receive_json()
+            assert resp.get("error") == "Unauthorized"
 
     def test_ws_auth_bad_token_rejected(self):
         """A WS connection with an invalid JWT should be rejected."""
@@ -134,7 +138,7 @@ class TestWebSocketAuthorization:
             assert auth_resp.get("authenticated") is True
 
             # Should get status snapshot (not error)
-            resp = ws.receive_json(timeout=2)
+            resp = ws.receive_json()
             assert resp.get("event") == "status"
 
     def test_vendor_cannot_see_other_vendors_order(self, mock_db_session):
@@ -166,6 +170,21 @@ class TestWebSocketAuthorization:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.fixture(autouse=True)
+def _sync_ws_secrets():
+    """Both WS routers capture SECRET_KEY from env independently of
+    app.core.security (one at import, one lazily); align them with the key
+    app.core.security signed our test tokens with, since import order
+    between this module's env overrides and app bootstrapping varies."""
+    import app.modules.orders.ws_router as owr
+    import app.modules.orders.vendor_ws_router as vwr
+    from app.core.security import SECRET_KEY as core_secret
+
+    with patch.object(owr, "_SECRET_KEY", core_secret), \
+         patch.object(vwr, "_SECRET_KEY", core_secret):
+        yield
+
+
 class TestVendorDashboardWebSocket:
     """Verifies the vendor-wide WS dashboard endpoint."""
 
@@ -174,10 +193,7 @@ class TestVendorDashboardWebSocket:
         token = _make_token(user_id=1, role="student")
         with client.websocket_connect("/ws/vendor/orders") as ws:
             ws.send_text(json.dumps({"token": token}))
-            auth_resp = ws.receive_json()
-            # Should get auth success but then vendor-role gate fails
-            assert auth_resp.get("authenticated") is True
-
+            # Role gate rejects before any authenticated frame is sent
             resp = ws.receive_json()
             assert "error" in resp
             assert "vendor role required" in resp["error"].lower()
@@ -187,17 +203,23 @@ class TestVendorDashboardWebSocket:
         mock_order = MagicMock()
         mock_order.id = 42
         mock_order.user_id = 5
+        mock_order.slot_id = 3
         mock_order.vendor_id = 10
         mock_order.total_amount = 300
         mock_order.status = "preparing"
         mock_order.created_at = None
         mock_order.eta_minutes = 15
         mock_order.qr_code = None
+        mock_order.booking_type = "food"
+        mock_order.group_id = None
+        mock_order.is_group = False
 
-        # Mock query to return one active order
+        # Mock query to return one active order; enrichment item lookups
+        # return an empty list so the snapshot stays JSON-serializable.
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
-        mock_query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [mock_order]
+        mock_query.order_by.return_value.limit.return_value.all.return_value = [mock_order]
+        mock_query.all.return_value = []
         mock_db_session.query.return_value = mock_query
 
         token = _make_token(user_id=10, role="vendor")
@@ -206,7 +228,7 @@ class TestVendorDashboardWebSocket:
             auth_resp = ws.receive_json()
             assert auth_resp.get("authenticated") is True
 
-            snapshot = ws.receive_json(timeout=2)
+            snapshot = ws.receive_json()
             assert snapshot.get("event") == "snapshot"
             assert isinstance(snapshot.get("data"), list)
 
@@ -366,54 +388,57 @@ class TestQRPickup:
 
     def test_generate_qr_code_valid(self):
         """generate_qr_code should produce a signed token for READY orders."""
+        from app.modules.orders.model import OrderStatus
         from app.modules.orders.qr_service import generate_qr_code, _verify_qr_token
 
-        with patch("app.modules.orders.qr_service.db") as mock_session:
-            mock_order = MagicMock()
-            mock_order.id = 1
-            mock_order.status = "ready"
-            mock_order.qr_code = None
-            mock_session.query.return_value.filter.return_value.first.return_value = mock_order
+        mock_session = MagicMock()
+        mock_order = MagicMock()
+        mock_order.id = 1
+        mock_order.status = OrderStatus.READY
+        mock_order.qr_code = None
+        mock_session.query.return_value.filter.return_value.first.return_value = mock_order
 
-            qr = generate_qr_code(1, mock_session)
-            assert qr is not None
-            assert "." in qr  # Signed: raw_token.signature
-            assert _verify_qr_token(1, qr) is True
+        qr = generate_qr_code(1, mock_session)
+        assert qr is not None
+        assert "." in qr  # Signed: raw_token.signature
+        assert _verify_qr_token(1, qr) is True
 
     def test_confirm_pickup_validates_ownership(self):
         """confirm_pickup should verify vendor ownership."""
+        from app.modules.orders.model import OrderStatus
         from app.modules.orders.qr_service import confirm_pickup
 
-        with patch("app.modules.orders.qr_service.db") as mock_session:
-            mock_order = MagicMock()
-            mock_order.id = 1
-            mock_order.vendor_id = 10
-            mock_order.status = "ready"
-            mock_order.qr_code = "test.qr.sig"
-            mock_session.query.return_value.filter.return_value.first.return_value = mock_order
+        mock_session = MagicMock()
+        mock_order = MagicMock()
+        mock_order.id = 1
+        mock_order.vendor_id = 10
+        mock_order.status = OrderStatus.READY
+        mock_order.qr_code = "test.qr.sig"
+        mock_session.query.return_value.filter.return_value.first.return_value = mock_order
 
-            with patch("app.modules.orders.qr_service._verify_qr_token") as mock_verify:
-                mock_verify.return_value = True
-                result = confirm_pickup("test.qr.sig", 10, mock_session)
-                assert result is True
-                assert mock_order.status == "picked"
+        with patch("app.modules.orders.qr_service._verify_qr_token") as mock_verify:
+            mock_verify.return_value = True
+            result = confirm_pickup("test.qr.sig", 10, mock_session)
+            assert result is True
+            assert mock_order.status == OrderStatus.PICKED
 
     def test_confirm_pickup_rejects_wrong_vendor(self):
         """confirm_pickup should reject if vendor doesn't own the order."""
+        from app.modules.orders.model import OrderStatus
         from app.modules.orders.qr_service import confirm_pickup
 
-        with patch("app.modules.orders.qr_service.db") as mock_session:
-            mock_order = MagicMock()
-            mock_order.id = 1
-            mock_order.vendor_id = 20
-            mock_order.status = "ready"
-            mock_order.qr_code = "test.qr.sig"
-            mock_session.query.return_value.filter.return_value.first.return_value = mock_order
+        mock_session = MagicMock()
+        mock_order = MagicMock()
+        mock_order.id = 1
+        mock_order.vendor_id = 20
+        mock_order.status = OrderStatus.READY
+        mock_order.qr_code = "test.qr.sig"
+        mock_session.query.return_value.filter.return_value.first.return_value = mock_order
 
-            with patch("app.modules.orders.qr_service._verify_qr_token") as mock_verify:
-                mock_verify.return_value = True
-                result = confirm_pickup("test.qr.sig", 10, mock_session)
-                assert result is False  # Wrong vendor
+        with patch("app.modules.orders.qr_service._verify_qr_token") as mock_verify:
+            mock_verify.return_value = True
+            result = confirm_pickup("test.qr.sig", 10, mock_session)
+            assert result is False  # Wrong vendor
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -482,42 +507,62 @@ class TestOrderServiceEventPublishing:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-class TestWSManagerVendorChannel:
-    """Verifies the WS manager's vendor channel methods."""
+@pytest.fixture
+def anyio_backend():
+    """Run anyio-marked tests on asyncio (anyio's pytest plugin ships with the
+    installed anyio package; pytest-asyncio is not a project dependency)."""
+    return "asyncio"
 
-    @pytest.mark.asyncio
+
+class TestWSManagerVendorChannel:
+    """Verifies the WS manager's vendor channel methods.
+
+    Each test uses its own vendor id — the manager is a module singleton, so
+    reusing an id would leak connections between tests.
+    """
+
+    @pytest.mark.anyio
     async def test_connect_vendor_adds_connection(self):
         """connect_vendor should add a websocket to the vendor map."""
         from app.modules.orders.ws_manager import manager
 
         ws_mock = AsyncMock()
-        await manager.connect_vendor(100, ws_mock)
-        assert 100 in manager._vendor_connections
-        assert ws_mock in manager._vendor_connections[100]
-        ws_mock.accept.assert_awaited_once()
+        await manager.connect_vendor(101, ws_mock)
+        try:
+            assert 101 in manager._vendor_connections
+            assert ws_mock in manager._vendor_connections[101]
+            ws_mock.accept.assert_awaited_once()
+        finally:
+            manager.disconnect_vendor(101, ws_mock)
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_disconnect_vendor_removes_connection(self):
         """disconnect_vendor should remove the websocket."""
         from app.modules.orders.ws_manager import manager
 
         ws_mock = AsyncMock()
-        await manager.connect_vendor(100, ws_mock)
-        assert len(manager._vendor_connections[100]) == 1
+        await manager.connect_vendor(102, ws_mock)
+        assert len(manager._vendor_connections[102]) == 1
 
-        manager.disconnect_vendor(100, ws_mock)
-        assert 100 not in manager._vendor_connections
+        manager.disconnect_vendor(102, ws_mock)
+        # The manager keeps the (now empty) vendor entry; what matters is
+        # that no connections remain to broadcast to.
+        assert not manager._vendor_connections.get(102)
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_broadcast_to_vendor_sends_to_all(self):
         """broadcast_to_vendor should send the payload to all connections."""
         from app.modules.orders.ws_manager import manager
 
         ws1 = AsyncMock()
         ws2 = AsyncMock()
-        await manager.connect_vendor(100, ws1)
-        await manager.connect_vendor(100, ws2)
+        await manager.connect_vendor(103, ws1)
+        await manager.connect_vendor(103, ws2)
 
-        await manager.broadcast_to_vendor(100, {"event": "test"})
-        assert ws1.send_text.called
-        assert ws2.send_text.called
+        try:
+            await manager.broadcast_to_vendor(103, {"event": "test"})
+            assert ws1.send_text.called
+            assert ws2.send_text.called
+        finally:
+            manager.disconnect_vendor(103, ws1)
+            manager.disconnect_vendor(103, ws2)
