@@ -194,6 +194,12 @@ def verify_payment(
 
     body = f"{payment.razorpay_order_id}|{razorpay_payment_id}"
     secret = os.getenv("RAZORPAY_KEY_SECRET")
+    if not secret:
+        # Server misconfiguration must surface clearly, not as a TypeError 500.
+        raise HTTPException(
+            status_code=503,
+            detail="Payment verification unavailable: gateway secret not configured",
+        )
 
     expected_signature = hmac.new(
         bytes(secret, "utf-8"),
