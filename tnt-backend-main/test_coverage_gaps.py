@@ -402,7 +402,10 @@ class TestAuthRouter:
                 client = TestClient(fastapi_app, raise_server_exceptions=False)
                 r = client.post("/auth/send-otp", json={"phone": "9999999999"})
                 assert r.status_code == 200
-                assert r.json() == {"message": "OTP sent"}
+                body = r.json()
+                assert body["message"] == "OTP sent"
+                assert body["success"] is True
+                assert body["phone"] == "+919999999999"  # normalized echo
         finally:
             _clear()
             engine.dispose()
@@ -435,8 +438,9 @@ class TestAuthRouter:
             with patch("app.modules.auth.otp_service.redis_client", fake), \
                  patch("app.core.sms.send_sms"), \
                  patch("app.core.rate_limit.redis_client", fake):
-                # Generate OTP for phone
-                otp = generate_otp("9990008888")
+                # Generate OTP under the normalized phone — the router
+                # normalizes to +91XXXXXXXXXX before storing/verifying.
+                otp = generate_otp("+919990008888")
                 client = TestClient(fastapi_app, raise_server_exceptions=False)
                 r = client.post("/auth/verify-otp", json={"phone": "9990008888", "otp": otp})
                 assert r.status_code == 200
@@ -490,7 +494,9 @@ class TestComplaintsRouter:
             client = _make_client(db, admin)
             r = client.get("/complaints/")
             assert r.status_code == 200
-            assert isinstance(r.json(), list)
+            body = r.json()
+            assert isinstance(body["items"], list)
+            assert body["total"] == len(body["items"])
         finally:
             _clear()
             engine.dispose()
