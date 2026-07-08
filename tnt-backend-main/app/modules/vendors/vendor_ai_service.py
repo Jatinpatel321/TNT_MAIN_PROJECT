@@ -46,7 +46,8 @@ class VendorAIService:
             if hasattr(row.order_date, 'weekday'):
                 dow = row.order_date.weekday()
             else:
-                dow = row.order_date.weekday()
+                # SQLite's func.date() yields an ISO string, not a date object
+                dow = date.fromisoformat(str(row.order_date)).weekday()
             dow_avg[dow].append(row.order_count)
         
         dow_prediction: Dict[int, float] = {}
