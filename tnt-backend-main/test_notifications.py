@@ -93,7 +93,7 @@ def test_get_notifications_returns_own_only(test_db_session, seed_data):
 
     assert resp.status_code == 200
     data = resp.json()
-    ids = {n["id"] for n in data}
+    ids = {n["id"] for n in data["items"]}
     assert seed_data["n1"].id in ids
     assert seed_data["n2"].id in ids
     # Other user's notification must NOT appear
@@ -106,7 +106,12 @@ def test_get_notifications_correct_count(test_db_session, seed_data):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    data = resp.json()
+    assert data["total"] == 2
+    assert len(data["items"]) == 2
+    # Pagination metadata reflects the request defaults
+    assert data["limit"] == 20
+    assert data["offset"] == 0
 
 
 def test_get_notifications_empty_for_user_with_none(test_db_session, seed_data):
@@ -121,7 +126,9 @@ def test_get_notifications_empty_for_user_with_none(test_db_session, seed_data):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    assert resp.json() == []
+    data = resp.json()
+    assert data["items"] == []
+    assert data["total"] == 0
 
 
 def test_get_notifications_contains_message_fields(test_db_session, seed_data):
@@ -130,7 +137,7 @@ def test_get_notifications_contains_message_fields(test_db_session, seed_data):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    first = resp.json()[0]
+    first = resp.json()["items"][0]
     assert "title" in first
     assert "message" in first
     assert "is_read" in first
@@ -154,7 +161,10 @@ def test_mark_notification_as_read_succeeds(test_db_session, seed_data):
     app.dependency_overrides.clear()
 
     assert resp.status_code == 200
-    assert "read" in resp.json().get("message", "").lower()
+    # Endpoint returns the updated notification object
+    body = resp.json()
+    assert body["id"] == seed_data["n1"].id
+    assert body["is_read"] is True
 
 
 def test_mark_notification_persists_in_db(test_db_session, seed_data):
