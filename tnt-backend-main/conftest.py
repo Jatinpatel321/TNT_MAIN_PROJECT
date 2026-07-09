@@ -56,4 +56,14 @@ def _auto_fake_redis(monkeypatch):
     monkeypatch.setattr("app.core.faculty_policy.redis_client", fake)
     fake.set(UNIVERSITY_POLICY_KEY, _json.dumps(_DEFAULT_POLICY))
 
+    # faculty_policy keeps a module-global _fallback_policy that
+    # set_faculty_priority_policy() rebinds. With redis faked fresh per test,
+    # every read cache-misses into that global — so one test enabling the
+    # policy would leak "enabled" into all later tests (wall-clock dependent
+    # 403s at checkout). Reset it per test; monkeypatch restores on teardown.
+    monkeypatch.setattr(
+        "app.core.faculty_policy._fallback_policy",
+        {"enabled": False, "start_hour": 12, "end_hour": 14},
+    )
+
     yield fake
