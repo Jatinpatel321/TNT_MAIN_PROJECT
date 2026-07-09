@@ -24,7 +24,9 @@ Public surface:
 """
 from __future__ import annotations
 
+import datetime as _dt
 import logging
+import time as _time
 
 from fastapi import HTTPException
 
@@ -434,13 +436,111 @@ def get_order_eta(user: dict, order_id: int, db: Session) -> dict:
     return _get_order_eta(order_id, db_user.id, db)
 
 
-def generate_order_qr(order_id: int, db: Session) -> dict:
-    """Generate (or return cached) QR code for student pickup."""
+def generate_order_qr(user: dict, order_id: int, db: Session, *, force: bool = False) -> dict:
+    """Generate (or reuse) a rotating pickup QR for the *owning* student.
+
+    Ownership is enforced: a QR can only ever be produced by the student who
+    placed the order, and only while it is READY for pickup.
+    """
+    db_user = _require_user(user, db)
+    order = _require_own_order(order_id, db_user, db)
     try:
-        qr_code = generate_qr_code(order_id, db)
-        return {"qr_code": qr_code}
+        qr_code = generate_qr_code(order.id, db, force=force)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    return _qr_payload(order, qr_code)
+
+
+def _qr_payload(order: Order, qr_code: str) -> dict:
+    """Shape a QR response with its rotation/expiry metadata."""
+    from app.modules.orders.qr_service import _parse_expiry
+
+    expires_at = _parse_expiry(qr_code)
+    now = int(_time.time())
+    return {
+        "order_id": order.id,
+        "qr_code": qr_code,
+        "expires_at": (
+            _dt.datetime.utcfromtimestamp(expires_at).isoformat() + "Z"
+            if expires_at else None
+        ),
+        "expires_in_seconds": max(0, expires_at - now) if expires_at else None,
+        "status": order.status.value if hasattr(order.status, "value") else str(order.status),
+    }
+
+
+def get_pickup_status(user: dict, order_id: int, db: Session) -> dict:
+    """Live pickup dashboard for the owning student: status, vendor, slot
+    window, ETA, QR availability/countdown and pickup confirmation."""
+    from app.modules.orders.qr_service import _is_live, _parse_expiry
+    from app.modules.slots.model import Slot
+
+    db_user = _require_user(user, db)
+    order = _require_own_order(order_id, db_user, db)
+
+    status_val = order.status.value if hasattr(order.status, "value") else str(order.status)
+    is_ready = order.status in (OrderStatus.READY, OrderStatus.READY_FOR_PICKUP)
+    is_picked = order.status in (OrderStatus.PICKED, OrderStatus.COMPLETED)
+
+    vendor = db.query(User).filter(User.id == order.vendor_id).first()
+    vendor_name = (vendor.full_name or vendor.name) if vendor else f"Vendor #{order.vendor_id}"
+
+    slot = db.query(Slot).filter(Slot.id == order.slot_id).first()
+
+    # QR is only live/available while READY and the token is signed+unexpired.
+    qr_live = is_ready and _is_live(order.id, order.qr_code)
+    expires_at = _parse_expiry(order.qr_code) if qr_live else None
+    now = int(_time.time())
+
+    return {
+        "order_id": order.id,
+        "status": status_val,
+        "is_ready_for_pickup": is_ready,
+        "is_picked": is_picked,
+        "can_generate_qr": is_ready,
+        "vendor_id": order.vendor_id,
+        "vendor_name": vendor_name,
+        "vendor_location": _resolve_vendor_location(order.vendor_id, db),
+        "slot": {
+            "id": slot.id,
+            "start_time": slot.start_time.isoformat() if slot and slot.start_time else None,
+            "end_time": slot.end_time.isoformat() if slot and slot.end_time else None,
+        } if slot else None,
+        "eta_minutes": order.eta_minutes,
+        "qr_available": qr_live,
+        "qr_expires_at": (
+            _dt.datetime.utcfromtimestamp(expires_at).isoformat() + "Z"
+            if expires_at else None
+        ),
+        "qr_expires_in_seconds": max(0, expires_at - now) if expires_at else None,
+        "pickup_confirmed_at": (
+            order.pickup_confirmed_at.isoformat() if order.pickup_confirmed_at else None
+        ),
+        "total_amount": float(order.total_amount),
+    }
+
+
+def _resolve_vendor_location(vendor_user_id: int, db: Session) -> str | None:
+    """Best-effort vendor pickup location via the vendor's business profile.
+
+    Orders reference the vendor's *user* id; the location lives on the linked
+    business profile. Any miss returns None rather than failing the response.
+    """
+    try:
+        from app.modules.vendors.model import Vendor
+        from app.modules.vendors.profile_models import VendorProfile
+
+        vendor = db.query(Vendor).filter(Vendor.owner_id == vendor_user_id).first()
+        if not vendor:
+            return None
+        profile = (
+            db.query(VendorProfile)
+            .filter(VendorProfile.vendor_id == vendor.vendor_id)
+            .first()
+        )
+        return profile.location if profile else None
+    except Exception:
+        return None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
