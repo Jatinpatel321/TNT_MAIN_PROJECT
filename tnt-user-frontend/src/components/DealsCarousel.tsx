@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, ImageBackground, StyleSheet, View, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import LinearGradient from 'react-native-linear-gradient';
-import { DEAL_IMAGES } from '../assets/images';
 
 const { width } = Dimensions.get('window');
 // Card takes up most of the screen width minus padding
@@ -16,27 +15,29 @@ type Deal = {
   image: any;
 };
 
+// Remote food/stationery banners — the bundled DEAL_IMAGES assets were blank
+// low-res placeholders, so the cards rendered as a grey gradient with no photo.
 const DEALS: Deal[] = [
   {
     id: '1',
     title: 'Burger Combo',
     description: 'Veg Burger + Fries + Coke',
     discount: '25% OFF',
-    image: DEAL_IMAGES.burger_combo,
+    image: { uri: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=70' },
   },
   {
     id: '2',
     title: 'Cafe Breakfast',
     description: 'Coffee + Sandwich',
     discount: '20% OFF',
-    image: DEAL_IMAGES.coffee_sandwich,
+    image: { uri: 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&w=800&q=70' },
   },
   {
     id: '3',
     title: 'Student Stationery Pack',
     description: 'Notebook + Pens',
     discount: '15% OFF',
-    image: DEAL_IMAGES.stationery_combo,
+    image: { uri: 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800&q=70' },
   },
 ];
 
