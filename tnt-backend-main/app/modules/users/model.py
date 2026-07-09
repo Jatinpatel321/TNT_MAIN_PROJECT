@@ -26,6 +26,10 @@ class User(Base):
     university_id = Column(String, nullable=True)
     department = Column(String, nullable=True)
     semester = Column(Integer, nullable=True)
+    email = Column(String(255), nullable=True)
+    campus = Column(String(100), nullable=True)
+    residence_type = Column(String(20), nullable=True)  # "hostel" | "day_scholar"
+    dietary_preference = Column(String(20), nullable=True)  # vegetarian | non_vegetarian | vegan | jain | other
     profile_image = Column(String, nullable=True)
     device_token = Column(String(512), nullable=True)
     push_enabled = Column(Boolean, nullable=False, default=True)
