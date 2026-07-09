@@ -1,11 +1,41 @@
 import { apiClient, authHeaders } from './apiClient';
-import type { User } from '../types/models';
+import type { DietaryPreference, ResidenceType, User } from '../types/models';
 
 export type ProfileUpdatePayload = {
   full_name?: string;
   university_id?: string;
   department?: string;
   semester?: number;
+  email?: string;
+  campus?: string;
+  residence_type?: ResidenceType;
+  dietary_preference?: DietaryPreference;
+};
+
+export type ProfileStats = {
+  total_orders: number;
+  food_orders: number;
+  stationery_orders: number;
+  group_orders: number;
+  total_spent: number;
+  loyalty_points: number;
+  rewards_earned: number;
+  saved_via_offers: number;
+  member_since: string | null;
+};
+
+export type UserPreferences = {
+  dietary_restrictions?: string[];
+  cuisine_preferences?: string[];
+  spice_level?: number;
+  preferred_pickup_hour?: number;
+  enable_reorder_suggestions?: boolean;
+  enable_offpeak_reminders?: boolean;
+  enable_rush_alerts?: boolean;
+  enable_ai_recommendations?: boolean;
+  preferred_pickup_locations?: string[];
+  favourite_categories?: string[];
+  dark_mode?: boolean;
 };
 
 export type FavoriteVendor = {
@@ -48,6 +78,25 @@ export async function uploadProfileImage(fileUri: string, fileName: string, mime
     },
   });
   return res.data as { profile_image: string };
+}
+
+export async function getProfileStats(): Promise<ProfileStats> {
+  const res = await apiClient.get('/profile/stats', { headers: await authHeaders() });
+  return res.data as ProfileStats;
+}
+
+export async function getPreferences(): Promise<UserPreferences> {
+  const res = await apiClient.get('/users/me/preferences', { headers: await authHeaders() });
+  return (res.data?.preferences ?? {}) as UserPreferences;
+}
+
+export async function updatePreferences(payload: UserPreferences): Promise<UserPreferences> {
+  const res = await apiClient.put('/users/me/preferences', payload, { headers: await authHeaders() });
+  return (res.data?.preferences ?? {}) as UserPreferences;
+}
+
+export async function deleteAccount(): Promise<void> {
+  await apiClient.delete('/profile/me', { headers: await authHeaders() });
 }
 
 export async function getFavoriteVendors(): Promise<FavoriteVendor[]> {
