@@ -156,6 +156,7 @@ export function OrdersScreen() {
         vendorLogoUrl={vendor?.logo_url ?? null}
         totalAmount={totalRupees}
         onPress={() => navigation.navigate('OrderTracking', {orderId: o.id})}
+        onShowQr={() => navigation.navigate('QR', {orderId: o.id})}
       />
     );
   };

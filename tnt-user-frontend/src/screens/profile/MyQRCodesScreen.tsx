@@ -16,10 +16,12 @@ import { EmptyState, FadeInSection, SectionCard, SkeletonBlock } from './profile
 type Props = NativeStackScreenProps<RootStackParamList, 'MyQRCodes'>;
 
 const PICKUP_READY_STATUSES = new Set(['ready', 'ready_for_pickup']);
+const PICKED_STATUSES = new Set(['picked', 'completed']);
 
 export function MyQRCodesScreen({ navigation }: Props) {
   const { colors } = useAppTheme();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [pastPickups, setPastPickups] = useState<Order[]>([]);
   const [vendors, setVendors] = useState<Record<number, Vendor>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,6 +35,9 @@ export function MyQRCodesScreen({ navigation }: Props) {
         getVendors('stationery').catch(() => [] as Vendor[]),
       ]);
       setOrders(myOrders.filter((o) => PICKUP_READY_STATUSES.has((o.status || '').toLowerCase())));
+      setPastPickups(
+        myOrders.filter((o) => PICKED_STATUSES.has((o.status || '').toLowerCase())).slice(0, 10),
+      );
       const map: Record<number, Vendor> = {};
       [...food, ...stationery].forEach((v) => {
         map[v.id] = v;
@@ -127,6 +132,37 @@ export function MyQRCodesScreen({ navigation }: Props) {
           ))}
         </View>
       )}
+
+      {/* Recent pickup history */}
+      {!loading && pastPickups.length > 0 && (
+        <View style={{ marginTop: 22 }}>
+          <Text style={[styles.historyHeading, { color: colors.text }]}>Recent Pickups</Text>
+          <View style={{ gap: 10, marginTop: 10 }}>
+            {pastPickups.map((order) => (
+              <Pressable key={order.id} onPress={() => navigation.navigate('Receipt', { orderId: order.id })}>
+                <SectionCard>
+                  <View style={styles.row}>
+                    <View style={[styles.qrIcon, { backgroundColor: colors.successSoft }]}>
+                      <MaterialCommunityIcons name="check-decagram" size={24} color={colors.success} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.orderTitle, { color: colors.text }]}>Order #{order.id}</Text>
+                      <Text style={[styles.orderMeta, { color: colors.muted }]}>
+                        {vendors[order.vendor_id]?.name ?? `Vendor #${order.vendor_id}`}
+                        {order.created_at ? `  ·  ${new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.receiptLink}>
+                      <MaterialCommunityIcons name="receipt" size={16} color={colors.primary} />
+                      <Text style={[styles.receiptLinkText, { color: colors.primary }]}>Receipt</Text>
+                    </View>
+                  </View>
+                </SectionCard>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -174,5 +210,18 @@ const styles = StyleSheet.create({
   readyBadgeText: {
     fontSize: 11,
     fontWeight: '800',
+  },
+  historyHeading: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  receiptLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  receiptLinkText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

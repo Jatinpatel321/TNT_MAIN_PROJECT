@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from '../../utils/tokenStorage';
 import { Text, TextInput } from 'react-native-paper';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -74,7 +74,7 @@ export function GroupDetailScreen() {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('access_token').then(setToken).catch(() => {});
+    getToken().then(setToken).catch(() => {});
   }, []);
 
   // invites

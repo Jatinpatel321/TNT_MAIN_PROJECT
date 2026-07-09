@@ -18,9 +18,11 @@ export function OrderHistoryCard(props: {
   vendorLogoUrl?: string | null;
   totalAmount?: number | null;
   onPress: () => void;
+  onShowQr?: () => void;
 }) {
-  const {order, vendorName, vendorLogoUrl, totalAmount, onPress} = props;
+  const {order, vendorName, vendorLogoUrl, totalAmount, onPress, onShowQr} = props;
   const statusKey = (order.status || '').toLowerCase();
+  const isReadyForPickup = statusKey === 'ready' || statusKey === 'ready_for_pickup';
   const statusLabel = ORDER_STATUS_LABELS[statusKey] ?? order.status;
   const statusColor = ORDER_STATUS_COLORS[statusKey] ?? '#6B7280';
   const active = isActiveOrder(statusKey);
@@ -78,6 +80,14 @@ export function OrderHistoryCard(props: {
             </Text>
           ) : null}
         </View>
+
+        {isReadyForPickup && onShowQr ? (
+          <Pressable
+            onPress={onShowQr}
+            style={({pressed}) => [styles.pickupCta, pressed && {opacity: 0.85}]}>
+            <Text style={styles.pickupCtaText}>📲  Show Pickup QR</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -186,5 +196,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#111827',
+  },
+  pickupCta: {
+    marginTop: 12,
+    backgroundColor: '#6C63FF',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  pickupCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
