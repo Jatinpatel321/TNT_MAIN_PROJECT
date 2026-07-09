@@ -14,17 +14,22 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
 
 import type { RootStackParamList } from '../../types/navigation';
-import type { User } from '../../types/models';
+import type { DietaryPreference, ResidenceType, User } from '../../types/models';
 import { Screen } from '../../components/Screen';
 import { GradientButton } from '../../components/GradientButton';
 import {
+  getPreferences,
   getProfile,
+  updatePreferences,
   updateProfile,
   uploadProfileImage,
 } from '../../services/profileService';
+import type { ProfileUpdatePayload, UserPreferences } from '../../services/profileService';
 import { toApiError } from '../../services/apiClient';
 import { useAuth } from '../../hooks/useAuth';
+import { useAppTheme } from '../../theme/ThemeContext';
 import { API_BASE_URL } from '../../constants/api';
+import { Chip } from './profileUi';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -42,13 +47,44 @@ const DEPARTMENTS = [
   'Other',
 ];
 
+const DIETARY_OPTIONS: { value: DietaryPreference; label: string; icon: string }[] = [
+  { value: 'vegetarian', label: 'Vegetarian', icon: 'leaf' },
+  { value: 'non_vegetarian', label: 'Non-Veg', icon: 'food-drumstick' },
+  { value: 'vegan', label: 'Vegan', icon: 'sprout' },
+  { value: 'jain', label: 'Jain', icon: 'flower-tulip' },
+  { value: 'other', label: 'Other', icon: 'silverware-fork-knife' },
+];
+
+const RESIDENCE_OPTIONS: { value: ResidenceType; label: string; icon: string }[] = [
+  { value: 'hostel', label: 'Hostel', icon: 'bed' },
+  { value: 'day_scholar', label: 'Day Scholar', icon: 'bus' },
+];
+
+const CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'south_indian', label: 'South Indian' },
+  { value: 'north_indian', label: 'North Indian' },
+  { value: 'chinese', label: 'Chinese' },
+  { value: 'fast_food', label: 'Fast Food' },
+  { value: 'healthy', label: 'Healthy' },
+  { value: 'snacks', label: 'Snacks' },
+  { value: 'beverages', label: 'Beverages' },
+];
+
 export function EditProfileScreen({ navigation }: Props) {
-  const { user, setSession, accessToken } = useAuth();
+  const { setSession, accessToken } = useAuth();
+  const { colors } = useAppTheme();
   const [profile, setProfile] = useState<User | null>(null);
   const [fullName, setFullName] = useState('');
   const [universityId, setUniversityId] = useState('');
   const [department, setDepartment] = useState('');
   const [semester, setSemester] = useState('');
+  const [email, setEmail] = useState('');
+  const [campus, setCampus] = useState('');
+  const [residence, setResidence] = useState<ResidenceType | null>(null);
+  const [dietary, setDietary] = useState<DietaryPreference | null>(null);
+  const [pickupLocations, setPickupLocations] = useState<string[]>([]);
+  const [pickupInput, setPickupInput] = useState('');
+  const [favCategories, setFavCategories] = useState<string[]>([]);
   const [showDeptPicker, setShowDeptPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -57,12 +93,21 @@ export function EditProfileScreen({ navigation }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const p = await getProfile();
+        const [p, prefs] = await Promise.all([
+          getProfile(),
+          getPreferences().catch(() => ({} as UserPreferences)),
+        ]);
         setProfile(p);
         setFullName(p.full_name ?? p.name ?? '');
         setUniversityId(p.university_id ?? '');
         setDepartment(p.department ?? '');
         setSemester(p.semester != null ? String(p.semester) : '');
+        setEmail(p.email ?? '');
+        setCampus(p.campus ?? '');
+        setResidence(p.residence_type ?? null);
+        setDietary(p.dietary_preference ?? null);
+        setPickupLocations(prefs.preferred_pickup_locations ?? []);
+        setFavCategories(prefs.favourite_categories ?? []);
       } catch (e) {
         Alert.alert('Error', toApiError(e).message);
       } finally {
@@ -105,14 +150,38 @@ export function EditProfileScreen({ navigation }: Props) {
     }
   };
 
+  const addPickupLocation = () => {
+    const value = pickupInput.trim();
+    if (!value) return;
+    if (pickupLocations.length >= 10) {
+      Alert.alert('Limit reached', 'You can save up to 10 pickup spots.');
+      return;
+    }
+    if (!pickupLocations.some((l) => l.toLowerCase() === value.toLowerCase())) {
+      setPickupLocations([...pickupLocations, value]);
+    }
+    setPickupInput('');
+  };
+
+  const toggleCategory = (value: string) => {
+    setFavCategories((prev) =>
+      prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value],
+    );
+  };
+
   const handleSave = async () => {
     const trimmedName = fullName.trim();
     if (!trimmedName) {
       Alert.alert('Validation', 'Full name is required.');
       return;
     }
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
+      Alert.alert('Validation', 'Please enter a valid email address.');
+      return;
+    }
 
-    const payload: Record<string, any> = { full_name: trimmedName };
+    const payload: ProfileUpdatePayload = { full_name: trimmedName };
     if (universityId.trim()) payload.university_id = universityId.trim();
     if (department.trim()) payload.department = department.trim();
     if (semester.trim()) {
@@ -123,10 +192,18 @@ export function EditProfileScreen({ navigation }: Props) {
       }
       payload.semester = sem;
     }
+    if (trimmedEmail) payload.email = trimmedEmail;
+    if (campus.trim()) payload.campus = campus.trim();
+    if (residence) payload.residence_type = residence;
+    if (dietary) payload.dietary_preference = dietary;
 
     setSaving(true);
     try {
       const updated = await updateProfile(payload);
+      await updatePreferences({
+        preferred_pickup_locations: pickupLocations,
+        favourite_categories: favCategories,
+      });
       setProfile(updated);
 
       // Update auth context
@@ -148,19 +225,25 @@ export function EditProfileScreen({ navigation }: Props) {
     return (
       <Screen>
         <View style={styles.center}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </Screen>
     );
   }
 
+  const inputStyle = [
+    styles.input,
+    { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+  ];
+  const labelStyle = [styles.label, { color: colors.subtext }];
+
   return (
     <Screen scroll>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
         </Pressable>
-        <Text style={styles.title}>Edit Profile</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Edit Profile</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -171,72 +254,85 @@ export function EditProfileScreen({ navigation }: Props) {
             {profileImageUrl ? (
               <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
             ) : (
-              <View style={styles.avatarPlaceholder}>
-                <MaterialCommunityIcons name="account" size={40} color="#6C63FF" />
+              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primarySoft }]}>
+                <MaterialCommunityIcons name="account" size={40} color={colors.primary} />
               </View>
             )}
-            {uploading ? (
-              <View style={styles.avatarBadge}>
+            <View style={[styles.avatarBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+              {uploading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
-              </View>
-            ) : (
-              <View style={styles.avatarBadge}>
+              ) : (
                 <MaterialCommunityIcons name="camera" size={14} color="#FFFFFF" />
-              </View>
-            )}
+              )}
+            </View>
           </View>
         </Pressable>
-        <Text style={styles.avatarHint}>Tap to change photo</Text>
+        <Text style={[styles.avatarHint, { color: colors.muted }]}>Tap to change photo</Text>
       </View>
 
       {/* Form Fields */}
       <View style={styles.form}>
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={labelStyle}>Full Name</Text>
           <TextInput
-            style={styles.input}
+            style={inputStyle}
             value={fullName}
             onChangeText={setFullName}
             placeholder="Enter your full name"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.muted}
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>University ID</Text>
+          <Text style={labelStyle}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={inputStyle}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@university.edu"
+            placeholderTextColor={colors.muted}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={labelStyle}>University ID</Text>
+          <TextInput
+            style={inputStyle}
             value={universityId}
             onChangeText={setUniversityId}
             placeholder="e.g. 2024CSE001"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.muted}
             autoCapitalize="characters"
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Department</Text>
+          <Text style={labelStyle}>Department</Text>
           <Pressable
-            style={styles.selectField}
+            style={[styles.selectField, { backgroundColor: colors.surface, borderColor: colors.border }]}
             onPress={() => setShowDeptPicker(!showDeptPicker)}
           >
-            <Text style={department ? styles.selectText : styles.selectPlaceholder}>
+            <Text style={department ? [styles.selectText, { color: colors.text }] : [styles.selectText, { color: colors.muted }]}>
               {department || 'Select department'}
             </Text>
             <MaterialCommunityIcons
               name={showDeptPicker ? 'chevron-up' : 'chevron-down'}
               size={20}
-              color="#6B7280"
+              color={colors.muted}
             />
           </Pressable>
           {showDeptPicker && (
-            <View style={styles.pickerContainer}>
+            <View style={[styles.pickerContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {DEPARTMENTS.map((dept) => (
                 <Pressable
                   key={dept}
                   style={[
                     styles.pickerItem,
-                    department === dept && styles.pickerItemActive,
+                    { borderBottomColor: colors.border },
+                    department === dept && { backgroundColor: colors.primarySoft },
                   ]}
                   onPress={() => {
                     setDepartment(dept);
@@ -246,6 +342,7 @@ export function EditProfileScreen({ navigation }: Props) {
                   <Text
                     style={[
                       styles.pickerItemText,
+                      { color: department === dept ? colors.primary : colors.subtext },
                       department === dept && styles.pickerItemTextActive,
                     ]}
                   >
@@ -258,22 +355,110 @@ export function EditProfileScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Semester</Text>
+          <Text style={labelStyle}>Semester</Text>
           <TextInput
-            style={styles.input}
+            style={inputStyle}
             value={semester}
             onChangeText={setSemester}
             placeholder="1-12"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colors.muted}
             keyboardType="number-pad"
             maxLength={2}
           />
         </View>
 
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Role</Text>
-          <View style={[styles.input, styles.disabledInput]}>
-            <Text style={styles.disabledText}>
+          <Text style={labelStyle}>Campus</Text>
+          <TextInput
+            style={inputStyle}
+            value={campus}
+            onChangeText={setCampus}
+            placeholder="e.g. North Campus"
+            placeholderTextColor={colors.muted}
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={labelStyle}>Residence</Text>
+          <View style={styles.chipRow}>
+            {RESIDENCE_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                label={opt.label}
+                icon={opt.icon}
+                active={residence === opt.value}
+                onPress={() => setResidence(residence === opt.value ? null : opt.value)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={labelStyle}>Dietary Preference</Text>
+          <View style={styles.chipRow}>
+            {DIETARY_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                label={opt.label}
+                icon={opt.icon}
+                active={dietary === opt.value}
+                onPress={() => setDietary(dietary === opt.value ? null : opt.value)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={labelStyle}>Preferred Pickup Spots</Text>
+          <View style={styles.pickupInputRow}>
+            <TextInput
+              style={[...inputStyle, { flex: 1 }]}
+              value={pickupInput}
+              onChangeText={setPickupInput}
+              placeholder="e.g. Library Gate"
+              placeholderTextColor={colors.muted}
+              onSubmitEditing={addPickupLocation}
+              returnKeyType="done"
+            />
+            <Pressable
+              onPress={addPickupLocation}
+              style={[styles.addBtn, { backgroundColor: colors.primary }]}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
+          {pickupLocations.length > 0 && (
+            <View style={styles.chipRow}>
+              {pickupLocations.map((loc) => (
+                <Chip
+                  key={loc}
+                  label={`${loc}  ✕`}
+                  icon="map-marker"
+                  onPress={() => setPickupLocations(pickupLocations.filter((l) => l !== loc))}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={labelStyle}>Favourite Categories</Text>
+          <View style={styles.chipRow}>
+            {CATEGORY_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                label={opt.label}
+                active={favCategories.includes(opt.value)}
+                onPress={() => toggleCategory(opt.value)}
+              />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={labelStyle}>Role</Text>
+          <View style={[styles.input, styles.disabledInput, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+            <Text style={[styles.disabledText, { color: colors.muted }]}>
               {profile?.role?.charAt(0).toUpperCase() + (profile?.role?.slice(1) ?? '')}
             </Text>
           </View>
@@ -320,7 +505,6 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#F3F2FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -331,16 +515,13 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#6C63FF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   avatarHint: {
     marginTop: 8,
     fontSize: 13,
-    color: '#6B7280',
   },
   form: {
     gap: 16,
@@ -351,50 +532,35 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
   },
   input: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#111827',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   disabledInput: {
-    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
   },
   disabledText: {
     fontSize: 15,
-    color: '#9CA3AF',
   },
   selectField: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   selectText: {
     fontSize: 15,
-    color: '#111827',
-  },
-  selectPlaceholder: {
-    fontSize: 15,
-    color: '#9CA3AF',
   },
   pickerContainer: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     marginTop: 4,
     overflow: 'hidden',
   },
@@ -402,18 +568,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  pickerItemActive: {
-    backgroundColor: '#F3F2FF',
   },
   pickerItemText: {
     fontSize: 14,
-    color: '#374151',
   },
   pickerItemTextActive: {
-    color: '#6C63FF',
     fontWeight: '600',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pickupInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  addBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actions: {
     marginTop: 24,

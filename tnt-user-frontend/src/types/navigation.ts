@@ -48,6 +48,8 @@ export type RootStackParamList = {
   GroupDetail: { groupId: number };
   InviteMember: { groupId: number };
   EditProfile: undefined;
+  MyQRCodes: undefined;
+  Complaints: undefined;
   Search: undefined;
   RecommendedForYou: undefined;
   SmartReorder: undefined;

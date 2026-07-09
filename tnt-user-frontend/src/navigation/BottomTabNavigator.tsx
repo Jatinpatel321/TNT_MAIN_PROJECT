@@ -10,6 +10,7 @@ import { RewardsScreen } from '../screens/rewards/RewardsScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { getNotifications } from '../services/notificationService';
+import { useAppTheme } from '../theme/ThemeContext';
 
 function useUnreadNotifications() {
   const [unread, setUnread] = React.useState(0);
@@ -42,17 +43,18 @@ const Tab = createBottomTabNavigator<AppTabsParamList>();
 
 export function BottomTabNavigator() {
   const unread = useUnreadNotifications();
+  const { colors } = useAppTheme();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }: { route: RouteProp<AppTabsParamList, keyof AppTabsParamList> }): BottomTabNavigationOptions => ({
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           shadowColor: 'rgba(0,0,0,0.1)',
           shadowOpacity: 0.1,
           shadowOffset: { width: 0, height: 2 },

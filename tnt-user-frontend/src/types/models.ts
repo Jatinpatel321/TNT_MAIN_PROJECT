@@ -5,6 +5,15 @@ export type UserRole =
   | 'admin'
   | 'super_admin';
 
+export type ResidenceType = 'hostel' | 'day_scholar';
+
+export type DietaryPreference =
+  | 'vegetarian'
+  | 'non_vegetarian'
+  | 'vegan'
+  | 'jain'
+  | 'other';
+
 export type User = {
   id: number;
   phone: string;
@@ -15,6 +24,10 @@ export type User = {
   university_id: string | null;
   department: string | null;
   semester: number | null;
+  email: string | null;
+  campus: string | null;
+  residence_type: ResidenceType | null;
+  dietary_preference: DietaryPreference | null;
   profile_image: string | null;
   is_active: boolean;
   is_approved: boolean;
