@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import type { Vendor } from '../types/models';
 import { VENDOR_IMAGES } from '../assets/images';
 import { toAbsoluteUrl } from '../utils/url';
+import { useAppTheme } from '../theme/ThemeContext';
+import type { AppPalette } from '../theme/theme';
 
 export function VendorCard(props: {
   vendor: Vendor;
@@ -12,6 +14,8 @@ export function VendorCard(props: {
   onToggleFavorite?: () => void;
 }) {
   const { vendor, isFavorite, onToggleFavorite } = props;
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const slug = vendor.name?.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || '';
   const localImage = VENDOR_IMAGES[slug];
   const remoteUri = toAbsoluteUrl(vendor.logo_url);
@@ -82,14 +86,16 @@ export function VendorCard(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   card: {
     width: '48%',
     minHeight: 210,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 10,
     marginBottom: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 4 },
@@ -100,7 +106,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#F5F7FB',
+    backgroundColor: colors.surfaceAlt,
     marginBottom: 10,
   },
   image: {
@@ -116,13 +122,13 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#6C63FF',
+    color: colors.primary,
   },
   ratingBadge: {
     position: 'absolute',
     right: 8,
     bottom: 8,
-    backgroundColor: '#333',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 6,
@@ -149,6 +155,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 15,
     fontWeight: '700',
+    color: colors.text,
   },
   chipRow: {
     flexDirection: 'row',
@@ -157,7 +164,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   chip: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.primarySoft,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -165,22 +172,22 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6C63FF',
+    color: colors.primary,
   },
   chipExpress: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: colors.warningSoft,
   },
   chipTextExpress: {
-    color: '#D97706',
+    color: colors.warning,
   },
   location: {
     fontSize: 12,
-    color: '#6B7280',
+    color: colors.muted,
     marginTop: 4,
   },
   meta: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.muted,
     marginTop: 4,
   },
 });

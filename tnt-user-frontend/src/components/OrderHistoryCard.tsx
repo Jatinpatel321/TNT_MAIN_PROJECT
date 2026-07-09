@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {Image, Pressable, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 
@@ -11,6 +11,8 @@ import {
 import {VENDOR_IMAGES} from '../assets/images';
 import {toAbsoluteUrl} from '../utils/url';
 import {formatCurrency} from '../utils/format';
+import {useAppTheme} from '../theme/ThemeContext';
+import type {AppPalette} from '../theme/theme';
 
 export function OrderHistoryCard(props: {
   order: Order;
@@ -21,6 +23,8 @@ export function OrderHistoryCard(props: {
   onShowQr?: () => void;
 }) {
   const {order, vendorName, vendorLogoUrl, totalAmount, onPress, onShowQr} = props;
+  const {colors} = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const statusKey = (order.status || '').toLowerCase();
   const isReadyForPickup = statusKey === 'ready' || statusKey === 'ready_for_pickup';
   const statusLabel = ORDER_STATUS_LABELS[statusKey] ?? order.status;
@@ -93,7 +97,7 @@ export function OrderHistoryCard(props: {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   wrap: {
     width: '100%',
   },
@@ -101,9 +105,11 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 18,
     padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: 'rgba(0,0,0,0.08)',
     shadowOpacity: 0.08,
     shadowOffset: {width: 0, height: 3},
@@ -113,7 +119,7 @@ const styles = StyleSheet.create({
   },
   activeCard: {
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: colors.accent,
   },
   headerRow: {
     flexDirection: 'row',
@@ -124,7 +130,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceAlt,
     marginRight: 12,
     overflow: 'hidden',
   },
@@ -137,10 +143,11 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
   },
   placeholderText: {
     fontWeight: '700',
-    color: '#3730A3',
+    color: colors.primary,
   },
   headerInfo: {
     flex: 1,
@@ -148,7 +155,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   statusRow: {
     flexDirection: 'row',
@@ -168,8 +175,8 @@ const styles = StyleSheet.create({
   delayBadge: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#EF4444',
-    backgroundColor: '#FEF2F2',
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 8,
@@ -181,31 +188,31 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: colors.border,
   },
   orderId: {
     fontSize: 13,
-    color: '#6B7280',
+    color: colors.muted,
   },
   dateText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.muted,
     marginTop: 2,
   },
   total: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   pickupCta: {
     marginTop: 12,
-    backgroundColor: '#6C63FF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 11,
     alignItems: 'center',
   },
   pickupCtaText: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '800',
   },

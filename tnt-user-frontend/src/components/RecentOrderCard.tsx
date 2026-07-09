@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import type { Order } from '../types/models';
+import { useAppTheme } from '../theme/ThemeContext';
+import type { AppPalette } from '../theme/theme';
 
 export function RecentOrderCard(props: { order: Order; vendorName: string; onPress: () => void }) {
   const { order, vendorName } = props;
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable style={styles.card} onPress={props.onPress}>
       <View style={styles.row}>
@@ -16,12 +20,14 @@ export function RecentOrderCard(props: { order: Order; vendorName: string; onPre
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 18,
     padding: 14,
     marginBottom: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: 'rgba(0,0,0,0.1)',
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 4 },
@@ -36,15 +42,16 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '700',
+    color: colors.text,
   },
   status: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6C63FF',
+    color: colors.primary,
   },
   time: {
     marginTop: 6,
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.muted,
   },
 });

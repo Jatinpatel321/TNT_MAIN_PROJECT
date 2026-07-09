@@ -52,6 +52,12 @@ export function BottomTabNavigator() {
         tabBarShowLabel: true,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
+        // Keep every label on one line — the default font truncates the longer
+        // labels ("Notifications", "Rewards") to "Notificatio…" on narrow phones.
+        tabBarLabelStyle: {
+          fontSize: 10.5,
+          fontWeight: '600',
+        },
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
@@ -60,6 +66,7 @@ export function BottomTabNavigator() {
           shadowOffset: { width: 0, height: 2 },
           shadowRadius: 6,
           elevation: 6,
+          paddingTop: 4,
         },
         tabBarIcon: ({ color, size }: { color: string; size: number }) => {
           const iconName =

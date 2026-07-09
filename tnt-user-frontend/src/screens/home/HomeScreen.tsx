@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -17,6 +17,8 @@ import { getMyOrders } from '../../services/orderService';
 import { toApiError } from '../../services/apiClient';
 import { LOGO } from '../../assets';
 import { useAuth } from '../../hooks/useAuth';
+import { useAppTheme } from '../../theme/ThemeContext';
+import type { AppPalette } from '../../theme/theme';
 import {
   getVendorRecommendations,
   getMenuSuggestions,
@@ -44,6 +46,8 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export function HomeScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [popularVendors, setPopularVendors] = useState<Vendor[]>([]);
   const [vendorMap, setVendorMap] = useState<Record<number, string>>({});
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -566,7 +570,7 @@ export function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   scroll: {
     paddingBottom: 20,
   },
@@ -589,6 +593,7 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 16,
     fontWeight: '800',
+    color: colors.text,
   },
   iconRow: {
     flexDirection: 'row',
@@ -596,7 +601,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.muted,
     marginTop: 4,
   },
   sectionSpacing: {
@@ -614,18 +619,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.text,
   },
   horizontalList: {
     paddingBottom: 4,
   },
   muted: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.muted,
   },
   seeAll: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: colors.primary,
     marginLeft: 'auto',
   },
 
@@ -639,14 +645,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   peakBannerActive: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: colors.danger,
   },
   peakBannerClear: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: colors.successSoft,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: colors.success,
   },
   peakBannerContent: {
     flex: 1,
@@ -655,10 +661,11 @@ const styles = StyleSheet.create({
   peakBannerTitle: {
     fontSize: 14,
     fontWeight: '700',
+    color: colors.text,
   },
   peakBannerAction: {
     fontSize: 12,
-    color: '#4B5563',
+    color: colors.subtext,
   },
 
   // AI shortcut cards
@@ -669,10 +676,12 @@ const styles = StyleSheet.create({
   },
   aiShortcutCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowOffset: { width: 0, height: 1 },
@@ -690,20 +699,22 @@ const styles = StyleSheet.create({
   aiShortcutTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   aiShortcutSub: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: colors.muted,
   },
 
   // AI card container
   aiCard: {
     marginTop: 20,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 18,
     padding: 16,
     gap: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   aiHeader: {
     flexDirection: 'row',
@@ -713,17 +724,19 @@ const styles = StyleSheet.create({
   aiTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
 
   // Vendor recommendation card
   vendorRecCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     gap: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   vendorRecIcon: {
     width: 36,
@@ -739,11 +752,11 @@ const styles = StyleSheet.create({
   vendorRecName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   vendorRecReason: {
     fontSize: 12,
-    color: '#2563EB',
+    color: colors.primary,
     fontWeight: '600',
   },
   vendorRecRight: {
@@ -767,21 +780,23 @@ const styles = StyleSheet.create({
   recoCard: {
     width: 150,
     marginRight: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   recoImage: {
     width: '100%',
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceAlt,
   },
   recoImagePlaceholder: {
     width: '100%',
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -789,12 +804,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   recoMeta: {
     marginTop: 2,
     fontSize: 11,
-    color: '#6B7280',
+    color: colors.muted,
   },
   recoReason: {
     marginTop: 3,
@@ -809,20 +824,20 @@ const styles = StyleSheet.create({
 
   // Personalized offers
   offersCard: {
-    backgroundColor: '#FDF2F8',
+    backgroundColor: colors.surfaceAlt,
   },
   offersTitle: {
-    color: '#BE185D',
+    color: colors.primary,
   },
   offerCard: {
     width: 170,
     marginRight: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#FBCFE8',
+    borderColor: colors.border,
   },
   offerBadge: {
     alignSelf: 'flex-start',
@@ -840,11 +855,11 @@ const styles = StyleSheet.create({
   offerTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   offerVendor: {
     fontSize: 12,
-    color: '#6B7280',
+    color: colors.muted,
     fontWeight: '600',
   },
   offerReason: {
@@ -855,31 +870,31 @@ const styles = StyleSheet.create({
 
   // Section variants
   frequentCard: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: colors.surfaceAlt,
   },
   frequentTitle: {
-    color: '#6D28D9',
+    color: colors.text,
   },
   personalizedCard: {
-    backgroundColor: '#F0FDFA',
+    backgroundColor: colors.surfaceAlt,
   },
   personalizedTitle: {
-    color: '#0E7490',
+    color: colors.text,
   },
   trendingCard: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: colors.surfaceAlt,
   },
   trendingTitle: {
-    color: '#9A3412',
+    color: colors.text,
   },
   becauseCard: {
-    backgroundColor: '#FDF2F8',
+    backgroundColor: colors.surfaceAlt,
   },
   becauseTitle: {
-    color: '#BE185D',
+    color: colors.text,
   },
   becauseReason: {
-    color: '#DB2777',
+    color: colors.primary,
   },
 
   // Popular Near You
@@ -889,22 +904,24 @@ const styles = StyleSheet.create({
   popularLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#374151',
+    color: colors.subtext,
   },
   popularCard: {
     width: 130,
     marginRight: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 10,
     gap: 4,
     alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   popularIconWrap: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.successSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
@@ -912,7 +929,7 @@ const styles = StyleSheet.create({
   popularName: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
     textAlign: 'center',
   },
   popularStats: {
@@ -922,7 +939,7 @@ const styles = StyleSheet.create({
   },
   popularOrders: {
     fontSize: 11,
-    color: '#6B7280',
+    color: colors.muted,
   },
   popularRating: {
     flexDirection: 'row',
@@ -932,6 +949,6 @@ const styles = StyleSheet.create({
   popularRatingText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.subtext,
   },
 });

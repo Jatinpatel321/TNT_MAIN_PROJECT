@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +15,8 @@ import { Screen } from '../../components/Screen';
 import { getPoints, getAvailableRedemptions, getVouchers } from '../../services/rewardsService';
 import type { UserPoints, RedemptionRule, Voucher, RewardTypeKey } from '../../types/models';
 import { toApiError } from '../../services/apiClient';
+import { useAppTheme } from '../../theme/ThemeContext';
+import type { AppPalette } from '../../theme/theme';
 
 type Props = NativeStackScreenProps<AppTabsParamList & RootStackParamList, 'RewardsTab'>;
 
@@ -35,6 +37,8 @@ function getTier(points: number): { name: string; color: string; min: number; ma
 }
 
 export function RewardsScreen({ navigation }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [points, setPoints] = useState<UserPoints | null>(null);
   const [redemptions, setRedemptions] = useState<RedemptionRule[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -72,7 +76,7 @@ export function RewardsScreen({ navigation }: Props) {
     return (
       <Screen>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </Screen>
     );
@@ -140,7 +144,7 @@ export function RewardsScreen({ navigation }: Props) {
           {(points?.recent_transactions ?? []).length === 0 &&
           (points?.recent_redemptions ?? []).length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="star-outline" size={40} color="#D1D5DB" />
+              <MaterialCommunityIcons name="star-outline" size={40} color={colors.muted} />
               <Text style={styles.emptyText}>No activity yet. Place an order to start earning!</Text>
             </View>
           ) : (
@@ -245,7 +249,7 @@ export function RewardsScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   scroll: {
     paddingBottom: 32,
     gap: 16,
@@ -261,13 +265,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#111827',
+    color: colors.text,
   },
   balanceCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 20,
     gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowOffset: { width: 0, height: 3 },
@@ -282,12 +288,12 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.muted,
   },
   balanceNumber: {
     fontSize: 36,
     fontWeight: '900',
-    color: '#111827',
+    color: colors.text,
     marginTop: 2,
   },
   tierBadge: {
@@ -305,7 +311,7 @@ const styles = StyleSheet.create({
   tierProgressBar: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceAlt,
     overflow: 'hidden',
   },
   tierProgressFill: {
@@ -314,7 +320,7 @@ const styles = StyleSheet.create({
   },
   tierProgressLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: colors.muted,
   },
   statsRow: {
     flexDirection: 'row',
@@ -322,7 +328,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: colors.border,
   },
   statItem: {
     flex: 1,
@@ -331,17 +337,17 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   statLabel: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.muted,
     marginTop: 2,
   },
   statDivider: {
     width: 1,
     height: 28,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   section: {
     gap: 10,
@@ -354,32 +360,36 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   seeAll: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: colors.primary,
   },
   emptyState: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   emptyText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: colors.muted,
     textAlign: 'center',
   },
   activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowOffset: { width: 0, height: 1 },
@@ -400,29 +410,31 @@ const styles = StyleSheet.create({
   activityDesc: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.text,
   },
   activityDate: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: colors.muted,
   },
   activityPoints: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#059669',
+    color: colors.success,
   },
   activityPointsRedeemed: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#DC2626',
+    color: colors.danger,
   },
   redemptionCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowOffset: { width: 0, height: 1 },
@@ -435,17 +447,17 @@ const styles = StyleSheet.create({
   redemptionType: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   redemptionMin: {
     fontSize: 12,
-    color: '#6B7280',
+    color: colors.muted,
   },
   redeemAvailable: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: colors.successSoft,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
@@ -453,20 +465,22 @@ const styles = StyleSheet.create({
   redeemAvailableText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#059669',
+    color: colors.success,
   },
   redeemLocked: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.muted,
     fontWeight: '600',
   },
   voucherCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.03,
     shadowOffset: { width: 0, height: 1 },
@@ -477,7 +491,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -488,18 +502,18 @@ const styles = StyleSheet.create({
   voucherCode: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   voucherDesc: {
     fontSize: 12,
-    color: '#6B7280',
+    color: colors.muted,
   },
   voucherExpiry: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: colors.muted,
   },
   voucherValue: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: colors.primary,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -507,6 +521,6 @@ const styles = StyleSheet.create({
   voucherValueText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
 });
