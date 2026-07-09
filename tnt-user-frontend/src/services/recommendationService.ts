@@ -229,6 +229,7 @@ export type PersonalizedOffer = {
   offer_id: number;
   vendor_id: number;
   vendor_name: string;
+  image_url?: string | null;
   title: string;
   description?: string | null;
   discount_type: string;

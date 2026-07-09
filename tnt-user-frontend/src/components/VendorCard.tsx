@@ -12,8 +12,11 @@ export function VendorCard(props: {
   onPress: () => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  /** Fixed-width variant for horizontal carousels (Home "Popular Vendors").
+   *  The default 48%-width is meant for the two-column grid on the list screen. */
+  horizontal?: boolean;
 }) {
-  const { vendor, isFavorite, onToggleFavorite } = props;
+  const { vendor, isFavorite, onToggleFavorite, horizontal } = props;
   const { colors } = useAppTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const slug = vendor.name?.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || '';
@@ -31,7 +34,7 @@ export function VendorCard(props: {
   const location = vendor.location ?? null;
 
   return (
-    <Pressable style={styles.card} onPress={props.onPress}>
+    <Pressable style={[styles.card, horizontal && styles.cardHorizontal]} onPress={props.onPress}>
       <View style={styles.imageWrap}>
         {source ? (
           <Image
@@ -102,6 +105,11 @@ const makeStyles = (colors: AppPalette) => StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
     elevation: 3,
+  },
+  cardHorizontal: {
+    width: 168,
+    marginBottom: 0,
+    marginRight: 12,
   },
   imageWrap: {
     height: 120,

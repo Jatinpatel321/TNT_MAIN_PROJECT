@@ -17,7 +17,11 @@ _IMG = {
     "dal": _u("1585937421612-70a008356fbe"),
     "burger": _u("1568901346375-23c9450c58cd"),
     "fries": _u("1573080496219-bb080dd4f877"),
-    "lassi": _u("1626200419199-391ae4be7a41"),
+    "idli": _u("1589301760014-d929f3979dbc"),
+    "mango": _u("1546173159-315724a31696"),
+    # Unsplash has no good "lassi"; loremflickr (keyword-tagged, locked seed for
+    # a stable result) gives a proper glass of white lassi.
+    "lassi": "https://loremflickr.com/500/500/lassi,yogurt,drink/all?lock=4",
     "shake": _u("1572490122747-3968b75cc699"),
     "wrap": _u("1528735602780-2552fd46c7af"),
     "pavbhaji": _u("1606491956689-2ea866880c84"),
@@ -27,13 +31,16 @@ _IMG = {
     "vadapav": _u("1606755962773-d324e0a13086"),
     "coffee": _u("1461023058943-07fcbe16d735"),
     "chapati": _u("1565557623262-b51c2513a641"),
-    # stationery
-    "paper": _u("1456735190827-d1262f71b8a3"),
-    "pencil": _u("1502740479091-635887520276"),
-    "eraser": _u("1600250395178-40fe752e5189"),
-    "pens": _u("1513364776144-60967b0f800f"),
-    "stapler": _u("1568205612837-017257d2310a"),
-    "tape": _u("1586864387967-d02ef85d93e8"),
+    # Stationery — Unsplash lacks these specific items (its closest photo IDs
+    # returned a goalkeeper / toy ambulance / hammer), so use keyword-tagged
+    # loremflickr with a locked seed for a stable, on-topic photo.
+    "paper": "https://loremflickr.com/500/500/printer,paper/all?lock=3",
+    "pencil": "https://loremflickr.com/500/500/pencils,colored/all?lock=3",
+    "ruler": "https://loremflickr.com/500/500/ruler,scale/all?lock=3",
+    "eraser": "https://loremflickr.com/500/500/eraser,stationery/all?lock=3",
+    "pens": "https://loremflickr.com/500/500/sketch,markers/all?lock=7",
+    "stapler": "https://loremflickr.com/500/500/stapler,office/all?lock=3",
+    "tape": "https://loremflickr.com/500/500/adhesive,tape/all?lock=7",
 }
 
 # Ordered keyword → image. First keyword found as a substring of the (lowercased)
@@ -49,8 +56,9 @@ _KEYWORD_IMAGES: List[Tuple[str, str]] = [
     ("dal", _IMG["dal"]),
     ("burger", _IMG["burger"]),
     ("fries", _IMG["fries"]),
-    ("idli", _IMG["rice"]),
+    ("idli", _IMG["idli"]),
     ("lassi", _IMG["lassi"]),
+    ("mango", _IMG["mango"]),  # before "shake" so "Mango Shake" → mango drink
     ("shake", _IMG["shake"]),
     ("smoothie", _IMG["shake"]),
     ("wrap", _IMG["wrap"]),
@@ -67,9 +75,10 @@ _KEYWORD_IMAGES: List[Tuple[str, str]] = [
     ("sheet", _IMG["paper"]),
     ("paper", _IMG["paper"]),
     ("eraser", _IMG["eraser"]),
-    ("glue", _IMG["pens"]),
+    ("glue", _IMG["pencil"]),
     ("pencil", _IMG["pencil"]),
-    ("scale", _IMG["pencil"]),
+    ("scale", _IMG["ruler"]),
+    ("ruler", _IMG["ruler"]),
     ("sharpener", _IMG["eraser"]),
     ("sketch", _IMG["pens"]),
     ("pen", _IMG["pens"]),

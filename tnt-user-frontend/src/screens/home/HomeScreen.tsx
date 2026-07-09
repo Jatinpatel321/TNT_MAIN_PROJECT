@@ -223,8 +223,17 @@ export function HomeScreen() {
                     onPress={() => navigation.navigate('Menu', { vendorId: offer.vendor_id, vendorName: offer.vendor_name })}
                     activeOpacity={0.85}
                   >
-                    <View style={styles.offerBadge}>
-                      <Text style={styles.offerBadgeText}>{badge}</Text>
+                    <View style={styles.offerImageWrap}>
+                      {offer.image_url ? (
+                        <Image source={{ uri: offer.image_url }} style={styles.offerImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.offerImage, styles.offerImageFallback]}>
+                          <MaterialCommunityIcons name="tag-heart" size={26} color="#DB2777" />
+                        </View>
+                      )}
+                      <View style={styles.offerBadge}>
+                        <Text style={styles.offerBadgeText}>{badge}</Text>
+                      </View>
                     </View>
                     <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
                     <Text style={styles.offerVendor} numberOfLines={1}>{offer.vendor_name}</Text>
@@ -543,7 +552,7 @@ export function HomeScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
           {popularVendors.map((v) => (
-            <VendorCard key={v.id} vendor={v} onPress={() => navigation.navigate('Menu', { vendorId: v.id, vendorName: v.name })} />
+            <VendorCard key={v.id} vendor={v} horizontal onPress={() => navigation.navigate('Menu', { vendorId: v.id, vendorName: v.name })} />
           ))}
           {popularVendors.length === 0 && <Text style={styles.muted}>No vendors available.</Text>}
         </ScrollView>
@@ -830,22 +839,37 @@ const makeStyles = (colors: AppPalette) => StyleSheet.create({
     color: colors.primary,
   },
   offerCard: {
-    width: 170,
+    width: 180,
     marginRight: 10,
     backgroundColor: colors.surface,
     borderRadius: 14,
-    padding: 12,
+    padding: 10,
     gap: 4,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  offerImageWrap: {
+    position: 'relative',
+    marginBottom: 6,
+  },
+  offerImage: {
+    width: '100%',
+    height: 96,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+  },
+  offerImageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   offerBadge: {
-    alignSelf: 'flex-start',
+    position: 'absolute',
+    top: 8,
+    right: 8,
     backgroundColor: '#DB2777',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginBottom: 4,
   },
   offerBadgeText: {
     color: '#FFFFFF',
