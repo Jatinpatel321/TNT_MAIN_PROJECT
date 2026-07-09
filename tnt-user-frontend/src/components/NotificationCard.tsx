@@ -1,8 +1,10 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {Pressable, StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 
 import type {NotificationItem, NotificationTypeKey} from '../types/models';
+import {useAppTheme} from '../theme/ThemeContext';
+import type {AppPalette} from '../theme/theme';
 
 const TYPE_CONFIG: Record<
   NotificationTypeKey,
@@ -24,6 +26,8 @@ export function NotificationCard(props: {
   onPress: () => void;
 }) {
   const {item, onPress} = props;
+  const {colors} = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isRead = item.is_read;
   const config = TYPE_CONFIG[item.notification_type] ?? TYPE_CONFIG.system;
   const timeAgo = getTimeAgo(item.created_at);
@@ -74,7 +78,7 @@ function getTimeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   wrapper: {
     width: '100%',
   },
@@ -82,9 +86,11 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
     shadowColor: 'rgba(0,0,0,0.06)',
     shadowOpacity: 0.06,
     shadowOffset: {width: 0, height: 2},
@@ -92,9 +98,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   unreadCard: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: colors.primarySoft,
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: colors.primary,
   },
   row: {
     flexDirection: 'row',
@@ -123,26 +129,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#374151',
+    color: colors.subtext,
   },
   unreadTitle: {
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: colors.primary,
   },
   message: {
     fontSize: 13,
-    color: '#6B7280',
+    color: colors.muted,
     lineHeight: 18,
   },
   meta: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: colors.muted,
     marginTop: 2,
   },
 });

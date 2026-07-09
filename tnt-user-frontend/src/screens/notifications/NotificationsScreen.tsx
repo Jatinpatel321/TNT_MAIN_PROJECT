@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,8 @@ import type {AppTabsParamList} from '../../types/navigation';
 import type {NotificationItem, NotificationTypeKey} from '../../types/models';
 import {Screen} from '../../components/Screen';
 import {NotificationCard} from '../../components/NotificationCard';
+import {useAppTheme} from '../../theme/ThemeContext';
+import type {AppPalette} from '../../theme/theme';
 import {
   getNotifications,
   getUnreadCount,
@@ -47,6 +49,8 @@ const ALERT_TYPES: NotificationTypeKey[] = [
 ];
 
 export function NotificationsScreen({navigation}: Props) {
+  const {colors} = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -207,7 +211,7 @@ export function NotificationsScreen({navigation}: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   header: {
     paddingVertical: 10,
     flexDirection: 'row',
@@ -222,9 +226,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '800',
+    color: colors.text,
   },
   badge: {
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.danger,
     borderRadius: 10,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -240,12 +245,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySoft,
   },
   markAllText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2563EB',
+    color: colors.primary,
   },
   tabRow: {
     flexDirection: 'row',
@@ -256,18 +261,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   tabActive: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   tabLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.muted,
   },
   tabLabelActive: {
-    color: '#1D4ED8',
+    color: colors.primary,
     fontWeight: '700',
   },
   center: {
@@ -286,12 +294,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.text,
     marginBottom: 4,
   },
   emptySub: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.muted,
     textAlign: 'center',
   },
   list: {

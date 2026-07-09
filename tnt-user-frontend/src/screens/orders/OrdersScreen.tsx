@@ -19,6 +19,8 @@ import {getOrdersPaged, type OrderSort} from '../../services/orderService';
 import {toApiError} from '../../services/apiClient';
 import {getVendors} from '../../services/vendorService';
 import {OrderHistoryCard} from '../../components/OrderHistoryCard';
+import {useAppTheme} from '../../theme/ThemeContext';
+import type {AppPalette} from '../../theme/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -53,6 +55,8 @@ function dateFromFor(filter: DateFilter): string | undefined {
 
 export function OrdersScreen() {
   const navigation = useNavigation<Nav>();
+  const {colors} = useAppTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -174,7 +178,7 @@ export function OrdersScreen() {
       <View style={styles.searchBox}>
         <TextInput
           placeholder="Search by vendor or item"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
           style={styles.searchInput}
@@ -280,31 +284,34 @@ export function OrdersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: AppPalette) => StyleSheet.create({
   header: {
     paddingTop: 18,
     paddingBottom: 8,
   },
   title: {
     fontWeight: '900',
+    color: colors.text,
   },
   sub: {
-    opacity: 0.7,
+    color: colors.muted,
     marginTop: 4,
   },
   searchBox: {
     marginBottom: 10,
   },
   searchInput: {
-    backgroundColor: '#F5F7FB',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 12,
     padding: 12,
     fontSize: 14,
-    color: '#111827',
+    color: colors.text,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 12,
     padding: 4,
     marginBottom: 10,
@@ -316,7 +323,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowOffset: {width: 0, height: 1},
@@ -326,10 +333,10 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.muted,
   },
   tabTextActive: {
-    color: '#111827',
+    color: colors.text,
     fontWeight: '700',
   },
   chipRowList: {
@@ -344,18 +351,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 14,
-    backgroundColor: '#F5F7FB',
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   chipActive: {
-    backgroundColor: '#6C63FF',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   chipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.muted,
   },
   chipTextActive: {
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   filterBar: {
     flexDirection: 'row',
@@ -374,12 +384,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 14,
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.primarySoft,
   },
   sortBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#6C63FF',
+    color: colors.primary,
   },
   listContent: {
     paddingBottom: 24,
@@ -399,11 +409,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   emptySub: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.muted,
     textAlign: 'center',
   },
   loadMoreBtn: {
@@ -412,11 +422,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: '#F5F7FB',
+    backgroundColor: colors.surfaceAlt,
   },
   loadMoreText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6C63FF',
+    color: colors.primary,
   },
 });
