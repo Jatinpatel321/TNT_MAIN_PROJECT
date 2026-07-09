@@ -591,7 +591,6 @@ const styles = StyleSheet.create({
   hero: {
     borderRadius: 22,
     padding: 18,
-    paddingBottom: 26,
   },
   heroTop: {
     flexDirection: 'row',
@@ -683,8 +682,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   identityCard: {
-    marginTop: -14,
-    marginHorizontal: 8,
+    marginTop: 12,
   },
   identityRow: {
     flexDirection: 'row',

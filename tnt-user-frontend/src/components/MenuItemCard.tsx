@@ -21,8 +21,10 @@ export function MenuItemCard(props: {
   const imageKey = item.name?.toLowerCase().trim() || '';
   const localImage = MENU_IMAGES[imageKey];
   const remoteUri = toAbsoluteUrl(item.image_url);
-  const fallbackUri = 'https://source.unsplash.com/600x400/?food';
-  const source = localImage ?? (remoteUri ? { uri: remoteUri } : { uri: fallbackUri });
+  const fallbackUri = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=70';
+  // Prefer the real remote photo; the bundled assets are low-res placeholders
+  // and only serve as an offline fallback.
+  const source = remoteUri ? { uri: remoteUri } : (localImage ?? { uri: fallbackUri });
 
   return (
     <Pressable style={styles.card}>
@@ -43,7 +45,6 @@ export function MenuItemCard(props: {
         {source ? (
           <Image
             source={source}
-            defaultSource={localImage ?? undefined}
             style={styles.image}
             resizeMode="cover"
           />

@@ -20,9 +20,11 @@ export function VendorCard(props: {
   const localImage = VENDOR_IMAGES[slug];
   const remoteUri = toAbsoluteUrl(vendor.logo_url);
   const fallbackUri = vendor.vendor_type === 'stationery'
-    ? 'https://source.unsplash.com/600x400/?printing'
-    : 'https://source.unsplash.com/600x400/?restaurant';
-  const source = localImage ?? (remoteUri ? { uri: remoteUri } : { uri: fallbackUri });
+    ? 'https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=600&q=70'
+    : 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=70';
+  // Prefer the real remote photo; bundled assets are low-res placeholders kept
+  // only as an offline fallback.
+  const source = remoteUri ? { uri: remoteUri } : (localImage ?? { uri: fallbackUri });
 
   const rating = vendor.rating ?? null;
   const category = vendor.category ?? vendor.vendor_type?.toUpperCase() ?? 'FOOD';
@@ -34,7 +36,6 @@ export function VendorCard(props: {
         {source ? (
           <Image
             source={source}
-            defaultSource={localImage ?? undefined}
             style={styles.image}
             resizeMode="cover"
           />

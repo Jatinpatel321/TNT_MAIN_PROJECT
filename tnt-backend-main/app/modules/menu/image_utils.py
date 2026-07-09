@@ -59,11 +59,19 @@ def _query_from_name(name: str | None) -> str:
     return base
 
 
+# Reliable generic fallbacks — images.unsplash.com direct CDN. The old
+# source.unsplash.com query redirector was retired and no longer resolves,
+# so every uncurated item was rendering as a broken image.
+_FALLBACK_MENU_IMAGES: Dict[str, str] = {
+    "food": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=70",
+    "stationery": "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=600&q=70",
+}
+
+
 def menu_image_for(name: str | None, category: str = "food") -> str:
     """Return a deterministic image URL for the menu item name.
 
-    Uses a curated map first; otherwise falls back to an Unsplash query that
-    matches the item name with a category hint (food / stationery).
+    Uses a curated map first; otherwise falls back to a reliable category image.
     """
 
     key = _normalise(name)
@@ -71,6 +79,7 @@ def menu_image_for(name: str | None, category: str = "food") -> str:
     if curated:
         return curated
 
-    hint = "stationery,printing" if category == "stationery" else "food,cafe"
-    query = f"{hint},{_query_from_name(name)}"
-    return f"https://source.unsplash.com/600x400/?{query}"
+    return _FALLBACK_MENU_IMAGES.get(
+        "stationery" if category == "stationery" else "food",
+        _FALLBACK_MENU_IMAGES["food"],
+    )

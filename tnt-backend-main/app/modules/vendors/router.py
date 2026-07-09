@@ -71,6 +71,42 @@ _VENDOR_IMAGES: dict[str, dict[str, str]] = {
         "logo": "https://images.unsplash.com/photo-1585336261022-680e295ce3fe?auto=format&fit=crop&w=400&q=70",
         "cover": "https://images.unsplash.com/photo-1586075010923-2dd450853842?auto=format&fit=crop&w=900&q=70",
     },
+    # ── Actual seeded vendor names (the eight campus stalls) ──────────────
+    "parul mess": {
+        "logo": "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=70",
+    },
+    "juice junction": {
+        "logo": "https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1622597467836-f3285f2131b8?auto=format&fit=crop&w=900&q=70",
+    },
+    "tandoor express": {
+        "logo": "https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=900&q=70",
+    },
+    "pizza hub": {
+        "logo": "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=70",
+    },
+    "book nook": {
+        "logo": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1526243741027-444d633d7365?auto=format&fit=crop&w=900&q=70",
+    },
+    "stationery shop": {
+        "logo": "https://images.unsplash.com/photo-1585336261022-680e295ce3fe?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1586075010923-2dd450853842?auto=format&fit=crop&w=900&q=70",
+    },
+    "art & craft": {
+        "logo": "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=400&q=70",
+        "cover": "https://images.unsplash.com/photo-1452860606245-08befc0ff44b?auto=format&fit=crop&w=900&q=70",
+    },
+}
+
+# Reliable generic fallbacks (images.unsplash.com direct CDN, unlike the retired
+# source.unsplash.com redirector which no longer resolves).
+_FALLBACK_IMAGES: dict[str, str] = {
+    "food": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=70",
+    "stationery": "https://images.unsplash.com/photo-1456735190827-d1262f71b8a3?auto=format&fit=crop&w=800&q=70",
 }
 
 
@@ -81,24 +117,36 @@ def _vendor_images(name: str | None, vendor_type: str = "food") -> dict[str, str
     if imgs:
         return {"logo_url": imgs.get("logo"), "cover_image": imgs.get("cover")}
 
-    hint = "printing" if vendor_type == "stationery" else "campus cafe"
-    query = key or "campus vendor"
-    fallback = f"https://source.unsplash.com/800x600/?{hint},{query}"
+    fallback = _FALLBACK_IMAGES.get(
+        "stationery" if vendor_type == "stationery" else "food",
+        _FALLBACK_IMAGES["food"],
+    )
     return {"logo_url": fallback, "cover_image": fallback}
 
 
-def _vendor_profile(vendor_id: int, db: Session) -> dict[str, Any]:
-    """Pull extra profile fields from vendor_profiles if the table exists."""
+def _vendor_profile(vendor_user_id: int, db: Session) -> dict[str, Any]:
+    """Pull extra profile fields for a vendor by their *user* id.
+
+    vendor_profiles is keyed by the business ``vendors.vendor_id``, so we join
+    through ``vendors.owner_id`` (the user id carried on orders/menus) rather
+    than matching the user id against the business id directly — those two id
+    spaces overlap and would otherwise return another stall's profile.
+    """
     try:
         row = db.execute(
-            text("SELECT category, description, rating, location FROM vendor_profiles WHERE vendor_id = :vid"),
-            {"vid": vendor_id},
+            text(
+                "SELECT vp.category, vp.description, vp.rating, vp.location "
+                "FROM vendor_profiles vp "
+                "JOIN vendors v ON v.vendor_id = vp.vendor_id "
+                "WHERE v.owner_id = :uid"
+            ),
+            {"uid": vendor_user_id},
         ).fetchone()
         if row:
             return {
                 "category": row[0],
                 "description": row[1],
-                "rating": float(row[2]),
+                "rating": float(row[2]) if row[2] is not None else 4.5,
                 "location": row[3],
             }
     except Exception:
