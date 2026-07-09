@@ -927,10 +927,18 @@ class RecommendationRankingService:
         loyalty_by_vendor = {vid: cnt for vid, cnt in loyalty_rows}
 
         # Off-peak campaign windows per offer (via campaign link).
-        vendor_names = {
-            u.id: (u.name or f"Vendor #{u.id}")
+        vendor_users = {
+            u.id: u
             for u in self.db.query(User).filter(User.id.in_([o.vendor_id for o in candidates])).all()
         }
+        vendor_names = {vid: (u.name or f"Vendor #{vid}") for vid, u in vendor_users.items()}
+
+        # Reuse the vendors module's curated image map so an offer card shows the
+        # stall's photo instead of a blank tile.
+        try:
+            from app.modules.vendors.router import _vendor_images as _vimg
+        except Exception:  # pragma: no cover - defensive
+            _vimg = None
 
         results: List[Dict[str, Any]] = []
         for ranked in base_ranked:
@@ -978,10 +986,13 @@ class RecommendationRankingService:
             if not reasons:
                 reasons.append("Recommended for you")
 
+            _vu = vendor_users.get(vendor_id)
+            _imgs = _vimg(_vu.name if _vu else None, (_vu.vendor_type if _vu else "food") or "food") if _vimg else {}
             results.append({
                 "offer_id": off.id,
                 "vendor_id": vendor_id,
                 "vendor_name": vendor_names.get(vendor_id, f"Vendor #{vendor_id}"),
+                "image_url": _imgs.get("cover_image") or _imgs.get("logo_url"),
                 "title": off.title,
                 "description": off.description,
                 "discount_type": getattr(off.discount_type, "value", off.discount_type),
