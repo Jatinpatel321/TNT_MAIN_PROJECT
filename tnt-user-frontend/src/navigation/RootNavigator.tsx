@@ -19,6 +19,7 @@ import { CartScreen } from '../screens/cart/CartScreen';
 import { SlotSelectionScreen } from '../screens/slots/SlotSelectionScreen';
 import { OrderTrackingScreen } from '../screens/orders/OrderTrackingScreen';
 import { QRScreen } from '../screens/qr/QRScreen';
+import { ReceiptScreen } from '../screens/qr/ReceiptScreen';
 import { FeedbackScreen } from '../screens/orders/FeedbackScreen';
 import { ReviewHistoryScreen } from '../screens/orders/ReviewHistoryScreen';
 import { RedemptionHistoryScreen } from '../screens/rewards/RedemptionHistoryScreen';
@@ -81,6 +82,7 @@ function RootNavigator() {
             <Stack.Screen name="SlotSelection" component={SlotSelectionScreen} />
             <Stack.Screen name="OrderTracking" component={OrderTrackingScreen} />
             <Stack.Screen name="QR" component={QRScreen} />
+            <Stack.Screen name="Receipt" component={ReceiptScreen} />
             <Stack.Screen name="Feedback" component={FeedbackScreen} />
             <Stack.Screen name="ReviewHistory" component={ReviewHistoryScreen} />
             <Stack.Screen name="RedemptionHistory" component={RedemptionHistoryScreen} />

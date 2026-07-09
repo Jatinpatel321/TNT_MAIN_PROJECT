@@ -40,7 +40,8 @@ export type RootStackParamList = {
   Checkout: { vendorId: number; stationeryItems?: { service_id: number; quantity: number; file_url?: string | null }[] };
   SlotSelection: { vendorId: number; stationeryItems?: { service_id: number; quantity: number; file_url?: string | null }[] };
   OrderTracking: { orderId: number };
-  QR: { qrCode: string; orderId: number };
+  QR: { qrCode?: string; orderId: number };
+  Receipt: { orderId: number };
   Feedback: { orderId: number; vendorName?: string | null };
   ReviewHistory: { vendorId: number; vendorName?: string | null };
   RedemptionHistory: undefined;

@@ -10,8 +10,8 @@ import {
 import {Text} from 'react-native-paper';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import {getToken} from '../../utils/tokenStorage';
 import type {RootStackParamList} from '../../types/navigation';
 import type {Order, OrderHistoryItem, Vendor} from '../../types/models';
 import {Screen} from '../../components/Screen';
@@ -60,9 +60,9 @@ export function OrderTrackingScreen({route, navigation}: Props) {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isTerminalRef = useRef(false);
 
-  // ── Load auth token ──────────────────────────────────────────────────
+  // ── Load auth token (used to authenticate the tracking WebSocket) ────
   useEffect(() => {
-    AsyncStorage.getItem('access_token').then(setToken).catch(() => {});
+    getToken().then(setToken).catch(() => {});
   }, []);
 
   // ── Load data (memoized with useCallback so it's stable for polling) ─

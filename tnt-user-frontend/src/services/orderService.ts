@@ -169,13 +169,51 @@ export async function getOrderEta(orderId: number): Promise<OrderEtaResponse> {
   return res.data as OrderEtaResponse;
 }
 
-export async function generateOrderQr(
-  orderId: number,
-): Promise<{qr_code: string}> {
+export type QrResponse = {
+  order_id: number;
+  qr_code: string;
+  expires_at: string | null;
+  expires_in_seconds: number | null;
+  status: string;
+};
+
+export type PickupStatus = {
+  order_id: number;
+  status: string;
+  is_ready_for_pickup: boolean;
+  is_picked: boolean;
+  can_generate_qr: boolean;
+  vendor_id: number;
+  vendor_name: string;
+  vendor_location: string | null;
+  slot: {id: number; start_time: string | null; end_time: string | null} | null;
+  eta_minutes: number | null;
+  qr_available: boolean;
+  qr_expires_at: string | null;
+  qr_expires_in_seconds: number | null;
+  pickup_confirmed_at: string | null;
+  total_amount: number;
+};
+
+export async function generateOrderQr(orderId: number): Promise<QrResponse> {
   const res = await apiClient.post(`/orders/${orderId}/qr`, undefined, {
     headers: await authHeaders(),
   });
-  return res.data as {qr_code: string};
+  return res.data as QrResponse;
+}
+
+export async function refreshOrderQr(orderId: number): Promise<QrResponse> {
+  const res = await apiClient.post(`/orders/${orderId}/refresh-qr`, undefined, {
+    headers: await authHeaders(),
+  });
+  return res.data as QrResponse;
+}
+
+export async function getPickupStatus(orderId: number): Promise<PickupStatus> {
+  const res = await apiClient.get(`/orders/${orderId}/pickup-status`, {
+    headers: await authHeaders(),
+  });
+  return res.data as PickupStatus;
 }
 
 export async function cancelOrder(orderId: number): Promise<{message: string}> {
