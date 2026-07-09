@@ -3,6 +3,8 @@ import axios, { AxiosError } from 'axios';
 import { API_BASE_URL, API_PREFIX, STORAGE_KEYS } from '../utils/constants';
 import { getItem } from '../utils/storage';
 
+declare const __DEV__: boolean;
+
 export type ApiError = {
   status: number;
   message: string;
@@ -23,58 +25,70 @@ export async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// ── Session-expiry bridge ────────────────────────────────────────────────────
+// The AuthProvider registers a handler here so the client can sign the user out
+// the moment the backend rejects their token (expired / rotated secret). Without
+// this, an expired session just fails every request forever, spamming the
+// console with 401s and leaving the UI stuck on stale/blank data.
+let onUnauthorized: (() => void) | null = null;
+let unauthorizedHandled = false;
+
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
+/** Re-arm the 401 handler after a fresh, successful sign-in. */
+export function resetUnauthorizedState(): void {
+  unauthorizedHandled = false;
+}
+
 apiClient.interceptors.request.use(async (config) => {
   const token = await getItem(STORAGE_KEYS.accessToken);
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
-
-  // Log every outgoing request for debugging
-  console.log(
-    `[apiClient] ${config.method?.toUpperCase() ?? "?"} ${config.baseURL ?? ""}${config.url ?? ""}`,
-    config.data ? { body: config.data } : ""
-  );
-
   return config;
 });
 
 apiClient.interceptors.response.use(
-  (response) => {
-    console.log(
-      `[apiClient] ${response.config.method?.toUpperCase() ?? "?"} ${response.config.baseURL ?? ""}${response.config.url ?? ""} → ${response.status}`
-    );
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status ?? 0;
-      const method = error.config?.method?.toUpperCase() ?? "";
-      const baseURL = error.config?.baseURL ?? "";
-      const url = error.config?.url ?? "";
-      const requestBody = error.config?.data ?? "(none)";
-      const detail = error.response?.data ?? error.message;
-
-      // Enhanced error logging — includes full request URL, method, body, and response
-      console.error(
-        `[apiClient] REQUEST FAILED ${method} ${baseURL}${url}\n` +
-        `  status : ${status}\n` +
-        `  body   : ${typeof requestBody === "string" ? requestBody : JSON.stringify(requestBody)}\n` +
-        `  detail : ${typeof detail === "string" ? detail : JSON.stringify(detail)}\n` +
-        `  message: ${error.message}`
+      const hadAuth = Boolean(
+        (error.config?.headers as Record<string, unknown> | undefined)?.Authorization,
       );
 
-      // Check for common network issues
-      if (status === 0 || error.message === "Network Error") {
-        console.error(
-          `[apiClient] NETWORK ERROR — device cannot reach ${baseURL}${url}.\n` +
-          `  • Physical device via USB: run "adb reverse tcp:8000 tcp:8000"\n` +
-          `  • Change baseURL to http://localhost:8000\n` +
-          `  • Or use Wi-Fi IP (same subnet): http://YOUR_LAN_IP:8000`
-        );
+      // 401 is an expected auth state, not an error to log on repeat. The first
+      // one that carried a token clears the session (→ login); every other 401
+      // (already handling, or fired with no token during/after logout) is
+      // swallowed silently so the console never fills with 401 spam.
+      if (status === 401) {
+        if (hadAuth && !unauthorizedHandled) {
+          unauthorizedHandled = true;
+          if (__DEV__) {
+            console.warn('[apiClient] session expired — signing out');
+          }
+          onUnauthorized?.();
+        }
+        return Promise.reject(error);
       }
-    } else {
-      console.error("[apiClient] request failed", error);
+
+      // Genuine errors (5xx, network, 4xx other than auth): one concise dev line.
+      if (__DEV__) {
+        const method = error.config?.method?.toUpperCase() ?? '';
+        const url = `${error.config?.baseURL ?? ''}${error.config?.url ?? ''}`;
+        if (status === 0 || error.message === 'Network Error') {
+          console.warn(
+            `[apiClient] network error → ${method} ${url} (backend reachable? adb reverse tcp:8000 tcp:8000)`,
+          );
+        } else {
+          console.warn(`[apiClient] ${method} ${url} → ${status}`);
+        }
+      }
+    } else if (__DEV__) {
+      console.warn('[apiClient] request failed', error);
     }
     return Promise.reject(error);
   }

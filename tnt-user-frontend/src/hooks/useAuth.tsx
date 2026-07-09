@@ -1,8 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { STORAGE_KEYS } from '../utils/constants';
 import { getItem, removeItem, setItem } from '../utils/storage';
 import { registerFCMToken } from '../services/pushNotificationService';
+import { resetUnauthorizedState, setUnauthorizedHandler } from '../services/apiClient';
 import type { User } from '../types/models';
 
 type AuthState = {
@@ -38,6 +39,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setItem(STORAGE_KEYS.user, JSON.stringify(u));
     setAccessToken(token);
     setUser(u);
+    // A fresh sign-in re-arms the 401 auto-logout for the next expiry.
+    resetUnauthorizedState();
     // Register FCM token after successful login
     registerFCMToken();
   }, []);
@@ -48,6 +51,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(null);
     setUser(null);
   }, []);
+
+  // Sign out automatically when the backend rejects our token (expired session
+  // or rotated signing key). This clears the dead token and flips RootNavigator
+  // to the login stack instead of looping failed requests forever.
+  const loggedOutRef = useRef(false);
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (loggedOutRef.current) return;
+      loggedOutRef.current = true;
+      logout().finally(() => {
+        loggedOutRef.current = false;
+      });
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [logout]);
 
   const value = useMemo<AuthState>(
     () => ({
