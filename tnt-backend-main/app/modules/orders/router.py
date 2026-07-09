@@ -200,13 +200,39 @@ def vendor_order_details(
 # 📱 QR PICKUP ENDPOINTS
 
 @router.post("/{order_id}/qr", response_model=dict)
+@router.get("/{order_id}/qr", response_model=dict)
 def generate_qr_endpoint(
     order_id: int,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Generate QR code for order pickup."""
-    return order_service.generate_order_qr(order_id, db)
+    """Generate (or reuse) the rotating pickup QR for the owning student.
+
+    Both GET and POST are accepted: GET reads the current live code, POST is
+    the idempotent generate. Ownership and READY status are enforced in the
+    service layer.
+    """
+    return order_service.generate_order_qr(user, order_id, db)
+
+
+@router.post("/{order_id}/refresh-qr", response_model=dict)
+def refresh_qr_endpoint(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Force-rotate the pickup QR, invalidating the previous token."""
+    return order_service.generate_order_qr(user, order_id, db, force=True)
+
+
+@router.get("/{order_id}/pickup-status", response_model=dict)
+def pickup_status_endpoint(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Live pickup status (status, vendor, slot window, ETA, QR countdown)."""
+    return order_service.get_pickup_status(user, order_id, db)
 
 
 @router.post("/qr/pickup/confirm", response_model=dict)
