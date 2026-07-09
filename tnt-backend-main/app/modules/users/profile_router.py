@@ -1,23 +1,33 @@
+import enum
+import logging
 import os
 import uuid
 
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
 from app.core.security import get_current_user
 from app.modules.menu.model import MenuItem
+from app.modules.orders.model import Order, OrderStatus
+from app.modules.payments.model import Payment, PaymentStatus
+from app.modules.rewards.model import RewardPoints, RewardRedemption, VoucherRedemption
+from app.modules.stationery.job_model import StationeryJob
 from app.modules.users.favorites_model import UserFavoriteMenuItem, UserFavoriteVendor
 from app.modules.users.model import User, UserRole
 from app.modules.users.schemas import (
     FavoriteMenuItemResponse,
     FavoriteVendorResponse,
     ProfileImageResponse,
+    ProfileStatsResponse,
     ProfileUpdateRequest,
     UserResponse,
 )
+
+logger = logging.getLogger("tnt.profile")
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
@@ -82,11 +92,105 @@ def update_profile(
         raise HTTPException(status_code=400, detail="No fields provided for update")
 
     for field, value in update_data.items():
+        if isinstance(value, enum.Enum):
+            value = value.value
         setattr(db_user, field, value)
 
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+@router.get("/stats", response_model=ProfileStatsResponse)
+def get_profile_stats(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Aggregated account statistics for the profile dashboard.
+
+    Order counts exclude cancelled orders; combined bookings count toward
+    both food and stationery. Money figures are rupees from successful
+    payments (orders + stationery jobs) and offer/point redemptions.
+    """
+    db_user = _get_current_db_user(user, db)
+    uid = db_user.id
+
+    active_orders = db.query(Order).filter(
+        Order.user_id == uid,
+        Order.status != OrderStatus.CANCELLED,
+    )
+    total_orders = active_orders.count()
+    food_orders = active_orders.filter(Order.booking_type.in_(["food", "combined"])).count()
+    stationery_orders = active_orders.filter(
+        Order.booking_type.in_(["stationery", "combined"])
+    ).count()
+    group_orders = active_orders.filter(Order.group_id.isnot(None)).count()
+
+    order_spend = (
+        db.query(func.coalesce(func.sum(Payment.amount), 0))
+        .join(Order, Order.id == Payment.order_id)
+        .filter(Order.user_id == uid, Payment.status == PaymentStatus.SUCCESS)
+        .scalar()
+    )
+    job_spend = (
+        db.query(func.coalesce(func.sum(Payment.amount), 0))
+        .join(StationeryJob, StationeryJob.id == Payment.stationery_job_id)
+        .filter(StationeryJob.user_id == uid, Payment.status == PaymentStatus.SUCCESS)
+        .scalar()
+    )
+
+    points_row = db.query(RewardPoints).filter(RewardPoints.user_id == uid).first()
+
+    voucher_savings = (
+        db.query(func.coalesce(func.sum(VoucherRedemption.discount_amount), 0))
+        .filter(VoucherRedemption.user_id == uid)
+        .scalar()
+    )
+    redemption_savings = (
+        db.query(func.coalesce(func.sum(RewardRedemption.value), 0))
+        .filter(RewardRedemption.user_id == uid)
+        .scalar()
+    )
+
+    return ProfileStatsResponse(
+        total_orders=total_orders,
+        food_orders=food_orders,
+        stationery_orders=stationery_orders,
+        group_orders=group_orders,
+        total_spent=float(order_spend) + float(job_spend),
+        loyalty_points=float(points_row.points) if points_row else 0.0,
+        rewards_earned=float(points_row.total_earned) if points_row else 0.0,
+        saved_via_offers=float(voucher_savings) + float(redemption_savings),
+        member_since=db_user.created_at,
+    )
+
+
+@router.delete("/me")
+def delete_account(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Deactivate the authenticated user's account.
+
+    Soft delete: the account is marked inactive (login is blocked and every
+    refresh token is revoked) while order/payment history is retained for
+    financial-audit integrity.
+    """
+    db_user = _get_current_db_user(user, db)
+
+    db_user.is_active = False
+    db_user.device_token = None
+    db_user.push_enabled = False
+    db.commit()
+
+    try:
+        from app.modules.auth.refresh_router import revoke_all_user_tokens
+        revoke_all_user_tokens(db_user.id)
+    except Exception:
+        logger.exception("delete_account_token_revoke_failed user_id=%s", db_user.id)
+
+    logger.info("account_deactivated user_id=%s", db_user.id)
+    return {"message": "Account deactivated"}
 
 
 @router.post("/upload-image", response_model=ProfileImageResponse)
