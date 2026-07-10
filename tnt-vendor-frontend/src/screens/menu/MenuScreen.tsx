@@ -45,7 +45,10 @@ export default function MenuScreen({ navigation }: any) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = getStyles(colors);
-  const vendorId = user?.vendor_id;
+  // menu_items.vendor_id is a FK to users.id, so the menu endpoints key on the
+  // owner's user id — not the business vendors.vendor_id. The two id spaces
+  // overlap, so passing the business id returns another stall's menu or nothing.
+  const vendorId = user?.owner_id;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
