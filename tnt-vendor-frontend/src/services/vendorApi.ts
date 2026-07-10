@@ -94,8 +94,13 @@ export const vendorApi = {
   prepareOrder: (orderId: number) => apiClient.put(`/v1/vendors/orders/${orderId}/prepare`),
   readyOrder: (orderId: number) => apiClient.put(`/v1/vendors/orders/${orderId}/ready`),
   completeOrder: (orderId: number) => apiClient.put(`/v1/vendors/orders/${orderId}/complete`),
-  confirmPickup: (qrCode: string) => apiClient.post(`/v1/orders/qr/confirm`, null, {params: {qr_code: qrCode}}),
-  confirmQRPickup: (qrCode: string) => apiClient.post(`/v1/orders/qr/pickup/confirm`, { qr_code: qrCode }),
+  // Must use the 3-segment path: `/v1/orders/qr/confirm` is shadowed by the
+  // earlier-declared `/v1/orders/{order_id}/confirm`, which tries to parse "qr"
+  // as an int and 422s. The endpoint takes qr_code as a query param, not a body.
+  confirmPickup: (qrCode: string) =>
+    apiClient.post(`/v1/orders/qr/pickup/confirm`, null, {params: {qr_code: qrCode}}),
+  confirmQRPickup: (qrCode: string) =>
+    apiClient.post(`/v1/orders/qr/pickup/confirm`, null, {params: {qr_code: qrCode}}),
   getOrderByQR: (qrCode: string) => apiClient.get(`/v1/orders/qr/${encodeURIComponent(qrCode)}`),
   // Single-scan pickup for a whole group order (Phase 9).
   confirmGroupPickup: (qrCode: string) => apiClient.post(`/v1/groups/pickup/confirm`, { qr_code: qrCode }),
