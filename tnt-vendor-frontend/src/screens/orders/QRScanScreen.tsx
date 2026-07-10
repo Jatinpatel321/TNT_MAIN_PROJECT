@@ -25,12 +25,28 @@ export function QRScanScreen({ navigation }: any) {
     })();
   }, []);
 
+  // The student app encodes the QR as {"order_id":N,"token":"..."}; older codes
+  // are the bare token. Pull out the token either way — the API keys on it.
+  const extractToken = (raw: string): string => {
+    const trimmed = raw.trim();
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && parsed.token) {
+        return String(parsed.token);
+      }
+    } catch {
+      // not JSON — it's already a raw token
+    }
+    return trimmed;
+  };
+
   const handleBarCodeScanned = async ({data}: {data: string}) => {
     if (scanned || loading) return;
     setScanned(true);
     setLoading(true);
+    const token = extractToken(data);
     try {
-      const orderRes = await vendorApi.getOrderByQR(data);
+      const orderRes = await vendorApi.getOrderByQR(token);
       const order = orderRes.data;
       Alert.alert(
         `Order #${order.id}`,
@@ -39,7 +55,10 @@ export function QRScanScreen({ navigation }: any) {
           {text: 'Cancel', style: 'cancel', onPress: () => setScanned(false)},
           {text: 'Confirm Pickup ✓', onPress: async () => {
             try {
-              await vendorApi.confirmQRPickup(data);
+              // confirmPickup sends qr_code as a query param, which is what the
+              // endpoint declares. confirmQRPickup posts it as a JSON body and
+              // would 422.
+              await vendorApi.confirmPickup(token);
               Alert.alert('Success', 'Order marked as picked up!', [
                 {text: 'Scan Next', onPress: () => setScanned(false)},
                 {text: 'Done', onPress: () => navigation.goBack()},
