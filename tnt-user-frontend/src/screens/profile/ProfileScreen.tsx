@@ -277,7 +277,7 @@ export function ProfileScreen({ navigation }: Props) {
                 </Text>
                 <View style={styles.heroBadges}>
                   <View style={styles.roleBadge}>
-                    <MaterialCommunityIcons name="account-tag" size={12} color="#FFFFFF" />
+                    <MaterialCommunityIcons name="school" size={12} color="#FFFFFF" />
                     <Text style={styles.roleBadgeText}>{displayRole}</Text>
                   </View>
                   {memberSince ? (
