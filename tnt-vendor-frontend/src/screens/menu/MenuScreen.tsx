@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors as staticColors, shadows, spacing, borderRadius } from '../../design-system';
@@ -76,14 +77,15 @@ export default function MenuScreen({ navigation }: any) {
       const itemsRes = await apiClient.get(`/v1/menu/items?vendor_id=${vendorId}`);
       const rawItems = itemsRes.data.items || [];
 
-      // 2. Fetch inventory dashboard
-      let inventoryMap: Record<number, { id: number; current_stock: number; low_stock_threshold: number }> = {};
+      // 2. Fetch inventory dashboard. It keys rows by `item_id` (the menu item
+      // id) and does not expose the inventory row's own id — restocking goes
+      // through the item-id endpoint below, which upserts.
+      let inventoryMap: Record<number, { current_stock: number; low_stock_threshold: number }> = {};
       try {
         const invRes = await apiClient.get(`/v1/vendors/inventory/dashboard`);
         const invItems = invRes.data.items || [];
         invItems.forEach((inv: any) => {
-          inventoryMap[inv.menu_item_id] = {
-            id: inv.id,
+          inventoryMap[inv.item_id] = {
             current_stock: inv.current_stock,
             low_stock_threshold: inv.low_stock_threshold,
           };
@@ -98,8 +100,7 @@ export default function MenuScreen({ navigation }: any) {
         return {
           ...item,
           stock_level: inv ? inv.current_stock : undefined,
-          inventory_id: inv ? inv.id : undefined,
-          is_low_stock: inv ? inv.current_stock < inv.low_stock_threshold : false,
+          is_low_stock: inv ? inv.current_stock <= inv.low_stock_threshold : false,
         };
       });
 
@@ -163,30 +164,23 @@ export default function MenuScreen({ navigation }: any) {
 
     setIsRestockLoading(true);
     try {
-      if (selectedRestockItem.inventory_id) {
-        // Restock existing inventory
-        const formData = new FormData();
-        formData.append('quantity', qty.toString());
-        await apiClient.post(
-          `/v1/menu/inventory/${selectedRestockItem.inventory_id}/restock`,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' } }
-        );
-      } else {
-        // Create new inventory record
-        const formData = new FormData();
-        formData.append('menu_item_id', selectedRestockItem.id.toString());
-        formData.append('current_stock', qty.toString());
-        formData.append('low_stock_threshold', '10');
-        formData.append('auto_disable', 'true');
-        await apiClient.post(`/v1/menu/inventory`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+      // Vendor-scoped restock keyed on the menu item id. It upserts — adds to an
+      // existing inventory row or creates one — so we never need the inventory
+      // row's id, and it can't fail with "inventory already exists".
+      const res = await apiClient.post(
+        `/v1/vendors/inventory/restock/${selectedRestockItem.id}?quantity=${qty}`,
+      );
+
+      // This endpoint reports failures as 200 + {success:false}, so check it
+      // rather than trusting the status code.
+      if (res.data?.success === false) {
+        Alert.alert('Error', res.data.error || 'Failed to restock item.');
+        return;
       }
 
       setIsRestockVisible(false);
       fetchData();
-      Alert.alert('Success', 'Stock level updated successfully!');
+      Alert.alert('Success', `Stock updated — ${selectedRestockItem.name} now at ${res.data?.new_stock ?? qty}.`);
     } catch (err: any) {
       console.error(err);
       Alert.alert('Error', err.response?.data?.detail || 'Failed to restock item.');
@@ -206,9 +200,13 @@ export default function MenuScreen({ navigation }: any) {
   const renderItem = ({ item }: { item: MenuItem }) => (
     <GlassCard style={styles.menuCard} padding={16} borderRadius={20} intensity="light">
       <View style={styles.menuRow}>
-        {/* Image Placeholder */}
+        {/* Item photo — falls back to a category emoji when there is no image */}
         <View style={[styles.imagePlaceholder, { backgroundColor: item.is_available ? colors.primaryPale : colors.bgTertiary }]}>
-          <Text style={styles.imageEmoji}>{item.category === 'stationery' ? '✏️' : '🍽️'}</Text>
+          {item.image_url ? (
+            <Image source={{ uri: item.image_url }} style={styles.itemImage} resizeMode="cover" />
+          ) : (
+            <Text style={styles.imageEmoji}>{item.category === 'stationery' ? '✏️' : '🍽️'}</Text>
+          )}
         </View>
 
         {/* Info */}
@@ -483,7 +481,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   imagePlaceholder: {
     width: 64, height: 64, borderRadius: 16,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
+    overflow: 'hidden',
   },
+  itemImage: { width: '100%', height: '100%' },
   imageEmoji: { fontSize: 28 },
   menuInfo: { flex: 1 },
   menuHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
