@@ -28,7 +28,7 @@ import StatCard from '../../design-system/components/StatCard';
 import AnimatedCounter from '../../design-system/components/AnimatedCounter';
 import PremiumEmptyState from '../../design-system/components/PremiumEmptyState';
 import { useTheme } from '../../context/ThemeContext';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 
 
@@ -129,10 +129,19 @@ export default function OrdersScreen() {
     return () => clearInterval(id);
   }, [wsConnected, loadOrders]);
 
+  // Re-sync whenever the screen regains focus — e.g. coming back from the QR
+  // scanner, which may have just moved an order to "picked". Without this the
+  // card stays stale and still offers "Complete", which the backend rejects.
+  useFocusEffect(
+    useCallback(() => {
+      loadOrders(true);
+    }, [loadOrders]),
+  );
+
   const handleStatusUpdate = async (orderId: number, action: StatusAction) => {
     try {
       const actions = { accept: vendorApi.acceptOrder, prepare: vendorApi.prepareOrder, ready: vendorApi.readyOrder, complete: vendorApi.completeOrder };
-      
+
       const order = orders.find(o => o.id === orderId);
       if (order && order.group_id) {
         const groupMembers = orders.filter(o => o.group_id === order.group_id);
@@ -141,8 +150,13 @@ export default function OrdersScreen() {
         await actions[action](orderId);
       }
       loadOrders(true);
-    } catch (error) {
-      Alert.alert('Error', `Failed to ${action} order`);
+    } catch (error: any) {
+      // Surface the backend's reason (e.g. "Order cannot be completed in current
+      // status") rather than a generic failure, and re-sync — a rejection here
+      // usually means the order moved on (a QR pickup already collected it).
+      const detail = error?.response?.data?.detail;
+      Alert.alert('Error', typeof detail === 'string' ? detail : `Failed to ${action} order`);
+      loadOrders(true);
     }
   };
 
