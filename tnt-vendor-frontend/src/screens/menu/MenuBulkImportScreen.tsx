@@ -137,7 +137,8 @@ export default function MenuBulkImportScreen({ navigation }: any) {
   };
 
   const handleExport = async () => {
-    const vendorId = user?.vendor_id;
+    // Menu endpoints key on the owner's user id (menu_items.vendor_id -> users.id).
+    const vendorId = user?.owner_id;
     if (!vendorId) return;
     setExporting(true);
     try {

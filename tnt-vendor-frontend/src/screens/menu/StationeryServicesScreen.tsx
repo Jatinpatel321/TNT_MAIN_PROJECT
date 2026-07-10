@@ -31,7 +31,9 @@ interface StationeryService {
 
 export default function StationeryServicesScreen({ navigation }: any) {
   const { user } = useAuth();
-  const vendorId = user?.vendor_id;
+  // stationery_services.vendor_id is a FK to users.id — use the owner's user id,
+  // not the business vendors.vendor_id (overlapping id spaces).
+  const vendorId = user?.owner_id;
 
   const [services, setServices] = useState<StationeryService[]>([]);
   const [isLoading, setIsLoading] = useState(false);
