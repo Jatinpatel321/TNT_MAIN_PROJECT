@@ -196,7 +196,10 @@ const getStyles = (colors: any) => StyleSheet.create({
   profileInitial: { fontSize: 34, fontWeight: '700', color: colors.textInverse },
   vendorName: { fontSize: 24, fontWeight: '700', color: colors.textInverse, marginBottom: 8 },
   statusRow: { flexDirection: 'row', gap: 8 },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, marginTop: -16, marginBottom: spacing.sm, gap: spacing.sm },
+  // Sit cleanly below the header. A negative marginTop pulled these cards up
+  // into the purple block and clipped its 28px rounded bottom corners, which
+  // read as the stat cards overlapping the vendor-name section.
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm, gap: spacing.sm },
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md, marginTop: spacing.sm },
   sectionAccent: { color: colors.primary },
