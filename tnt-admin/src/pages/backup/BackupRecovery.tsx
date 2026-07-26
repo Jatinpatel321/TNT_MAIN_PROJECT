@@ -1,9 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Database, Download, RefreshCw, ShieldCheck, Trash2, RotateCcw,
-  HardDrive, Clock, CheckCircle, XCircle, AlertTriangle, Play,
-  Calendar, BarChart3, FileText, Activity, Server, Lock,
-  ChevronRight, Info, Loader2, Filter
+  Database,
+  HardDrive,
+  Clock,
+  Server,
+  Play,
+  RotateCcw,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Loader2,
+  Trash2,
+  ShieldCheck,
+  RefreshCw,
+  Activity,
+  Calendar,
+  Lock,
+  FileText,
+  Filter,
+  BarChart3,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/admin';
@@ -15,30 +30,20 @@ interface BackupRecord {
   filename: string;
   backup_type: 'manual' | 'daily' | 'weekly';
   status: 'success' | 'failed' | 'in_progress' | 'deleted';
-  size_bytes: number | null;
-  size_kb: number | null;
   size_mb: number | null;
-  checksum_sha256: string | null;
-  database_name: string | null;
+  size_kb: number | null;
   tables_count: number | null;
   rows_exported: number | null;
   duration_seconds: number | null;
-  error_message: string | null;
   created_at: string;
-  completed_at: string | null;
+  error_message: string | null;
 }
 
 interface StorageStats {
   total_backups: number;
-  total_size_bytes: number;
   total_size_mb: number;
   by_type: Record<string, number>;
-  by_status: Record<string, number>;
-  disk_free_mb: number | null;
-  disk_total_bytes: number | null;
-  backup_dir: string;
-  oldest_backup: string | null;
-  newest_backup: string | null;
+  disk_free_mb: number;
 }
 
 interface SchedulerJob {
@@ -56,27 +61,29 @@ interface SchedulerStatus {
 interface VerifyResult {
   backup_id: number;
   filename: string;
-  stored_checksum: string | null;
-  computed_checksum: string | null;
-  integrity_ok: boolean;
   file_exists: boolean;
+  sha256_match: boolean;
+  file_size_valid: boolean;
+  sql_format_valid: boolean;
+  tables_found: number;
+  integrity_ok: boolean;
   message: string;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
+// ── Formatters & Helpers ──────────────────────────────────────────────────
 
-function formatAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+function formatAgo(isoStr: string | null): string {
+  if (!isoStr) return 'Never';
+  const dt = new Date(isoStr);
+  const diffSec = Math.floor((Date.now() - dt.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  return `${Math.floor(diffSec / 86400)}d ago`;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return '—';
   return new Date(iso).toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
@@ -91,16 +98,16 @@ function formatSize(mb: number | null, kb: number | null): string {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  manual: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  daily: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  weekly: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  manual: 'bg-purple-50 text-purple-700 border-purple-200',
+  daily: 'bg-blue-50 text-blue-700 border-blue-200',
+  weekly: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  success: 'text-emerald-400',
-  failed: 'text-red-400',
-  in_progress: 'text-amber-400',
-  deleted: 'text-slate-500',
+  success: 'text-emerald-600',
+  failed: 'text-red-600',
+  in_progress: 'text-amber-600',
+  deleted: 'text-slate-400',
 };
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
@@ -143,71 +150,71 @@ function RestoreModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#12121E] border border-red-500/30 rounded-2xl w-full max-w-lg shadow-2xl shadow-red-900/20">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white border border-red-200 rounded-2xl w-full max-w-lg shadow-xl">
         {/* Header */}
-        <div className="p-6 border-b border-red-500/20">
+        <div className="p-6 border-b border-red-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
+            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#F1F0FF]">Destructive Restore</h3>
-              <p className="text-xs text-red-400">All current data will be replaced</p>
+              <h3 className="text-base font-bold text-[#111827]">Destructive Restore</h3>
+              <p className="text-xs text-red-600 font-medium">All current data will be replaced</p>
             </div>
           </div>
         </div>
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-300 space-y-2">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-900 space-y-2">
             <p className="font-semibold">⚠️ This operation will:</p>
-            <ul className="list-disc list-inside space-y-1 text-xs text-red-400">
+            <ul className="list-disc list-inside space-y-1 text-xs text-red-700">
               <li>Truncate <strong>ALL</strong> database tables</li>
-              <li>Reload data from: <code className="bg-red-900/30 px-1 rounded">{backup.filename}</code></li>
+              <li>Reload data from: <code className="bg-red-100 px-1 py-0.5 rounded font-mono text-red-800">{backup.filename}</code></li>
               <li>This action cannot be undone</li>
             </ul>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-xs text-[#9B9BC4]">
-              Backup: <span className="text-[#F1F0FF] font-mono">{backup.filename}</span>
+          <div className="space-y-1.5">
+            <p className="text-xs text-[#6B7280]">
+              Backup File: <span className="text-[#111827] font-mono font-medium">{backup.filename}</span>
             </p>
-            <p className="text-xs text-[#9B9BC4]">
-              Size: <span className="text-[#F1F0FF]">{formatSize(backup.size_mb, backup.size_kb)}</span>
+            <p className="text-xs text-[#6B7280]">
+              Size: <span className="text-[#111827] font-medium">{formatSize(backup.size_mb, backup.size_kb)}</span>
               {backup.tables_count && (
-                <> · <span className="text-[#F1F0FF]">{backup.tables_count} tables</span></>
+                <> · <span className="text-[#111827] font-medium">{backup.tables_count} tables</span></>
               )}
             </p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#9B9BC4]">
-              Type <span className="text-red-400 font-mono">CONFIRM RESTORE</span> to proceed:
+            <label className="text-xs font-semibold text-[#374151]">
+              Type <span className="text-red-600 font-mono">CONFIRM RESTORE</span> to proceed:
             </label>
             <input
               type="text"
               value={phrase}
               onChange={(e) => setPhrase(e.target.value)}
               placeholder="CONFIRM RESTORE"
-              className="w-full bg-[#1A1A2E] border border-[#2D2D4E] rounded-xl px-4 py-3 text-sm text-[#F1F0FF] font-mono placeholder:text-[#4B4B6E] focus:outline-none focus:border-red-500/50 transition"
+              className="w-full bg-white border border-[#E5E7EB] rounded-xl px-4 py-3 text-sm text-[#111827] font-mono placeholder:text-[#9CA3AF] focus:outline-none focus:border-red-500 transition"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-[#2D2D4E] flex gap-3">
+        <div className="p-6 border-t border-[#E5E7EB] flex gap-3 bg-[#F9FAFB] rounded-b-2xl">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-[#2D2D4E] text-[#9B9BC4] text-sm font-medium hover:bg-[#1A1A2E] transition"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E7EB] bg-white text-[#374151] text-sm font-medium hover:bg-[#F3F4F6] transition"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={phrase !== REQUIRED || loading}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold
-              disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-600 transition flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold
+              disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-700 transition flex items-center justify-center gap-2 shadow-xs"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
             Restore Now
@@ -245,61 +252,62 @@ function DashboardTab({
           {
             label: 'Total Backups',
             value: storage?.total_backups ?? '—',
-            icon: <Database className="w-5 h-5 text-violet-400" />,
-            color: 'from-violet-500/10 to-violet-600/5',
-            border: 'border-violet-500/20',
+            icon: <Database className="w-5 h-5 text-purple-600" />,
+            color: 'from-purple-50/80 to-purple-100/30',
+            border: 'border-purple-200/80',
           },
           {
             label: 'Storage Used',
             value: storage ? `${storage.total_size_mb.toFixed(1)} MB` : '—',
-            icon: <HardDrive className="w-5 h-5 text-blue-400" />,
-            color: 'from-blue-500/10 to-blue-600/5',
-            border: 'border-blue-500/20',
+            icon: <HardDrive className="w-5 h-5 text-blue-600" />,
+            color: 'from-blue-50/80 to-blue-100/30',
+            border: 'border-blue-200/80',
           },
           {
             label: 'Last Backup',
             value: lastBackup ? formatAgo(lastBackup.created_at) : 'Never',
-            icon: <Clock className="w-5 h-5 text-emerald-400" />,
-            color: 'from-emerald-500/10 to-emerald-600/5',
-            border: 'border-emerald-500/20',
+            icon: <Clock className="w-5 h-5 text-emerald-600" />,
+            color: 'from-emerald-50/80 to-emerald-100/30',
+            border: 'border-emerald-200/80',
           },
           {
             label: 'Disk Free',
             value: storage?.disk_free_mb != null ? `${(storage.disk_free_mb / 1024).toFixed(1)} GB` : '—',
-            icon: <Server className="w-5 h-5 text-amber-400" />,
-            color: 'from-amber-500/10 to-amber-600/5',
-            border: 'border-amber-500/20',
+            icon: <Server className="w-5 h-5 text-amber-600" />,
+            color: 'from-amber-50/80 to-amber-100/30',
+            border: 'border-amber-200/80',
           },
         ].map((card) => (
           <div
             key={card.label}
-            className={`bg-gradient-to-br ${card.color} border ${card.border} rounded-2xl p-5`}
+            className={`bg-gradient-to-br ${card.color} border ${card.border} rounded-2xl p-5 shadow-xs`}
           >
             <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 rounded-xl bg-black/20 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-white/90 shadow-2xs flex items-center justify-center">
                 {card.icon}
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#F1F0FF]">{card.value}</p>
-            <p className="text-xs text-[#9B9BC4] mt-1">{card.label}</p>
+            <p className="text-2xl font-bold text-[#111827]">{card.value}</p>
+            <p className="text-xs text-[#6B7280] mt-1 font-medium">{card.label}</p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Manual Backup Action */}
-        <div className="lg:col-span-2 bg-[#12121E] border border-[#2D2D4E] rounded-2xl p-6">
+        <div className="lg:col-span-2 tnt-card">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
-              <Database className="w-5 h-5 text-violet-400" />
+            <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center">
+              <Database className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[#F1F0FF]">Manual Backup</h3>
-              <p className="text-xs text-[#9B9BC4]">Full database snapshot with SHA-256 integrity</p>
+              <h3 className="text-base font-bold text-[#111827]">Manual Backup</h3>
+              <p className="text-xs text-[#6B7280]">Full database snapshot with SHA-256 integrity</p>
             </div>
             <button
               onClick={onRefresh}
-              className="ml-auto text-[#6B7280] hover:text-[#F1F0FF] transition"
+              className="ml-auto text-[#9CA3AF] hover:text-[#111827] transition p-1.5 rounded-lg hover:bg-[#F3F4F6]"
+              title="Refresh status"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -309,9 +317,9 @@ function DashboardTab({
             onClick={onRunBackup}
             disabled={runningBackup}
             className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl
-              bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600
+              bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700
               text-white font-semibold text-sm transition-all duration-200
-              disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-900/30"
+              disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             {runningBackup ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Creating backup...</>
@@ -321,8 +329,8 @@ function DashboardTab({
           </button>
 
           {lastBackup && (
-            <p className="text-xs text-[#9B9BC4] mt-3 text-center">
-              Last: <span className="text-[#F1F0FF]">{lastBackup.filename}</span> ·{' '}
+            <p className="text-xs text-[#6B7280] mt-3 text-center">
+              Last: <span className="text-[#111827] font-mono font-medium">{lastBackup.filename}</span> ·{' '}
               {formatAgo(lastBackup.created_at)}
             </p>
           )}
@@ -331,9 +339,9 @@ function DashboardTab({
           {storage && Object.keys(storage.by_type).length > 0 && (
             <div className="mt-5 grid grid-cols-3 gap-3">
               {(['manual', 'daily', 'weekly'] as const).map((type) => (
-                <div key={type} className="text-center bg-[#1A1A2E] rounded-xl p-3">
-                  <p className="text-lg font-bold text-[#F1F0FF]">{storage.by_type[type] ?? 0}</p>
-                  <p className="text-xs text-[#9B9BC4] capitalize">{type}</p>
+                <div key={type} className="text-center bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-3">
+                  <p className="text-lg font-bold text-[#111827]">{storage.by_type[type] ?? 0}</p>
+                  <p className="text-xs text-[#6B7280] capitalize font-medium">{type}</p>
                 </div>
               ))}
             </div>
@@ -341,41 +349,41 @@ function DashboardTab({
         </div>
 
         {/* Scheduler Status */}
-        <div className="bg-[#12121E] border border-[#2D2D4E] rounded-2xl p-6">
+        <div className="tnt-card">
           <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-4 h-4 text-[#9B9BC4]" />
-            <h3 className="text-sm font-bold text-[#F1F0FF]">Scheduler</h3>
-            <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium
+            <Calendar className="w-4 h-4 text-[#6B7280]" />
+            <h3 className="text-base font-bold text-[#111827]">Scheduler</h3>
+            <span className={`ml-auto text-xs px-2.5 py-0.5 rounded-full font-semibold border
               ${scheduler?.running
-                ? 'bg-emerald-500/20 text-emerald-400'
-                : 'bg-red-500/20 text-red-400'}`}>
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-red-50 text-red-700 border-red-200'}`}>
               {scheduler?.running ? 'Active' : 'Stopped'}
             </span>
           </div>
 
           <div className="space-y-3">
             {scheduler?.jobs.map((job) => (
-              <div key={job.job_id} className="bg-[#1A1A2E] rounded-xl p-3">
-                <p className="text-xs font-semibold text-[#F1F0FF]">{job.name}</p>
+              <div key={job.job_id} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-3">
+                <p className="text-xs font-bold text-[#111827]">{job.name}</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <Clock className="w-3 h-3 text-[#9B9BC4]" />
-                  <p className="text-xs text-[#9B9BC4]">
+                  <Clock className="w-3 h-3 text-[#6B7280]" />
+                  <p className="text-xs text-[#6B7280]">
                     {job.next_run_time
                       ? `Next: ${formatDate(job.next_run_time)}`
                       : 'Not scheduled'}
                   </p>
                 </div>
-                <p className="text-xs text-[#6B7280] mt-1 font-mono truncate">{job.trigger}</p>
+                <p className="text-xs text-[#9CA3AF] mt-1 font-mono truncate">{job.trigger}</p>
               </div>
             )) ?? (
-              <div className="text-xs text-[#9B9BC4] text-center py-4">
+              <div className="text-xs text-[#6B7280] text-center py-4">
                 Loading scheduler info...
               </div>
             )}
           </div>
 
-          <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-            <p className="text-xs text-amber-300">
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="text-xs text-amber-800">
               <strong>Daily</strong> at 02:00 UTC · <strong>Weekly</strong> Sunday 03:00 UTC
             </p>
           </div>
@@ -384,20 +392,20 @@ function DashboardTab({
 
       {/* Recent Backups Quick List */}
       {recentBackups.length > 0 && (
-        <div className="bg-[#12121E] border border-[#2D2D4E] rounded-2xl p-6">
-          <h3 className="text-sm font-bold text-[#F1F0FF] mb-4">Recent Backups</h3>
+        <div className="tnt-card">
+          <h3 className="text-base font-bold text-[#111827] mb-4">Recent Backups</h3>
           <div className="space-y-2">
             {recentBackups.slice(0, 5).map((b) => (
-              <div key={b.id} className="flex items-center gap-3 p-3 bg-[#1A1A2E] rounded-xl">
-                <span className={`flex items-center gap-1 text-xs ${STATUS_COLORS[b.status]}`}>
+              <div key={b.id} className="flex items-center gap-3 p-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl">
+                <span className={`flex items-center gap-1 text-xs font-medium ${STATUS_COLORS[b.status]}`}>
                   {STATUS_ICONS[b.status]}
                 </span>
                 <span className={`text-xs px-2 py-0.5 rounded-md border capitalize font-medium ${TYPE_COLORS[b.backup_type]}`}>
                   {b.backup_type}
                 </span>
-                <span className="flex-1 text-xs text-[#F1F0FF] font-mono truncate">{b.filename}</span>
-                <span className="text-xs text-[#9B9BC4]">{formatSize(b.size_mb, b.size_kb)}</span>
-                <span className="text-xs text-[#6B7280]">{formatAgo(b.created_at)}</span>
+                <span className="flex-1 text-xs text-[#111827] font-mono font-medium truncate">{b.filename}</span>
+                <span className="text-xs text-[#6B7280] font-medium">{formatSize(b.size_mb, b.size_kb)}</span>
+                <span className="text-xs text-[#9CA3AF]">{formatAgo(b.created_at)}</span>
               </div>
             ))}
           </div>
@@ -429,11 +437,11 @@ function RecoveryTab({
   return (
     <div className="space-y-6">
       {/* Warning Banner */}
-      <div className="bg-red-500/10 border border-red-500/25 rounded-2xl p-5 flex gap-4">
-        <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex gap-4">
+        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-red-300">Restore is a Destructive Operation</p>
-          <p className="text-xs text-red-400">
+          <p className="text-sm font-bold text-red-900">Restore is a Destructive Operation</p>
+          <p className="text-xs text-red-700">
             Restoring a backup will truncate all current database tables and replace them with
             backup data. This cannot be undone. Always create a fresh backup before restoring.
           </p>
@@ -441,12 +449,12 @@ function RecoveryTab({
       </div>
 
       {/* Backup Selection Table */}
-      <div className="bg-[#12121E] border border-[#2D2D4E] rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#2D2D4E] flex items-center justify-between">
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-xs">
+        <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F9FAFB]">
           <div className="flex items-center gap-2">
-            <RotateCcw className="w-4 h-4 text-[#9B9BC4]" />
-            <h3 className="text-sm font-bold text-[#F1F0FF]">Available for Restore</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[#2D2D4E] text-[#9B9BC4]">
+            <RotateCcw className="w-4 h-4 text-[#6B7280]" />
+            <h3 className="text-base font-bold text-[#111827]">Available for Restore</h3>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#E5E7EB] text-[#374151] font-semibold">
               {successBackups.length}
             </span>
           </div>
@@ -454,64 +462,64 @@ function RecoveryTab({
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+            <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
           </div>
         ) : successBackups.length === 0 ? (
           <div className="py-16 text-center">
-            <Database className="w-10 h-10 text-[#4B4B6E] mx-auto mb-3" />
-            <p className="text-sm text-[#9B9BC4]">No successful backups available</p>
+            <Database className="w-10 h-10 text-[#9CA3AF] mx-auto mb-3" />
+            <p className="text-sm font-medium text-[#374151]">No successful backups available</p>
             <p className="text-xs text-[#6B7280] mt-1">Create a backup first from the Dashboard tab</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#1E1E32]">
+          <div className="divide-y divide-[#E5E7EB]">
             {successBackups.map((b) => {
               const verResult = verifyResults[b.id];
               const isVerifying = verifyingId === b.id;
 
               return (
-                <div key={b.id} className="px-6 py-4 hover:bg-[#1A1A2E] transition-colors">
+                <div key={b.id} className="px-6 py-4 hover:bg-[#F9FAFB] transition-colors">
                   <div className="flex items-start gap-4">
                     {/* File Icon */}
-                    <div className="w-9 h-9 rounded-xl bg-[#2D2D4E] flex items-center justify-center shrink-0 mt-0.5">
-                      <FileText className="w-4 h-4 text-[#9B9BC4]" />
+                    <div className="w-9 h-9 rounded-xl bg-[#F3F4F6] border border-[#E5E7EB] flex items-center justify-center shrink-0 mt-0.5">
+                      <FileText className="w-4 h-4 text-[#6B7280]" />
                     </div>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-[#F1F0FF] font-mono truncate">{b.filename}</p>
+                        <p className="text-sm font-semibold text-[#111827] font-mono truncate">{b.filename}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-md border capitalize font-medium ${TYPE_COLORS[b.backup_type]}`}>
                           {b.backup_type}
                         </span>
                       </div>
                       <div className="flex items-center gap-4 mt-1.5 flex-wrap">
-                        <span className="text-xs text-[#9B9BC4] flex items-center gap-1">
+                        <span className="text-xs text-[#6B7280] flex items-center gap-1 font-medium">
                           <HardDrive className="w-3 h-3" /> {formatSize(b.size_mb, b.size_kb)}
                         </span>
                         {b.tables_count && (
-                          <span className="text-xs text-[#9B9BC4] flex items-center gap-1">
+                          <span className="text-xs text-[#6B7280] flex items-center gap-1 font-medium">
                             <Database className="w-3 h-3" /> {b.tables_count} tables
                           </span>
                         )}
                         {b.rows_exported && (
-                          <span className="text-xs text-[#9B9BC4]">
+                          <span className="text-xs text-[#6B7280] font-medium">
                             {b.rows_exported.toLocaleString()} rows
                           </span>
                         )}
-                        <span className="text-xs text-[#9B9BC4] flex items-center gap-1">
+                        <span className="text-xs text-[#6B7280] flex items-center gap-1">
                           <Clock className="w-3 h-3" /> {formatDate(b.created_at)}
                         </span>
                       </div>
 
                       {/* Integrity Status */}
                       {verResult && (
-                        <div className={`mt-2 flex items-center gap-2 text-xs rounded-lg px-3 py-1.5
+                        <div className={`mt-2 flex items-center gap-2 text-xs rounded-lg px-3 py-1.5 border font-medium
                           ${verResult.integrity_ok
-                            ? 'bg-emerald-500/10 text-emerald-400'
-                            : 'bg-red-500/10 text-red-400'}`}>
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-red-50 text-red-700 border-red-200'}`}>
                           {verResult.integrity_ok
-                            ? <><CheckCircle className="w-3 h-3" /> Integrity verified — {verResult.message}</>
-                            : <><XCircle className="w-3 h-3" /> {verResult.message}</>}
+                            ? <><CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Integrity verified — {verResult.message}</>
+                            : <><XCircle className="w-3.5 h-3.5 text-red-600" /> {verResult.message}</>}
                         </div>
                       )}
                     </div>
@@ -523,19 +531,19 @@ function RecoveryTab({
                         disabled={isVerifying}
                         title="Verify integrity"
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                          bg-[#2D2D4E] text-[#9B9BC4] hover:bg-[#3D3D5E] hover:text-[#F1F0FF]
-                          disabled:opacity-50 transition"
+                          bg-white border border-[#E5E7EB] text-[#374151] hover:bg-[#F9FAFB] hover:text-[#111827]
+                          disabled:opacity-50 transition shadow-2xs"
                       >
                         {isVerifying
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <ShieldCheck className="w-3.5 h-3.5" />}
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                          : <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />}
                         Verify
                       </button>
                       <button
                         onClick={() => onRestore(b)}
                         title="Restore this backup"
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                          bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 transition"
+                          bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         Restore
@@ -586,13 +594,13 @@ function LogsTab({
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-[#9B9BC4]" />
-          <span className="text-xs text-[#9B9BC4]">Filter:</span>
+          <Filter className="w-4 h-4 text-[#6B7280]" />
+          <span className="text-xs font-semibold text-[#374151]">Filter:</span>
         </div>
         <select
           value={filterType}
           onChange={(e) => { setFilterType(e.target.value); onPageChange(1); }}
-          className="bg-[#1A1A2E] border border-[#2D2D4E] text-[#F1F0FF] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500/50"
+          className="bg-white border border-[#E5E7EB] text-[#111827] text-xs font-medium rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 shadow-2xs"
         >
           <option value="">All Types</option>
           <option value="manual">Manual</option>
@@ -602,7 +610,7 @@ function LogsTab({
         <select
           value={filterStatus}
           onChange={(e) => { setFilterStatus(e.target.value); onPageChange(1); }}
-          className="bg-[#1A1A2E] border border-[#2D2D4E] text-[#F1F0FF] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500/50"
+          className="bg-white border border-[#E5E7EB] text-[#111827] text-xs font-medium rounded-lg px-3 py-2 focus:outline-none focus:border-purple-500 shadow-2xs"
         >
           <option value="">All Statuses</option>
           <option value="success">Success</option>
@@ -612,7 +620,7 @@ function LogsTab({
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 text-xs text-[#9B9BC4] hover:text-[#F1F0FF] transition"
+          className="ml-auto flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#111827] font-medium transition"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -620,43 +628,43 @@ function LogsTab({
       </div>
 
       {/* Table */}
-      <div className="bg-[#12121E] border border-[#2D2D4E] rounded-2xl overflow-hidden">
+      <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-xs">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#2D2D4E] bg-[#0F0F1A]">
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Filename</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Type</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Status</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Size</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Tables</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Duration</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Created</th>
-              <th className="px-4 py-3.5 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wide">Actions</th>
+            <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
+              <th className="px-5 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Filename</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Type</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Status</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Size</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Tables</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Duration</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Created</th>
+              <th className="px-4 py-3.5 text-left text-xs font-bold text-[#4B5563] uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-[#E5E7EB]">
             {loading ? (
               <tr>
                 <td colSpan={8} className="text-center py-16">
-                  <Loader2 className="w-6 h-6 animate-spin text-violet-400 mx-auto" />
+                  <Loader2 className="w-6 h-6 animate-spin text-purple-600 mx-auto" />
                 </td>
               </tr>
             ) : backups.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center py-16">
-                  <Activity className="w-8 h-8 text-[#4B4B6E] mx-auto mb-2" />
-                  <p className="text-sm text-[#9B9BC4]">No backup records found</p>
+                  <Activity className="w-8 h-8 text-[#9CA3AF] mx-auto mb-2" />
+                  <p className="text-sm font-medium text-[#374151]">No backup records found</p>
                 </td>
               </tr>
             ) : (
               backups.map((b) => (
-                <tr key={b.id} className="border-b border-[#1E1E32] hover:bg-[#1A1A2E] transition-colors">
+                <tr key={b.id} className="hover:bg-[#F9FAFB] transition-colors">
                   <td className="px-5 py-3.5">
-                    <span className="text-xs font-mono text-[#F1F0FF] truncate block max-w-[220px]" title={b.filename}>
+                    <span className="text-xs font-mono text-[#111827] font-semibold truncate block max-w-[220px]" title={b.filename}>
                       {b.filename}
                     </span>
                     {b.error_message && (
-                      <span className="text-xs text-red-400 mt-0.5 block truncate max-w-[220px]" title={b.error_message}>
+                      <span className="text-xs text-red-600 mt-0.5 block truncate max-w-[220px]" title={b.error_message}>
                         {b.error_message}
                       </span>
                     )}
@@ -667,21 +675,21 @@ function LogsTab({
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className={`flex items-center gap-1.5 text-xs font-medium ${STATUS_COLORS[b.status]}`}>
+                    <span className={`flex items-center gap-1.5 text-xs font-semibold ${STATUS_COLORS[b.status]}`}>
                       {STATUS_ICONS[b.status]} {b.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-xs text-[#9B9BC4]">{formatSize(b.size_mb, b.size_kb)}</td>
-                  <td className="px-4 py-3.5 text-xs text-[#9B9BC4]">{b.tables_count ?? '—'}</td>
-                  <td className="px-4 py-3.5 text-xs text-[#9B9BC4]">{b.duration_seconds != null ? `${b.duration_seconds}s` : '—'}</td>
-                  <td className="px-4 py-3.5 text-xs text-[#9B9BC4] whitespace-nowrap">{formatDate(b.created_at)}</td>
+                  <td className="px-4 py-3.5 text-xs text-[#6B7280] font-medium">{formatSize(b.size_mb, b.size_kb)}</td>
+                  <td className="px-4 py-3.5 text-xs text-[#6B7280] font-medium">{b.tables_count ?? '—'}</td>
+                  <td className="px-4 py-3.5 text-xs text-[#6B7280] font-medium">{b.duration_seconds != null ? `${b.duration_seconds}s` : '—'}</td>
+                  <td className="px-4 py-3.5 text-xs text-[#6B7280] whitespace-nowrap">{formatDate(b.created_at)}</td>
                   <td className="px-4 py-3.5">
                     {b.status === 'success' && (
                       <button
                         onClick={() => onDelete(b.id, b.filename)}
                         disabled={deletingId === b.id}
                         title="Delete backup"
-                        className="text-red-400 hover:text-red-300 disabled:opacity-40 transition"
+                        className="text-red-600 hover:text-red-700 disabled:opacity-40 transition p-1 hover:bg-red-50 rounded-md"
                       >
                         {deletingId === b.id
                           ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -702,15 +710,15 @@ function LogsTab({
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            className="px-3 py-1.5 rounded-lg text-xs text-[#9B9BC4] bg-[#1A1A2E] hover:bg-[#2D2D4E] disabled:opacity-40 transition"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#374151] bg-white border border-[#E5E7EB] hover:bg-[#F9FAFB] disabled:opacity-40 transition shadow-2xs"
           >
             Previous
           </button>
-          <span className="text-xs text-[#9B9BC4]">Page {page} of {totalPages}</span>
+          <span className="text-xs text-[#6B7280] font-medium">Page {page} of {totalPages}</span>
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
-            className="px-3 py-1.5 rounded-lg text-xs text-[#9B9BC4] bg-[#1A1A2E] hover:bg-[#2D2D4E] disabled:opacity-40 transition"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#374151] bg-white border border-[#E5E7EB] hover:bg-[#F9FAFB] disabled:opacity-40 transition shadow-2xs"
           >
             Next
           </button>
@@ -807,8 +815,8 @@ export default function BackupRecovery() {
       setRestoreTarget(null);
       await fetchAll();
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || 'Restore failed';
-      toast.error(`Restore failed: ${detail}`);
+      detail: err?.response?.data?.detail || 'Restore failed';
+      toast.error(`Restore failed: ${err?.response?.data?.detail || 'Restore failed'}`);
       throw err;
     }
   };
@@ -837,33 +845,33 @@ export default function BackupRecovery() {
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/30 to-violet-600/10 border border-violet-500/30 flex items-center justify-center">
-          <Database className="w-6 h-6 text-violet-400" />
+        <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-center">
+          <Database className="w-6 h-6 text-purple-600" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-[#F1F0FF]">Backup & Recovery</h1>
-          <p className="text-xs text-[#9B9BC4] mt-0.5">
+          <h1 className="text-xl font-bold text-[#111827]">Backup & Recovery</h1>
+          <p className="text-xs text-[#6B7280] mt-0.5">
             PostgreSQL database backup, restore, and integrity monitoring
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[#12121E] border border-[#2D2D4E] text-[#9B9BC4]">
-            <Lock className="w-3 h-3 text-violet-400" />
+          <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#F9FAFB] border border-[#E5E7EB] text-[#374151]">
+            <Lock className="w-3.5 h-3.5 text-purple-600" />
             Admin Only
           </div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 bg-[#0F0F1A] border border-[#2D2D4E] rounded-xl p-1">
+      <div className="flex gap-1 bg-[#F3F4F6] border border-[#E5E7EB] rounded-xl p-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex-1 justify-center
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 flex-1 justify-center
               ${activeTab === tab.id
-                ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/30'
-                : 'text-[#9B9BC4] hover:text-[#F1F0FF] hover:bg-[#1A1A2E]'
+                ? 'bg-white text-purple-700 shadow-xs'
+                : 'text-[#6B7280] hover:text-[#111827] hover:bg-white/60'
               }`}
           >
             {tab.icon}
