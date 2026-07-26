@@ -7,7 +7,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { adminApi } from '../../api/admin';
 import { formatOrderId, formatRupees, formatTimeAgo, formatDateTime } from '../../utils/format';
-import { POLL_INTERVAL_ORDERS, ACTIVE_ORDER_STATUSES } from '../../utils/constants';
+import { POLL_INTERVAL_ORDERS, ACTIVE_ORDER_STATUSES, WS_BASE_URL } from '../../utils/constants';
 import type { Order, OrderStatus } from '../../types';
 import { cn } from '../../utils/cn';
 
@@ -38,8 +38,32 @@ export default function OrdersHub() {
 
   useEffect(() => {
     fetchOrders();
+
+    // ── Live WebSocket connection ─────────────────────────────────────
+    let ws: WebSocket | null = null;
+    try {
+      const wsUrl = `${WS_BASE_URL.replace(/^http/, 'ws')}/v1/orders/ws/0`;
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.event && ['status_change', 'new_order', 'pickup_confirmed'].includes(data.event)) {
+            fetchOrders();
+          }
+        } catch {
+          // ignore non-json messages
+        }
+      };
+    } catch {
+      // ignore WS init errors — fallback poll will handle updates
+    }
+
+    // Fallback polling (30s interval)
     const interval = setInterval(fetchOrders, POLL_INTERVAL_ORDERS);
-    return () => clearInterval(interval);
+    return () => {
+      if (ws) ws.close();
+      clearInterval(interval);
+    };
   }, [fetchOrders]);
 
   const handleFlagFraud = async (id: number, e: React.MouseEvent) => {
@@ -211,7 +235,7 @@ export default function OrdersHub() {
             <option value="confirmed">Confirmed</option>
             <option value="preparing">Preparing</option>
             <option value="ready">Ready</option>
-            <option value="picked_up">Picked Up</option>
+            <option value="picked">Picked Up</option>
             <option value="cancelled">Cancelled</option>
           </select>
           <label className="flex items-center gap-2 text-sm text-[#6B7280] cursor-pointer">

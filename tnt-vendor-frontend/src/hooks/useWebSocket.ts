@@ -50,6 +50,12 @@ export function useWebSocket(url: string, token: string) {
         try {
           const message = JSON.parse(event.data);
 
+          // Handle heartbeat ping frames from server
+          if (message.type === 'ping') {
+            ws.current?.send(JSON.stringify({ type: 'pong' }));
+            return;
+          }
+
           // Handle authentication response
           if (message.authenticated === true) {
             setIsConnected(true);
@@ -83,22 +89,18 @@ export function useWebSocket(url: string, token: string) {
         setIsConnected(false);
         isConnectedRef.current = false;
 
-        // Exponential backoff reconnect
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          reconnectAttempts.current += 1;
-          const delay = Math.min(
-            1000 * Math.pow(2, reconnectAttempts.current),
-            30000,
-          );
-          console.log(
-            `[useWebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`,
-          );
-          reconnectTimeout.current = setTimeout(() => {
-            connect();
-          }, delay);
-        } else {
-          console.log('[useWebSocket] Max reconnect attempts reached');
-        }
+        // Exponential backoff reconnect (indefinite retry capped at 30s for mobile resilience)
+        reconnectAttempts.current += 1;
+        const delay = Math.min(
+          1000 * Math.pow(1.5, Math.min(reconnectAttempts.current, 10)),
+          30000,
+        );
+        console.log(
+          `[useWebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttempts.current})`,
+        );
+        reconnectTimeout.current = setTimeout(() => {
+          connect();
+        }, delay);
       };
     } catch (error) {
       console.error('[useWebSocket] Failed to create connection:', error);

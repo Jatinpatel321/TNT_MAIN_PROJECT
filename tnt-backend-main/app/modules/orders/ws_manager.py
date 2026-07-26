@@ -279,6 +279,26 @@ class OrderWSManager:
             if order_id in self._redis_pubsub_tasks:
                 del self._redis_pubsub_tasks[order_id]
 
+    async def start_heartbeat(self, interval_seconds: int = 30) -> None:
+        """Periodic ping loop to detect and clean up dead/zombie sockets."""
+        from app.core.time_utils import utcnow_naive
+        while True:
+            await asyncio.sleep(interval_seconds)
+            ping_frame = {"type": "ping", "timestamp": utcnow_naive().isoformat()}
+            all_groups = [self._active, self._vendor_connections, self._group_connections]
+            for group in all_groups:
+                for key, ws_list in list(group.items()):
+                    for ws in list(ws_list):
+                        try:
+                            if ws.client_state == WebSocketState.CONNECTED:
+                                await self.send_json(ws, ping_frame)
+                            else:
+                                if ws in ws_list:
+                                    ws_list.remove(ws)
+                        except Exception:
+                            if ws in ws_list:
+                                ws_list.remove(ws)
+
 
 # Global singleton
 manager = OrderWSManager()

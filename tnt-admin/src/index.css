@@ -360,3 +360,94 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ─── PREMIUM LOGIN ANIMATIONS ────────────────────────────────────────────── */
+
+/* Ambient float animation for background blobs */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-15px) scale(1.03) rotate(3deg);
+  }
+  66% {
+    transform: translateY(10px) scale(0.97) rotate(-3deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0) scale(1.03) rotate(0deg);
+  }
+  50% {
+    transform: translateY(15px) scale(0.97) rotate(-5deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 15s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 18s ease-in-out infinite;
+}
+
+/* Glass reflection shine effect */
+.glass-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-shine::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -150%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(25deg);
+  transition: none;
+}
+
+.glass-shine:hover::after {
+  left: 150%;
+  transition: left 1.5s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* Animated dots/grid */
+.bg-grid-dots {
+  background-image: radial-gradient(#E5E7EB 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+/* Animated gradient background */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    background-attachment: initial !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}

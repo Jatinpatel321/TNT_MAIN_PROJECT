@@ -19,14 +19,14 @@
   --border-default: #E5E7EB;
   --border-strong: #D1D5DB;
 
-  /* Brand — Primary (Indigo) */
-  --primary: #4F46E5;
-  --primary-hover: #4338CA;
-  --primary-soft: rgba(79,70,229,0.10);
+  /* Brand — Primary (TNT Orange) */
+  --primary: #E85D24;
+  --primary-hover: #D84D14;
+  --primary-soft: rgba(232,93,36,0.10);
 
-  /* TNT Brand — Orange only for branding */
+  /* TNT Brand — Orange */
   --tnt-orange: #E85D24;
-  --tnt-orange-hover: #F97316;
+  --tnt-orange-hover: #D84D14;
   --tnt-orange-soft: rgba(232,93,36,0.10);
 
   /* KPI Metric Colors */
@@ -43,7 +43,7 @@
   --info: #2563EB;
 
   /* Chart Palette */
-  --chart-1: #4F46E5;
+  --chart-1: #E85D24;
   --chart-2: #2563EB;
   --chart-3: #22C55E;
   --chart-4: #F59E0B;
@@ -52,8 +52,8 @@
   /* Sidebar — White */
   --sidebar-bg: #FFFFFF;
   --sidebar-border: #E5E7EB;
-  --sidebar-active-bg: rgba(79,70,229,0.10);
-  --sidebar-active-text: #4F46E5;
+  --sidebar-active-bg: rgba(232,93,36,0.10);
+  --sidebar-active-text: #E85D24;
   --sidebar-hover-bg: #F3F5F9;
   --sidebar-text: #6B7280;
   --sidebar-text-hover: #111827;
@@ -77,7 +77,7 @@
   --status-confirmed: #F59E0B;
   --status-preparing: #E85D24;
   --status-ready: #22C55E;
-  --status-picked-up: #14B8A6;
+  --status-picked: #14B8A6;
   --status-cancelled: #EF4444;
   --status-fraud: #991B1B;
   --status-approved: #22C55E;

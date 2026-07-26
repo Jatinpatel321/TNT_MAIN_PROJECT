@@ -170,6 +170,21 @@ def _run_ml_retraining():
         logger.error("Scheduler: ML model retraining failed: %s", exc)
 
 
+def _run_payment_reconciliation():
+    """Scheduled job: reconcile stuck initiated payments (>15 mins old)."""
+    try:
+        from app.database.session import SessionLocal
+        from app.modules.payments.reconciliation_service import reconcile_stuck_payments_job
+        db = SessionLocal()
+        try:
+            results = reconcile_stuck_payments_job(db)
+            logger.info("Scheduler: payment reconciliation complete: %s", results)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: payment reconciliation failed: %s", exc)
+
+
 def start_scheduler() -> None:
     """Start the background scheduler with daily + weekly backup jobs."""
     sched = _get_scheduler()
@@ -207,6 +222,16 @@ def start_scheduler() -> None:
             name="Proactive Delay Alerts Check",
             replace_existing=True,
             misfire_grace_time=300,
+        )
+
+        # Payment Reconciliation (every 15 minutes)
+        sched.add_job(
+            _run_payment_reconciliation,
+            trigger=CronTrigger(minute="*/15", timezone="UTC"),
+            id="payment_reconciliation",
+            name="Automated Razorpay Payment Reconciliation",
+            replace_existing=True,
+            misfire_grace_time=600,
         )
 
         # Proactive Rush Hour Alerts (every hour)

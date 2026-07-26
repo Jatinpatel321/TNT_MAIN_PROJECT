@@ -12,10 +12,14 @@ from app.core.sms import send_sms
 from app.core.time_utils import utcnow_naive
 from app.modules.notifications.model import Notification, NotificationType
 
+from concurrent.futures import ThreadPoolExecutor
+
 logger = logging.getLogger("tnt.notifications")
 
 REDIS_QUEUE_KEY = "tnt:notifications:queue"
 SMS_FALLBACK_WINDOW_SECONDS = 30  # suppress SMS if push was delivered within this window
+
+_notification_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="notif_dispatch")
 
 
 def _push_delivered_recently(user_id: int) -> bool:
@@ -57,6 +61,103 @@ def _mark_push_delivered(user_id: int) -> None:
         logger.exception("push_delivered_mark_error user_id=%s", user_id)
 
 
+def _async_dispatch_notification_external(
+    user_id: int,
+    phone: str,
+    title: str,
+    message: str,
+    notification_id: int,
+    notification_type_val: str,
+    reference_id: Optional[int],
+    device_token: Optional[str],
+    push_enabled: bool,
+    user_preferences: Optional[dict],
+    send_sms_flag: bool,
+    sms_fallback: bool,
+) -> None:
+    """Execute external notification network calls asynchronously (FCM, SMS, Redis, WebSockets)."""
+    push_succeeded = False
+
+    # Push notification via FCM
+    if device_token and push_enabled:
+        try:
+            send_push(
+                device_token=device_token,
+                title=title,
+                body=message,
+                data={
+                    "notification_type": notification_type_val,
+                    "reference_id": reference_id,
+                },
+            )
+            push_succeeded = True
+            _mark_push_delivered(user_id)
+        except Exception:
+            logger.exception("notification_push_fcm_failed user_id=%s", user_id)
+
+    # Resolve per-user sms_fallback preference
+    if isinstance(user_preferences, dict):
+        user_sms_fallback = user_preferences.get("sms_fallback")
+        if user_sms_fallback is not None:
+            sms_fallback = bool(user_sms_fallback)
+
+    try:
+        _enqueue_to_redis(
+            user_id=user_id,
+            notification_id=notification_id,
+            title=title,
+            message=message,
+            notification_type=notification_type_val,
+        )
+    except Exception:
+        logger.exception("notification_redis_enqueue_failed user_id=%s", user_id)
+
+    # Broadcast notification event to user's WebSocket channel
+    try:
+        publish_order_event(
+            order_id=reference_id or 0,
+            event="notification",
+            data={
+                "user_id": user_id,
+                "title": title,
+                "message": message,
+                "notification_type": notification_type_val,
+                "reference_id": reference_id,
+                "created_at": utcnow_naive().isoformat(),
+            },
+        )
+    except Exception:
+        logger.exception("notification_event_publish_failed user_id=%s", user_id)
+
+    # Decide whether to send SMS
+    should_sms = send_sms_flag
+    if should_sms and sms_fallback and push_succeeded:
+        if _push_delivered_recently(user_id):
+            logger.info(
+                "sms_skipped_push_recent user_id=%s notification_id=%s",
+                user_id,
+                notification_id,
+            )
+            should_sms = False
+
+    if not send_sms_flag:
+        logger.debug(
+            "sms_skipped_by_flag user_id=%s title=%s",
+            user_id,
+            title,
+        )
+
+    if should_sms:
+        try:
+            send_sms(phone, message)
+        except Exception:
+            logger.exception(
+                "notification_sms_failed user_id=%s phone=%s",
+                user_id,
+                phone,
+            )
+
+
 def notify_user(
     user_id: int,
     phone: str,
@@ -79,95 +180,30 @@ def notify_user(
     db.add(notification)
     db.flush()
 
-    push_succeeded = False
+    # Pre-fetch user metadata needed for external dispatch
+    from app.modules.users.model import User
+    user = db.query(User).filter(User.id == user_id).first()
+    device_token = user.device_token if user else None
+    push_enabled = getattr(user, 'push_enabled', True) if user else True
+    user_preferences = user.preferences if user else None
 
-    # Push notification via FCM
-    try:
-        from app.modules.users.model import User
-
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and user.device_token and getattr(user, 'push_enabled', True):
-            send_push(
-                device_token=user.device_token,
-                title=title,
-                body=message,
-                data={
-                    "notification_type": notification_type.value,
-                    "reference_id": reference_id,
-                },
-            )
-            push_succeeded = True
-            _mark_push_delivered(user_id)
-    except Exception:
-        logger.exception("notification_push_fcm_failed user_id=%s", user_id)
-
-    # Resolve per-user sms_fallback preference from user.preferences JSON column.
-    # If the user has explicitly set sms_fallback=false in preferences, respect
-    # that as an opt-out.  Default to the caller-supplied value.
-    if user is not None and isinstance(user.preferences, dict):
-        user_sms_fallback = user.preferences.get("sms_fallback")
-        if user_sms_fallback is not None:
-            sms_fallback = bool(user_sms_fallback)
-    elif user is not None:
-        # preferences might be a string or None; treat missing as default
-        pass
-
-    try:
-        _enqueue_to_redis(
-            user_id=user_id,
-            notification_id=notification.id,
-            title=title,
-            message=message,
-            notification_type=notification_type.value,
-        )
-    except Exception:
-        logger.exception("notification_redis_enqueue_failed user_id=%s", user_id)
-
-    # Broadcast notification event to user's WebSocket channel
-    try:
-        publish_order_event(
-            order_id=reference_id or 0,
-            event="notification",
-            data={
-                "user_id": user_id,
-                "title": title,
-                "message": message,
-                "notification_type": notification_type.value,
-                "reference_id": reference_id,
-                "created_at": utcnow_naive().isoformat(),
-            },
-        )
-    except Exception:
-        logger.exception("notification_event_publish_failed user_id=%s", user_id)
-
-    # Decide whether to send SMS
-    should_sms = send_sms_flag
-    if should_sms and sms_fallback and push_succeeded:
-        # If push was just delivered, skip SMS to avoid double-ping
-        if _push_delivered_recently(user_id):
-            logger.info(
-                "sms_skipped_push_recent user_id=%s notification_id=%s",
-                user_id,
-                notification.id,
-            )
-            should_sms = False
-
-    if not send_sms_flag:
-        logger.debug(
-            "sms_skipped_by_flag user_id=%s title=%s",
-            user_id,
-            title,
-        )
-
-    if should_sms:
-        try:
-            send_sms(phone, message)
-        except Exception:
-            logger.exception(
-                "notification_sms_failed user_id=%s phone=%s",
-                user_id,
-                phone,
-            )
+    # Offload external network side-effects (FCM, SMS, Redis, WebSockets) to non-blocking background thread
+    notification_type_val = notification_type.value if hasattr(notification_type, "value") else str(notification_type)
+    _notification_executor.submit(
+        _async_dispatch_notification_external,
+        user_id=user_id,
+        phone=phone,
+        title=title,
+        message=message,
+        notification_id=notification.id,
+        notification_type_val=notification_type_val,
+        reference_id=reference_id,
+        device_token=device_token,
+        push_enabled=push_enabled,
+        user_preferences=user_preferences,
+        send_sms_flag=send_sms_flag,
+        sms_fallback=sms_fallback,
+    )
 
     return notification
 

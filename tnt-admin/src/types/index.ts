@@ -30,7 +30,7 @@ export interface AdminAnalytics {
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
-export type OrderStatus = 'placed' | 'confirmed' | 'preparing' | 'ready' | 'picked_up' | 'cancelled';
+export type OrderStatus = 'placed' | 'confirmed' | 'preparing' | 'ready' | 'picked' | 'cancelled';
 
 export interface OrderItem {
   id: number;
