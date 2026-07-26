@@ -794,12 +794,32 @@ export default function Login() {
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        placeholder="9876543210"
+                        placeholder="9999999999"
                         className="tnt-input flex-1 focus:border-[#4F46E5]"
                         autoFocus
                         required
                         inputMode="numeric"
                       />
+                    </div>
+                    
+                    {/* Demo Admin Helper Badges */}
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span className="text-[#6B7280]">Demo Accounts:</span>
+                      <button
+                        type="button"
+                        onClick={() => setPhone('9999999999')}
+                        className="text-[#E85D24] hover:underline font-medium"
+                      >
+                        Admin (9999999999)
+                      </button>
+                      <span className="text-[#D1D5DB]">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setPhone('9999999900')}
+                        className="text-[#4F46E5] hover:underline font-medium"
+                      >
+                        Super Admin (9999999900)
+                      </button>
                     </div>
                   </div>
 
