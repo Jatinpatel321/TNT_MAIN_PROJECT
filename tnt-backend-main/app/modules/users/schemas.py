@@ -100,6 +100,12 @@ class UserPreferencesUpdate(BaseModel):
         default=None,
         description="Persisted UI theme choice so it follows the account across devices.",
     )
+    sms_fallback: Optional[bool] = Field(
+        default=None,
+        description="Whether to send SMS when push notification fails.",
+    )
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class UserCreate(BaseModel):

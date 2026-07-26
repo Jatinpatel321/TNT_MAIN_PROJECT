@@ -128,15 +128,21 @@ def refresh(
 
 @router.post("/logout")
 def logout(
+    request: Request,
     body: dict | None = Body(default=None),
     vendor_ctx: dict = Depends(get_current_vendor),
 ):
     """Log out the current vendor session.
 
-    Requires a valid vendor access token. If the request body includes a
-    ``refresh_token`` it is revoked so it can no longer be rotated. The access
-    token itself is stateless and expires naturally; the client clears it.
+    Requires a valid vendor access token. Revokes both the access token and the
+    optional refresh token server-side.
     """
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        access_token = auth_header.split(" ", 1)[1].strip()
+        from app.core.security import revoke_token
+        revoke_token(access_token)
+
     refresh_token = (body or {}).get("refresh_token")
     logout_vendor(refresh_token)
     return {"message": "Logged out successfully"}

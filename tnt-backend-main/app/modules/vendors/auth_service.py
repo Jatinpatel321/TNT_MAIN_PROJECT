@@ -143,6 +143,10 @@ def get_current_vendor(
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    from app.core.security import is_token_revoked
+    if is_token_revoked(token, payload):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
+
     token_type = payload.get("type")
     if token_type != "vendor_access":
         raise HTTPException(status_code=401, detail="Invalid token type — use an access token")

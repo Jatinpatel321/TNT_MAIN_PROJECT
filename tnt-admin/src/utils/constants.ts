@@ -6,7 +6,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   confirmed: 'Confirmed',
   preparing: 'Preparing',
   ready: 'Ready',
-  picked_up: 'Picked Up',
+  picked: 'Picked Up',
   cancelled: 'Cancelled',
 };
 
@@ -15,11 +15,11 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   confirmed: 'bg-amber-50 text-amber-600 border-amber-200',
   preparing: 'bg-orange-50 text-orange-600 border-orange-200',
   ready: 'bg-green-50 text-green-600 border-green-200',
-  picked_up: 'bg-teal-50 text-teal-600 border-teal-200',
+  picked: 'bg-teal-50 text-teal-600 border-teal-200',
   cancelled: 'bg-red-50 text-red-600 border-red-200',
 };
 
-export const TERMINAL_ORDER_STATUSES: OrderStatus[] = ['picked_up', 'cancelled'];
+export const TERMINAL_ORDER_STATUSES: OrderStatus[] = ['picked', 'cancelled'];
 export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['placed', 'confirmed', 'preparing', 'ready'];
 
 // ─── Vendor Status ────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ export const NAV_ITEMS = [
 
 // ─── Chart Colors ─────────────────────────────────────────────────────────────
 export const CHART_COLORS = {
-  primary: '#4F46E5',
+  primary: '#E85D24',
   secondary: '#2563EB',
   tertiary: '#22C55E',
   quaternary: '#F59E0B',
@@ -92,11 +92,13 @@ export const CHART_COLORS = {
 export const VENDOR_TYPE_LABELS = {
   food: 'Food Court',
   stationery: 'Stationery',
+  mixed: 'Mixed Services',
 };
 
 export const VENDOR_TYPE_COLORS = {
   food: 'bg-orange-50 text-orange-600 border-orange-200',
   stationery: 'bg-blue-50 text-blue-600 border-blue-200',
+  mixed: 'bg-purple-50 text-purple-600 border-purple-200',
 };
 
 // ─── Role Labels ──────────────────────────────────────────────────────────────
@@ -121,5 +123,5 @@ export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 export const POLL_INTERVAL_STATS = 30_000; // 30s
 export const POLL_INTERVAL_HEALTH = 10_000; // 10s
-export const POLL_INTERVAL_ORDERS = 5_000; // 5s
+export const POLL_INTERVAL_ORDERS = 30_000; // 30s fallback (real-time via WebSockets)
 export const POLL_INTERVAL_AI = 60_000; // 60s

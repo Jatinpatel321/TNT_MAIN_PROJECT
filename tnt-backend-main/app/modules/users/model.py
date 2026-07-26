@@ -41,6 +41,10 @@ class User(Base):
     # across orders/slots/menu). Holds: stall, location, business_name, description,
     # email, operating_hours (JSON), slot_defaults (JSON). Null for non-vendors.
     vendor_meta = Column(JSON, nullable=True)
+    vendor_stall = Column(String(100), nullable=True)
+    vendor_location = Column(String(255), nullable=True)
+    vendor_business_name = Column(String(255), nullable=True)
+    vendor_operating_hours = Column(JSON, nullable=True)
     totp_secret = Column(String(64), nullable=True)
     totp_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utcnow_naive)

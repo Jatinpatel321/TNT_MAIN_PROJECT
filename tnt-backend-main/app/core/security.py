@@ -10,7 +10,10 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+import hashlib
+
 from app.core.deps import get_db
+from app.core.redis import redis_client
 from app.core.time_utils import utcnow_naive
 
 security = HTTPBearer()
@@ -37,6 +40,59 @@ ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 _BLOCKED_USER_DETAIL = (
     "Your account is currently restricted. Contact admin."
 )
+
+REVOKED_TOKEN_PREFIX = "jwt:revoked:"
+
+
+def revoke_token(token: str, payload: dict | None = None) -> None:
+    """Revoke an access token server-side by storing its JTI or SHA-256 hash in Redis."""
+    if not token:
+        return
+    jti = payload.get("jti") if isinstance(payload, dict) else None
+    if not jti and not payload:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
+            jti = payload.get("jti") if isinstance(payload, dict) else None
+        except Exception:
+            pass
+
+    identifier = jti if jti else hashlib.sha256(token.encode("utf-8")).hexdigest()
+    key = f"{REVOKED_TOKEN_PREFIX}{identifier}"
+
+    exp = payload.get("exp") if isinstance(payload, dict) else None
+    ttl = 86400
+    if exp:
+        if isinstance(exp, (int, float)):
+            import time
+            ttl = int(exp - time.time())
+        elif isinstance(exp, datetime):
+            ttl = int((exp - utcnow_naive()).total_seconds())
+
+    ttl = max(ttl, 60)  # at least 60 seconds
+    try:
+        redis_client.setex(key, ttl, "1")
+    except Exception as e:
+        logger.warning(f"Failed to record token revocation in Redis: {e}")
+
+
+def is_token_revoked(token: str, payload: dict | None = None) -> bool:
+    """Check if a token has been revoked in Redis."""
+    if not token:
+        return False
+    jti = payload.get("jti") if isinstance(payload, dict) else None
+    if not jti and not payload:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_signature": False})
+            jti = payload.get("jti") if isinstance(payload, dict) else None
+        except Exception:
+            pass
+
+    identifier = jti if jti else hashlib.sha256(token.encode("utf-8")).hexdigest()
+    key = f"{REVOKED_TOKEN_PREFIX}{identifier}"
+    try:
+        return bool(redis_client.get(key))
+    except Exception:
+        return False
 
 
 def create_access_token(data: dict, expires_delta: int):
@@ -72,6 +128,9 @@ def get_current_user(
             except Exception:
                 pass
             raise HTTPException(status_code=401, detail="Invalid token")
+
+    if is_token_revoked(token, payload):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
 
     if is_vendor_token:
         vendor_id_str = payload.get("sub")
@@ -206,6 +265,8 @@ def get_current_user_id(
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if is_token_revoked(token, payload):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
         user_id = payload.get("sub")
         if user_id is None:
             try:

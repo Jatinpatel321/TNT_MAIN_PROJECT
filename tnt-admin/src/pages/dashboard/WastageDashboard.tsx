@@ -104,29 +104,29 @@ export default function WastageDashboard() {
           title="Total Wasted Revenue"
           value={formatRupees(wasted_revenue)}
           icon={IndianRupee}
-          color="red"
-          description="Value of food cancelled after prep"
+          accent="red"
+          subtitle="Value of food cancelled after prep"
         />
         <StatCard
           title="Cancelled Orders"
           value={formatNumber(cancelled_orders)}
           icon={AlertTriangle}
-          color="amber"
-          description="Total orders cancelled (last 90 days)"
+          accent="amber"
+          subtitle="Total orders cancelled (last 90 days)"
         />
         <StatCard
           title="Cancellation Waste Rate"
           value={`${cancellation_rate}%`}
           icon={TrendingDown}
-          color="indigo"
-          description="Percentage of wasted orders"
+          accent="indigo"
+          subtitle="Percentage of wasted orders"
         />
         <StatCard
           title="Daily Waste Avg"
           value={formatRupees(daily_waste_average)}
           icon={Trash2}
-          color="rose"
-          description="Wasted revenue average per day"
+          accent="red"
+          subtitle="Wasted revenue average per day"
         />
       </div>
 

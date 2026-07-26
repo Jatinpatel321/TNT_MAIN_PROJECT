@@ -11,14 +11,14 @@ import logging
 import os
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
 from app.core.redis import redis_client
-from app.core.security import create_access_token
+from app.core.security import create_access_token, revoke_token
 from app.modules.users.model import User
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -110,7 +110,12 @@ def refresh_access_token(body: RefreshRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/logout")
-def logout(body: RefreshRequest):
-    """Revoke the provided refresh token immediately."""
+def logout(request: Request, body: RefreshRequest):
+    """Revoke the provided refresh token and access token immediately."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        access_token = auth_header.split(" ", 1)[1].strip()
+        revoke_token(access_token)
+
     revoke_refresh_token(body.refresh_token)
     return {"message": "Logged out successfully"}

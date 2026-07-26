@@ -19,7 +19,7 @@ type StatusType =
   | { type: 'vendor'; status: VendorStatus }
   | { type: 'complaint'; status: ComplaintStatus }
   | { type: 'print_job'; status: PrintJobStatus }
-  | { type: 'vendor_type'; status: 'food' | 'stationery' }
+  | { type: 'vendor_type'; status: 'food' | 'stationery' | 'mixed' }
   | { type: 'role'; status: string }
   | { type: 'active'; status: boolean }
   | { type: 'custom'; label: string; className: string };
