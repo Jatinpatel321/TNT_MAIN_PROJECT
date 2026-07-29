@@ -201,6 +201,82 @@ class ModelRegistry:
                 session.close()
 
     @staticmethod
+    def get_active_version(model_type: str) -> Optional[dict[str, Any]]:
+        """Get metadata for the currently active champion version of model_type."""
+        session, should_close = ModelRegistry._get_session()
+        try:
+            row = (
+                session.execute(
+                    select(MlModel)
+                    .where(MlModel.model_name == model_type, MlModel.status == "active")
+                    .order_by(MlModel.trained_at.desc())
+                    .limit(1)
+                ).scalar_one_or_none()
+            )
+            if not row:
+                return None
+            return {
+                "version_id": row.model_version,
+                "model_type": row.model_name,
+                "trained_at": row.trained_at.isoformat() if row.trained_at else None,
+                "accuracy": row.accuracy,
+                "file_path": row.file_path,
+                "status": row.status,
+                "metrics": json.loads(row.metrics_json) if row.metrics_json else {},
+                "hyperparams": json.loads(row.hyperparams_json) if row.hyperparams_json else {},
+                "features": json.loads(row.features_json) if row.features_json else [],
+            }
+        finally:
+            if should_close:
+                session.close()
+
+    @staticmethod
+    def get_version(model_type: str, version_id: str) -> Optional[dict[str, Any]]:
+        """Get metadata for a specific model_version ID."""
+        versions = ModelRegistry.list_versions(model_type)
+        for v in versions:
+            if v.get("version_id") == version_id:
+                return v
+        return None
+
+    @staticmethod
+    def set_active_version(model_type: str, version_id: str) -> bool:
+        """Promote a specific version_id as the active serving champion model."""
+        session, should_close = ModelRegistry._get_session()
+        try:
+            row = (
+                session.execute(
+                    select(MlModel).where(
+                        MlModel.model_name == model_type, MlModel.model_version == version_id
+                    )
+                ).scalar_one_or_none()
+            )
+            if not row:
+                return False
+
+            # Mark all versions of this model_type as inactive
+            session.execute(
+                MlModel.__table__.update()
+                .where(MlModel.model_name == model_type)
+                .values(status="inactive")
+            )
+            # Mark target version as active
+            session.execute(
+                MlModel.__table__.update()
+                .where(MlModel.model_name == model_type, MlModel.model_version == version_id)
+                .values(status="active")
+            )
+            session.commit()
+            return True
+        except SQLAlchemyError as e:
+            session.rollback()
+            logger.error("Failed to set_active_version %s for %s: %s", version_id, model_type, e)
+            return False
+        finally:
+            if should_close:
+                session.close()
+
+    @staticmethod
     def list_versions(model_type: str) -> list[dict[str, Any]]:
         session, should_close = ModelRegistry._get_session()
         try:

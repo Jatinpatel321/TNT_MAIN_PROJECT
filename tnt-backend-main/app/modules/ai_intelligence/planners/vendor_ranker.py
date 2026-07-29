@@ -6,9 +6,16 @@ from sqlalchemy.orm import Session
 
 from app.core.load_insights import get_load_label, is_express_pickup_eligible
 from app.core.time_utils import utcnow_naive
+from app.modules.ai_intelligence.ml_bridge import predict_with_fallback
 from app.modules.orders.model import Order, OrderStatus
 from app.modules.slots.model import Slot
 from app.modules.users.model import User, UserRole
+
+try:
+    from app.modules.feedback.model import VendorReview as _VendorReview  # noqa: F401
+    _HAS_VENDOR_REVIEW = True
+except ImportError:
+    _HAS_VENDOR_REVIEW = False
 
 
 class VendorRanker:
@@ -28,8 +35,11 @@ class VendorRanker:
         rankings = []
 
         for vendor in vendors:
-            rank_score = self._calculate_vendor_rank_score(vendor.id)
+            rank_score, source = self._calculate_vendor_rank_score(vendor.id)
             load_indicator = self._calculate_live_load_indicator(vendor.id)
+
+            # Policy-driven hard rule: express pickup eligibility is computed
+            # from live capacity data, NOT delegated to the ML model.
             express_pickup_eligible = self._calculate_express_pickup_eligibility(vendor.id)
             reasoning = self._generate_ranking_reasoning(vendor.id, rank_score, load_indicator)
 
@@ -38,45 +48,109 @@ class VendorRanker:
                 "vendor_rank_score": rank_score,
                 "live_load_indicator": load_indicator,
                 "express_pickup_eligible": express_pickup_eligible,
-                "reasoning": reasoning
+                "reasoning": reasoning,
+                "source": source,
             })
 
-        # Sort by rank score descending
+        # Sort by rank score descending and assign rank index
         rankings.sort(key=lambda x: x["vendor_rank_score"], reverse=True)
+        for idx, r in enumerate(rankings, start=1):
+            r["rank"] = idx
 
         return rankings
 
-    def _calculate_vendor_rank_score(self, vendor_id: int) -> float:
-        """Calculate comprehensive vendor rank score (0-100)"""
+    def _calculate_vendor_rank_score(self, vendor_id: int) -> tuple[float, str]:
+        """Calculate comprehensive vendor rank score (0-100), via ML or heuristic fallback.
 
+        Returns (score, source) where source is "model" or "heuristic".
+        """
         thirty_days_ago = utcnow_naive() - timedelta(days=30)
 
-        # Factor 1: Completion speed (30%)
-        completion_speed = self._calculate_completion_speed(vendor_id, thirty_days_ago)
+        # Gather raw metrics needed by both heuristic and feature vector
+        total_orders = self.db.query(func.count(Order.id)).filter(
+            Order.vendor_id == vendor_id,
+            Order.created_at >= thirty_days_ago,
+        ).scalar() or 0
 
-        # Factor 2: Success rate (25%)
-        success_rate = self._calculate_success_rate(vendor_id, thirty_days_ago)
+        completed = self.db.query(func.count(Order.id)).filter(
+            Order.vendor_id == vendor_id,
+            Order.status.in_([OrderStatus.COMPLETED]),
+            Order.created_at >= thirty_days_ago,
+        ).scalar() or 0
 
-        # Factor 3: Customer satisfaction proxy (20%)
-        # Using repeat orders as satisfaction proxy
-        satisfaction_score = self._calculate_satisfaction_score(vendor_id, thirty_days_ago)
+        cancelled = self.db.query(func.count(Order.id)).filter(
+            Order.vendor_id == vendor_id,
+            Order.status == OrderStatus.CANCELLED,
+            Order.created_at >= thirty_days_ago,
+        ).scalar() or 0
 
-        # Factor 4: Operational efficiency (15%)
-        efficiency_score = self._calculate_efficiency_score(vendor_id)
+        repeat_customers = self.db.query(
+            Order.user_id, func.count(Order.id)
+        ).filter(
+            Order.vendor_id == vendor_id,
+            Order.created_at >= thirty_days_ago,
+        ).group_by(Order.user_id).having(func.count(Order.id) > 1).count()
 
-        # Factor 5: Recent performance (10%)
-        recent_performance = self._calculate_recent_performance(vendor_id)
+        unique_customers = self.db.query(Order.user_id).filter(
+            Order.vendor_id == vendor_id,
+            Order.created_at >= thirty_days_ago,
+        ).distinct().count()
 
-        # Weighted score calculation
-        rank_score = (
-            completion_speed * 0.30 +
-            success_rate * 0.25 +
-            satisfaction_score * 0.20 +
-            efficiency_score * 0.15 +
-            recent_performance * 0.10
+        avg_rating = 0.0
+        if _HAS_VENDOR_REVIEW:
+            try:
+                from app.modules.feedback.model import VendorReview
+                avg_rating = self.db.query(func.avg(VendorReview.rating)).filter(
+                    VendorReview.vendor_id == vendor_id
+                ).scalar() or 0.0
+            except Exception:
+                avg_rating = 0.0
+
+        completion_rate = completed / max(total_orders, 1)
+        repeat_rate = repeat_customers / max(unique_customers, 1)
+
+        # Build feature dict matching extract_vendor_ranking_features columns:
+        # ["completion_rate", "avg_rating", "repeat_customer_rate",
+        #  "cancellations", "refunds", "total_orders"]
+        features = {
+            "completion_rate": completion_rate,
+            "avg_rating": float(avg_rating),
+            "repeat_customer_rate": repeat_rate,
+            "cancellations": float(cancelled),
+            "refunds": float(cancelled),   # refunds proxied by cancellations (same in training)
+            "total_orders": float(total_orders),
+        }
+
+        # Heuristic: original weighted scoring formula, unchanged in behaviour
+        def heuristic_fn() -> float:
+            speed_score = self._calculate_completion_speed(vendor_id, thirty_days_ago)
+            success_score = self._calculate_success_rate(vendor_id, thirty_days_ago)
+            satisfaction_score = self._calculate_satisfaction_score(vendor_id, thirty_days_ago)
+            efficiency_score = self._calculate_efficiency_score(vendor_id)
+            recent_score = self._calculate_recent_performance(vendor_id)
+            return round(
+                speed_score * 0.30 +
+                success_score * 0.25 +
+                satisfaction_score * 0.20 +
+                efficiency_score * 0.15 +
+                recent_score * 0.10,
+                2,
+            )
+
+        raw_score, source = predict_with_fallback(
+            "vendor_ranking", features, heuristic_fn
         )
 
-        return round(rank_score, 2)
+        # Model output is in [0, 1] (completion_rate range) — scale to 0–100
+        if source == "model":
+            rank_score = round(float(raw_score) * 100, 2)
+        else:
+            rank_score = float(raw_score)
+
+        # Clamp to valid range
+        rank_score = max(0.0, min(rank_score, 100.0))
+
+        return rank_score, source
 
     def _calculate_live_load_indicator(self, vendor_id: int) -> str:
         """Calculate current load level: LOW/MEDIUM/HIGH"""

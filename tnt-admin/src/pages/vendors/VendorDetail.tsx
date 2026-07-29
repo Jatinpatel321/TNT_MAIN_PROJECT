@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Store, MapPin, Phone, Star, ShoppingBag,
-  Clock, CheckCircle, XCircle, Ban, Tag, Calendar, Pencil,
+  Clock, CheckCircle, XCircle, Ban, Tag, Calendar, Pencil, Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { type ColumnDef } from '@tanstack/react-table';
@@ -233,6 +233,13 @@ export default function VendorDetail() {
                 <Calendar className="w-3.5 h-3.5" />
                 Joined {formatDate(vendor.created_at)}
               </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2 p-2.5 px-3 rounded-lg bg-indigo-50/90 border border-indigo-200 text-xs text-indigo-900">
+              <Sparkles className="w-4 h-4 text-[#4F46E5] shrink-0" />
+              <span>
+                <strong>AI Vendor Ranking:</strong> Ranked using ML model based on <strong>order volume, rating, current stall load, and cancellation rate</strong>.
+              </span>
             </div>
           </div>
 

@@ -5,6 +5,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.time_utils import utcnow_naive
+from app.ml.features import is_rush_hour
+from app.ml.registry import ModelRegistry
+from app.modules.ai_intelligence.ml_bridge import predict_with_fallback
 from app.modules.orders.model import Order
 from app.modules.slots.model import Slot
 
@@ -69,34 +72,94 @@ class DemandPlanner:
         }
 
     def _generate_demand_forecast(self, vendor_id: int, since: datetime) -> Dict[str, Any]:
-        """Generate demand forecast for next 7 days"""
+        """Generate demand forecast for next 7 days using ML model or heuristic fallback."""
 
-        # Simple trend-based forecasting
-        recent_orders = self.db.query(func.count(Order.id)).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= since
+        # Define heuristic calculation closure (daily average with 5% growth projection)
+        def heuristic_fn() -> int:
+            recent_orders = self.db.query(func.count(Order.id)).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= since
+            ).scalar() or 0
+            days = (utcnow_naive() - since).days
+            daily_avg = recent_orders / max(days, 1)
+            growth_factor = 1.05
+            return int(daily_avg * growth_factor)
+
+        # Check vendor history length (>= 90 days required for ML model path)
+        oldest_order_at = self.db.query(func.min(Order.created_at)).filter(
+            Order.vendor_id == vendor_id
         ).scalar()
 
-        days = (utcnow_naive() - since).days
-        daily_avg = recent_orders / max(days, 1)
+        has_90_days_history = False
+        if oldest_order_at is not None:
+            history_days = (utcnow_naive() - oldest_order_at).days
+            if history_days >= 90:
+                has_90_days_history = True
 
-        # Forecast next 7 days with slight growth assumption
-        growth_factor = 1.05  # 5% growth
+        if not has_90_days_history:
+            predicted_daily = heuristic_fn()
+            source = "heuristic"
+            confidence = 0.75  # Explicit documented fallback constant
+        else:
+            now = utcnow_naive()
+            features = {
+                "vendor_id": float(vendor_id),
+                "hour": float(now.hour),
+                "weekday": float(now.weekday()),
+                "day_of_month": float(now.day),
+                "month": float(now.month),
+                "rush_hour": float(1 if is_rush_hour(now) else 0),
+            }
+            res, source = predict_with_fallback(
+                "demand_forecast",
+                features,
+                heuristic_fn,
+                db=self.db,
+                entity_id=vendor_id,
+                shadow=True,
+            )
+            predicted_daily = max(0, int(round(float(res))))
+
+            if source == "model":
+                try:
+                    model_data = ModelRegistry.load("demand_forecast")
+                    metadata = model_data[1] if isinstance(model_data, tuple) else {}
+                    confidence = self._extract_model_confidence(metadata)
+                except Exception:
+                    confidence = 0.75
+            else:
+                confidence = 0.75
+
         forecast = []
-
         for day in range(1, 8):
-            forecast_orders = int(daily_avg * growth_factor)
             forecast.append({
                 "day": day,
-                "predicted_orders": forecast_orders,
-                "confidence": 0.75
+                "predicted_orders": predicted_daily,
+                "confidence": confidence
             })
 
         return {
             "period": "next_7_days",
             "forecast": forecast,
-            "total_predicted": sum(f["predicted_orders"] for f in forecast)
+            "total_predicted": sum(f["predicted_orders"] for f in forecast),
+            "source": source
         }
+
+    def _extract_model_confidence(self, metadata: dict[str, Any]) -> float:
+        """Derive confidence score from stored model accuracy/metrics in registry."""
+        if not isinstance(metadata, dict):
+            return 0.75
+
+        acc = metadata.get("accuracy")
+        if acc is None and "metrics" in metadata and isinstance(metadata["metrics"], dict):
+            metrics = metadata["metrics"]
+            acc = metrics.get("r2") if metrics.get("r2") is not None else metrics.get("accuracy")
+
+        if acc is not None and isinstance(acc, (int, float)):
+            return round(max(0.50, min(float(acc), 0.99)), 2)
+
+        return 0.75
+
 
     def _calculate_optimal_capacity(self, vendor_id: int, demand_patterns: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate optimal capacity based on demand patterns"""

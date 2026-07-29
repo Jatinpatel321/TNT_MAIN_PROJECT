@@ -37,3 +37,9 @@ class MlModel(Base):
     hyperparams_json = Column(Text, nullable=True)
     features_json = Column(Text, nullable=True)
 
+
+from app.ml.shadow_log_model import ShadowLog  # noqa: F401
+from app.ml.drift_report_model import DriftReport  # noqa: F401
+
+
+

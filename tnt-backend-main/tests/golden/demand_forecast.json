@@ -1,0 +1,73 @@
+{
+  "model_type": "demand_forecast",
+  "feature_names": ["hour", "weekday", "day_of_month", "month", "rush_hour"],
+  "target_description": "predicted order count per vendor per hour bucket",
+  "reasoning_notes": [
+    "Campus canteen demand is highly temporal — driven by class schedules.",
+    "Rush hours (12-14, 18-20) see 3-6x baseline demand.",
+    "Off-peak hours (22:00+, 06:00-07:00) should be near-zero (0-2 orders).",
+    "Mid-morning (9-11) moderate activity ~2-8 orders/hr during weekdays.",
+    "Weekends see lower overall volume but demand pattern remains similar.",
+    "Ranges are wide (+/- 50%) to accommodate model variance and dataset size.",
+    "Minimum is 0 (no constraint that orders must happen).",
+    "Month=6-7 (summer vacation) → lower demand even at lunch."
+  ],
+  "cases": [
+    {
+      "id": "demand_001",
+      "description": "Peak lunch hour, weekday — highest expected demand",
+      "features": {"hour": 13, "weekday": 2, "day_of_month": 15, "month": 3, "rush_hour": 1},
+      "expected_min": 3.0,
+      "expected_max": 25.0
+    },
+    {
+      "id": "demand_002",
+      "description": "Off-peak late night — near-zero orders expected",
+      "features": {"hour": 23, "weekday": 3, "day_of_month": 10, "month": 3, "rush_hour": 0},
+      "expected_min": 0.0,
+      "expected_max": 5.0
+    },
+    {
+      "id": "demand_003",
+      "description": "Early morning pre-class — very low demand",
+      "features": {"hour": 7, "weekday": 1, "day_of_month": 12, "month": 4, "rush_hour": 0},
+      "expected_min": 0.0,
+      "expected_max": 8.0
+    },
+    {
+      "id": "demand_004",
+      "description": "Dinner rush on a weekday evening",
+      "features": {"hour": 19, "weekday": 4, "day_of_month": 20, "month": 2, "rush_hour": 1},
+      "expected_min": 2.0,
+      "expected_max": 20.0
+    },
+    {
+      "id": "demand_005",
+      "description": "Weekend lunch — lower than weekday but still active",
+      "features": {"hour": 13, "weekday": 6, "day_of_month": 18, "month": 3, "rush_hour": 1},
+      "expected_min": 1.0,
+      "expected_max": 18.0
+    },
+    {
+      "id": "demand_006",
+      "description": "Mid-morning weekday — moderate activity",
+      "features": {"hour": 10, "weekday": 1, "day_of_month": 8, "month": 1, "rush_hour": 0},
+      "expected_min": 0.0,
+      "expected_max": 12.0
+    },
+    {
+      "id": "demand_007",
+      "description": "Summer vacation lunch — depressed demand",
+      "features": {"hour": 13, "weekday": 2, "day_of_month": 20, "month": 6, "rush_hour": 1},
+      "expected_min": 0.0,
+      "expected_max": 15.0
+    },
+    {
+      "id": "demand_008",
+      "description": "Exam week afternoon — moderate, students staying on campus",
+      "features": {"hour": 14, "weekday": 3, "day_of_month": 22, "month": 4, "rush_hour": 1},
+      "expected_min": 1.0,
+      "expected_max": 18.0
+    }
+  ]
+}

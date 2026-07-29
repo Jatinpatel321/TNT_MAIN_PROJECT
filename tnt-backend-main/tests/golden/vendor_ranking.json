@@ -1,0 +1,65 @@
+{
+  "model_type": "vendor_ranking",
+  "feature_names": ["completion_rate", "avg_rating", "repeat_customer_rate", "cancellations", "refunds", "total_orders"],
+  "target_description": "predicted vendor performance score (≈ completion_rate, range 0.0–1.0)",
+  "reasoning_notes": [
+    "Target is completion_rate (0-1) as a proxy for overall vendor performance.",
+    "High completion_rate (0.9+) vendors with strong ratings should predict ≥0.75.",
+    "Vendors with high cancellations/refunds relative to total_orders should predict ≤0.6.",
+    "avg_rating (0-5 scale) has moderate but real correlation with performance.",
+    "repeat_customer_rate near 0 despite ok completion suggests volatile service.",
+    "Models predicting outside [0.0, 1.0] are definitively wrong (clamp check).",
+    "Wide ±0.25 tolerance applied since training set may be small."
+  ],
+  "cases": [
+    {
+      "id": "vendor_001",
+      "description": "High-performing vendor — high completion, good rating, loyal customers",
+      "features": {"completion_rate": 0.92, "avg_rating": 4.5, "repeat_customer_rate": 0.60, "cancellations": 3, "refunds": 2, "total_orders": 120},
+      "expected_min": 0.70,
+      "expected_max": 1.0
+    },
+    {
+      "id": "vendor_002",
+      "description": "Low-performing vendor — poor completion, many cancellations",
+      "features": {"completion_rate": 0.40, "avg_rating": 2.5, "repeat_customer_rate": 0.10, "cancellations": 30, "refunds": 15, "total_orders": 60},
+      "expected_min": 0.0,
+      "expected_max": 0.60
+    },
+    {
+      "id": "vendor_003",
+      "description": "Moderate vendor — decent completion but mediocre rating",
+      "features": {"completion_rate": 0.72, "avg_rating": 3.2, "repeat_customer_rate": 0.30, "cancellations": 12, "refunds": 5, "total_orders": 80},
+      "expected_min": 0.45,
+      "expected_max": 0.85
+    },
+    {
+      "id": "vendor_004",
+      "description": "New vendor — low order count, no cancellations, perfect rating",
+      "features": {"completion_rate": 1.0, "avg_rating": 5.0, "repeat_customer_rate": 0.0, "cancellations": 0, "refunds": 0, "total_orders": 5},
+      "expected_min": 0.50,
+      "expected_max": 1.0
+    },
+    {
+      "id": "vendor_005",
+      "description": "High volume vendor with moderate performance — established stall",
+      "features": {"completion_rate": 0.80, "avg_rating": 3.8, "repeat_customer_rate": 0.45, "cancellations": 20, "refunds": 8, "total_orders": 200},
+      "expected_min": 0.55,
+      "expected_max": 0.90
+    },
+    {
+      "id": "vendor_006",
+      "description": "Zero orders vendor — edge case, cold start",
+      "features": {"completion_rate": 0.0, "avg_rating": 0.0, "repeat_customer_rate": 0.0, "cancellations": 0, "refunds": 0, "total_orders": 0},
+      "expected_min": 0.0,
+      "expected_max": 0.50
+    },
+    {
+      "id": "vendor_007",
+      "description": "Very high cancellation relative to orders — distressed vendor",
+      "features": {"completion_rate": 0.55, "avg_rating": 2.8, "repeat_customer_rate": 0.05, "cancellations": 40, "refunds": 25, "total_orders": 90},
+      "expected_min": 0.0,
+      "expected_max": 0.65
+    }
+  ]
+}

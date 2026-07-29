@@ -151,23 +151,57 @@ def _run_dynamic_slot_adjustment():
 
 
 def _run_ml_retraining():
-    """Scheduled job to retrain ML models periodically."""
-    logger.info("Scheduler: starting ML model retraining")
+    """Scheduled job to retrain all ML models periodically."""
+    logger.info("Scheduler: starting ML model retraining sweep")
     try:
         from app.database.session import SessionLocal
-        from app.ml.training_pipeline import ModelTrainer, train_fraud_detection
+        from app.ml.retraining import run_scheduled_retraining
         db = SessionLocal()
         try:
-            trainer = ModelTrainer(db)
-            results = trainer.train_all()
-            logger.info("Scheduler: main ML models retraining complete: %s", results)
-            
-            fraud_res = train_fraud_detection(db)
-            logger.info("Scheduler: fraud detection ML model retraining complete: %s", fraud_res)
+            results = run_scheduled_retraining(db=db)
+            logger.info("Scheduler: ML model retraining sweep complete: %s", results)
         finally:
             db.close()
     except Exception as exc:
-        logger.error("Scheduler: ML model retraining failed: %s", exc)
+        logger.error("Scheduler: ML model retraining sweep failed: %s", exc)
+
+
+def _run_weekly_ml_retraining():
+    """Scheduled job: weekly retraining for fast-changing models (ETA, Demand, Slot, Fraud)."""
+    logger.info("Scheduler: starting weekly ML model retraining")
+    try:
+        from app.database.session import SessionLocal
+        from app.ml.retraining import run_scheduled_retraining
+        db = SessionLocal()
+        try:
+            results = run_scheduled_retraining(
+                model_types=["eta_prediction", "demand_forecast", "slot_recommendation", "fraud_detection"],
+                db=db,
+            )
+            logger.info("Scheduler: weekly ML retraining complete: %s", results)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: weekly ML retraining failed: %s", exc)
+
+
+def _run_monthly_ml_retraining():
+    """Scheduled job: monthly retraining for slower-changing models (Vendor Ranking)."""
+    logger.info("Scheduler: starting monthly ML model retraining")
+    try:
+        from app.database.session import SessionLocal
+        from app.ml.retraining import run_scheduled_retraining
+        db = SessionLocal()
+        try:
+            results = run_scheduled_retraining(
+                model_types=["vendor_ranking"],
+                db=db,
+            )
+            logger.info("Scheduler: monthly ML retraining complete: %s", results)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: monthly ML retraining failed: %s", exc)
 
 
 def _run_payment_reconciliation():
@@ -183,6 +217,38 @@ def _run_payment_reconciliation():
             db.close()
     except Exception as exc:
         logger.error("Scheduler: payment reconciliation failed: %s", exc)
+
+
+def _run_weekly_drift_checks():
+    """Scheduled job to check feature and prediction drift weekly for all ML models."""
+    logger.info("Scheduler: starting weekly ML drift checks")
+    try:
+        from app.database.session import SessionLocal
+        from app.ml.drift import run_all_drift_checks
+        db = SessionLocal()
+        try:
+            results = run_all_drift_checks(db, lookback_days=7)
+            logger.info("Scheduler: weekly ML drift checks complete: %s", results)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: weekly ML drift checks failed: %s", exc)
+
+
+def _run_daily_rollback_checks():
+    """Scheduled job: daily check to automatically rollback degraded models (< 7 days old, > 20% drop)."""
+    logger.info("Scheduler: starting daily ML automatic rollback checks")
+    try:
+        from app.database.session import SessionLocal
+        from app.ml.promotion import check_and_rollback_degraded_models
+        db = SessionLocal()
+        try:
+            results = check_and_rollback_degraded_models(db)
+            logger.info("Scheduler: daily ML rollback checks complete: %s", results)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error("Scheduler: daily ML rollback checks failed: %s", exc)
 
 
 def start_scheduler() -> None:
@@ -254,12 +320,22 @@ def start_scheduler() -> None:
             misfire_grace_time=600,
         )
 
-        # ML model retraining (daily at 01:00 UTC)
+        # Weekly ML model retraining (Sunday at 05:00 UTC)
         sched.add_job(
-            _run_ml_retraining,
-            trigger=CronTrigger(hour=1, minute=0, timezone="UTC"),
-            id="ml_retraining",
-            name="Periodic ML Model Retraining",
+            _run_weekly_ml_retraining,
+            trigger=CronTrigger(day_of_week="sun", hour=5, minute=0, timezone="UTC"),
+            id="weekly_ml_retraining",
+            name="Weekly ML Model Retraining (ETA, Demand, Slot, Fraud)",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
+        # Monthly ML model retraining (1st of month at 05:30 UTC)
+        sched.add_job(
+            _run_monthly_ml_retraining,
+            trigger=CronTrigger(day=1, hour=5, minute=30, timezone="UTC"),
+            id="monthly_ml_retraining",
+            name="Monthly ML Model Retraining (Vendor Ranking)",
             replace_existing=True,
             misfire_grace_time=3600,
         )
@@ -272,6 +348,26 @@ def start_scheduler() -> None:
             name="Dynamic Slot Capacity Adjustment",
             replace_existing=True,
             misfire_grace_time=1800,
+        )
+
+        # Weekly ML drift checks (Sunday at 04:00 UTC)
+        sched.add_job(
+            _run_weekly_drift_checks,
+            trigger=CronTrigger(day_of_week="sun", hour=4, minute=0, timezone="UTC"),
+            id="weekly_ml_drift_checks",
+            name="Weekly ML Drift Checks",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
+        # Daily ML rollback check (06:00 UTC)
+        sched.add_job(
+            _run_daily_rollback_checks,
+            trigger=CronTrigger(hour=6, minute=0, timezone="UTC"),
+            id="daily_ml_rollback_check",
+            name="Daily ML Degradation Rollback Check",
+            replace_existing=True,
+            misfire_grace_time=3600,
         )
 
         sched.start()
