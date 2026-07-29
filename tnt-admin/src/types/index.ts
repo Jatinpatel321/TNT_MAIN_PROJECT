@@ -198,11 +198,16 @@ export interface RushHourSignal {
 
 export interface VendorRanking {
   vendor_id: number;
-  vendor_name: string;
-  score: number;
+  vendor_name?: string;
+  score?: number;
+  vendor_rank_score: number;
   rank: number;
   trend?: 'up' | 'down' | 'stable';
   category?: string;
+  source?: 'model' | 'heuristic';
+  live_load_indicator?: string;  // LOW, MEDIUM, HIGH
+  express_pickup_eligible?: boolean;
+  reasoning?: string;
 }
 
 export interface DemandPlan {
@@ -218,10 +223,46 @@ export interface SlotSuggestion {
   slot_id: number;
   vendor_id: number;
   vendor_name: string;
-  slot_time: string;
-  utilization_percent: number;
-  suggested_action: string;
+  slot_time?: string;
+  utilization_percent?: number;
 }
+
+export interface ModelVersionInfo {
+  version_id?: string;
+  version_num?: number;
+  status?: 'active' | 'archived';
+  metrics?: Record<string, any>;
+  cv_score?: number;
+  cv_rmse?: number;
+  cv_f1?: number;
+  tuned_params?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface ModelAccuracyDetail {
+  model_type: string;
+  active_version?: ModelVersionInfo;
+  versions?: ModelVersionInfo[];
+  latest_backtest?: {
+    status?: string;
+    total_orders?: number;
+    within_3_min_pct?: number;
+    within_5_min_pct?: number;
+    mae_minutes?: number;
+    top_1_hit_rate?: number;
+    top_3_hit_rate?: number;
+    caveat?: string;
+  };
+  latest_drift?: {
+    has_drift: boolean;
+    drifted_features: string[];
+    feature_psi: Record<string, number>;
+    created_at?: string;
+  };
+  feature_importance?: Array<{ feature: string; importance: number }>;
+}
+
+export type ModelAccuracySummary = Record<string, ModelAccuracyDetail>;
 
 export interface ReorderPrompt {
   user_id: number;

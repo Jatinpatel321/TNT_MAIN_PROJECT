@@ -44,6 +44,7 @@ class PredictiveETAResponse(BaseModel):
     pickup_window_start: datetime
     pickup_window_end: datetime
     delay_risk_level: str  # LOW, MEDIUM, HIGH
+    source: Optional[str] = "heuristic"
 
 
 class VendorRanking(BaseModel):
@@ -52,6 +53,8 @@ class VendorRanking(BaseModel):
     live_load_indicator: str  # LOW, MEDIUM, HIGH
     express_pickup_eligible: bool
     reasoning: str
+    source: str = "heuristic"  # "model" or "heuristic"
+    rank: int = 0
 
 
 class VendorRankingResponse(BaseModel):

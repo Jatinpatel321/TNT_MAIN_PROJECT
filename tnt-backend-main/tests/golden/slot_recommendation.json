@@ -1,0 +1,72 @@
+{
+  "model_type": "slot_recommendation",
+  "feature_names": ["occupancy", "hour", "weekday", "rush_hour", "avg_completion_minutes", "max_capacity"],
+  "target_description": "predicted slot occupancy score (0.0–1.0; higher = slot is in high demand/use)",
+  "reasoning_notes": [
+    "Target is occupancy (0-1): model predicts current utilization of a slot.",
+    "Slots with high input occupancy (0.8+) should predict similarly high (0.6-1.0).",
+    "Off-peak slots (hour=22) with low max_capacity should predict near 0.",
+    "Rush-hour slots (rush_hour=1) at lunch time should predict moderate-high (0.4-0.9).",
+    "avg_completion_minutes that is high (>25) suggests congested/slow slot → high occupancy.",
+    "Ranges are ±0.3 around expected since training data may be sparse.",
+    "Prediction must always be in [0.0, 1.0]; any value outside is a clear regression."
+  ],
+  "cases": [
+    {
+      "id": "slot_001",
+      "description": "Peak lunch slot near full capacity",
+      "features": {"occupancy": 0.90, "hour": 13, "weekday": 2, "rush_hour": 1, "avg_completion_minutes": 22.0, "max_capacity": 20},
+      "expected_min": 0.50,
+      "expected_max": 1.0
+    },
+    {
+      "id": "slot_002",
+      "description": "Off-peak late-night slot, very low occupancy",
+      "features": {"occupancy": 0.05, "hour": 22, "weekday": 3, "rush_hour": 0, "avg_completion_minutes": 10.0, "max_capacity": 10},
+      "expected_min": 0.0,
+      "expected_max": 0.40
+    },
+    {
+      "id": "slot_003",
+      "description": "Morning slot, moderate load, mid-week",
+      "features": {"occupancy": 0.45, "hour": 10, "weekday": 1, "rush_hour": 0, "avg_completion_minutes": 15.0, "max_capacity": 15},
+      "expected_min": 0.15,
+      "expected_max": 0.75
+    },
+    {
+      "id": "slot_004",
+      "description": "Dinner rush slot, moderately occupied",
+      "features": {"occupancy": 0.70, "hour": 19, "weekday": 4, "rush_hour": 1, "avg_completion_minutes": 18.0, "max_capacity": 20},
+      "expected_min": 0.35,
+      "expected_max": 0.95
+    },
+    {
+      "id": "slot_005",
+      "description": "Weekend afternoon, lower demand, half-filled",
+      "features": {"occupancy": 0.40, "hour": 15, "weekday": 6, "rush_hour": 0, "avg_completion_minutes": 12.0, "max_capacity": 12},
+      "expected_min": 0.10,
+      "expected_max": 0.70
+    },
+    {
+      "id": "slot_006",
+      "description": "Completely empty slot at breakfast time",
+      "features": {"occupancy": 0.0, "hour": 8, "weekday": 0, "rush_hour": 1, "avg_completion_minutes": 15.0, "max_capacity": 20},
+      "expected_min": 0.0,
+      "expected_max": 0.50
+    },
+    {
+      "id": "slot_007",
+      "description": "Congested slot — high avg_completion_minutes signal",
+      "features": {"occupancy": 0.85, "hour": 13, "weekday": 1, "rush_hour": 1, "avg_completion_minutes": 30.0, "max_capacity": 25},
+      "expected_min": 0.45,
+      "expected_max": 1.0
+    },
+    {
+      "id": "slot_008",
+      "description": "Small capacity slot (5 max) at lunch — likely near full",
+      "features": {"occupancy": 0.80, "hour": 12, "weekday": 2, "rush_hour": 1, "avg_completion_minutes": 20.0, "max_capacity": 5},
+      "expected_min": 0.40,
+      "expected_max": 1.0
+    }
+  ]
+}

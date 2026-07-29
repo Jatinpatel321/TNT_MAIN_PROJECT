@@ -7,6 +7,8 @@ import type {
   ReorderPrompt,
   ETAMetrics,
   AISignals,
+  ModelAccuracySummary,
+  ModelAccuracyDetail,
 } from '../types';
 
 export const aiApi = {
@@ -40,4 +42,11 @@ export const aiApi = {
 
   getReorderPrompts: () =>
     api.get<ReorderPrompt[]>('/v1/ai/signals/reorder-prompts'),
+
+  getAccuracySummary: () =>
+    api.get<ModelAccuracySummary>('/ml/accuracy/summary'),
+
+  getModelAccuracy: (modelType: string) =>
+    api.get<ModelAccuracyDetail>(`/ml/accuracy/${modelType}`),
 };
+

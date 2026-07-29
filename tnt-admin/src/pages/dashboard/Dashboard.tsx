@@ -592,7 +592,7 @@ export default function Dashboard() {
                       #{v.rank}
                     </span>
                     <span className="text-xs flex-1 truncate text-[#111827]">{v.vendor_name}</span>
-                    <span className="text-xs font-mono text-[#111827]">{v.score.toFixed(1)}</span>
+                    <span className="text-xs font-mono text-[#111827]">{(v.vendor_rank_score ?? v.score ?? 0).toFixed(1)}</span>
                   </div>
                 ))}
               </div>

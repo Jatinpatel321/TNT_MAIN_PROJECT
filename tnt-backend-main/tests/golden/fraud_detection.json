@@ -1,0 +1,74 @@
+{
+  "model_type": "fraud_detection",
+  "feature_names": ["total_orders_30d", "cancelled_orders_30d", "cancel_rate", "avg_amount", "has_device_token", "fraud_flagged_count"],
+  "target_description": "predicted fraud label (0 = clean, 1 = fraudulent/suspicious)",
+  "prediction_type": "classification",
+  "reasoning_notes": [
+    "Binary classification: 0 = clean user, 1 = fraudulent.",
+    "High cancel_rate (>0.6) + multiple prior fraud flags → strong fraud signal (predict 1).",
+    "Normal student ordering pattern: ~5-15 orders/month, low cancel rate, device token → predict 0.",
+    "No device token + very high cancel rate with large orders → suspicious pattern.",
+    "fraud_flagged_count > 0 is the strongest individual predictor.",
+    "avg_amount: typical campus meal ₹50-200 (in rupees in DB); very high amounts (>1000) are anomalous.",
+    "Threshold for classification: model outputs probability; we compare against 0.5 threshold.",
+    "predicted_class rather than probability is used — so each case expects 0 or 1."
+  ],
+  "cases": [
+    {
+      "id": "fraud_001",
+      "description": "Normal student — regular ordering, device token, no fraud history",
+      "features": {"total_orders_30d": 12, "cancelled_orders_30d": 1, "cancel_rate": 0.083, "avg_amount": 120.0, "has_device_token": 1, "fraud_flagged_count": 0},
+      "expected_class": 0,
+      "note": "Clean pattern — should predict NOT fraud (0)"
+    },
+    {
+      "id": "fraud_002",
+      "description": "Suspicious user — high cancel rate, no device token, prior fraud flags",
+      "features": {"total_orders_30d": 20, "cancelled_orders_30d": 15, "cancel_rate": 0.75, "avg_amount": 800.0, "has_device_token": 0, "fraud_flagged_count": 3},
+      "expected_class": 1,
+      "note": "Strong fraud signal — should predict FRAUD (1)"
+    },
+    {
+      "id": "fraud_003",
+      "description": "Faculty member — moderate orders, low cancel, no fraud history",
+      "features": {"total_orders_30d": 8, "cancelled_orders_30d": 0, "cancel_rate": 0.0, "avg_amount": 200.0, "has_device_token": 1, "fraud_flagged_count": 0},
+      "expected_class": 0,
+      "note": "Clean pattern — should predict NOT fraud (0)"
+    },
+    {
+      "id": "fraud_004",
+      "description": "Extreme cancel rate, zero legitimate orders completed, anomalous amounts",
+      "features": {"total_orders_30d": 30, "cancelled_orders_30d": 28, "cancel_rate": 0.93, "avg_amount": 1500.0, "has_device_token": 0, "fraud_flagged_count": 5},
+      "expected_class": 1,
+      "note": "Very strong fraud signal — should predict FRAUD (1)"
+    },
+    {
+      "id": "fraud_005",
+      "description": "New user — few orders, no cancellations, device token present",
+      "features": {"total_orders_30d": 2, "cancelled_orders_30d": 0, "cancel_rate": 0.0, "avg_amount": 80.0, "has_device_token": 1, "fraud_flagged_count": 0},
+      "expected_class": 0,
+      "note": "Clean new user — should predict NOT fraud (0)"
+    },
+    {
+      "id": "fraud_006",
+      "description": "Borderline: moderate cancel rate, no device token, no prior flags",
+      "features": {"total_orders_30d": 10, "cancelled_orders_30d": 4, "cancel_rate": 0.40, "avg_amount": 300.0, "has_device_token": 0, "fraud_flagged_count": 0},
+      "expected_class": 0,
+      "note": "Borderline but no fraud flags — most likely NOT fraud (0)"
+    },
+    {
+      "id": "fraud_007",
+      "description": "Heavy user with 1 prior fraud flag and elevated cancel rate",
+      "features": {"total_orders_30d": 25, "cancelled_orders_30d": 10, "cancel_rate": 0.40, "avg_amount": 500.0, "has_device_token": 1, "fraud_flagged_count": 1},
+      "expected_class": 1,
+      "note": "1 prior fraud flag + elevated cancel — should predict FRAUD (1)"
+    },
+    {
+      "id": "fraud_008",
+      "description": "Inactive user — very few orders, single cancellation",
+      "features": {"total_orders_30d": 1, "cancelled_orders_30d": 1, "cancel_rate": 1.0, "avg_amount": 100.0, "has_device_token": 1, "fraud_flagged_count": 0},
+      "expected_class": 0,
+      "note": "100% cancel but only 1 order — likely innocent; no fraud history (0)"
+    }
+  ]
+}

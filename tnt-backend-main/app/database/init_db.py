@@ -16,6 +16,9 @@ import app.modules.stationery.service_model
 
 # ── ML registry models ───────────────────────────────────────────────────
 import app.ml.ml_models_model  # noqa
+import app.ml.shadow_log_model  # noqa
+import app.ml.drift_report_model  # noqa
+import app.ml.retraining_log_model  # noqa
 
 # ── VENDOR MODULE MODELS ──────────────────────────────────────────────────
 import app.modules.vendors.model  # noqa

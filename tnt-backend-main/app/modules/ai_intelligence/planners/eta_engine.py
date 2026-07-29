@@ -5,6 +5,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.time_utils import utcnow_naive
+from app.ml.features import is_rush_hour
+from app.modules.ai_intelligence.ml_bridge import predict_with_fallback
 from app.modules.orders.model import Order, OrderStatus
 from app.modules.slots.model import Slot
 
@@ -23,20 +25,42 @@ class ETAEngine:
         if not slot:
             return self._default_eta_response()
 
-        # Calculate base prep time
-        base_prep_time = self._calculate_base_prep_time(vendor_id)
+        # Define heuristic calculation closure (unchanged formula from before)
+        def heuristic_fn() -> float:
+            base_prep_time = self._calculate_base_prep_time(vendor_id)
+            queue_factor = self._calculate_queue_depth_factor(slot)
+            efficiency_factor = self._calculate_vendor_efficiency_factor(vendor_id)
+            return base_prep_time * queue_factor * efficiency_factor
 
-        # Calculate queue depth factor
-        queue_factor = self._calculate_queue_depth_factor(slot)
+        # Check vendor historical order count (>= 30 required for model attempt)
+        order_count = self.db.query(Order).filter(Order.vendor_id == vendor_id).count()
 
-        # Calculate vendor efficiency factor
-        efficiency_factor = self._calculate_vendor_efficiency_factor(vendor_id)
+        if order_count < 30:
+            predicted_eta = int(heuristic_fn())
+            source = "heuristic"
+        else:
+            now = utcnow_naive()
+            features = {
+                "vendor_id": float(vendor_id),
+                "queue_length": float(slot.current_orders),
+                "slot_occupancy": float(slot.current_orders / max(slot.max_orders, 1)),
+                "item_count": 1.0,
+                "time_of_day": float(now.hour),
+                "weekday": float(now.weekday()),
+                "rush_hour": float(1 if is_rush_hour(now) else 0),
+            }
+            res, source = predict_with_fallback(
+                "eta_prediction",
+                features,
+                heuristic_fn,
+                db=self.db,
+                entity_id=slot_id,
+                shadow=True,
+            )
+            predicted_eta = int(round(float(res)))
 
-        # AI prediction formula
-        predicted_eta = int(base_prep_time * queue_factor * efficiency_factor)
-
-        # Ensure reasonable bounds
-        predicted_eta = max(5, min(predicted_eta, 60))  # 5-60 minutes
+        # Ensure reasonable bounds (5-60 minutes applied to whichever source produced answer)
+        predicted_eta = max(5, min(predicted_eta, 60))
 
         # Calculate pickup window
         _raw_start = slot.start_time
@@ -54,8 +78,10 @@ class ETAEngine:
             "predicted_eta_minutes": predicted_eta,
             "pickup_window_start": pickup_window_start,
             "pickup_window_end": pickup_window_end,
-            "delay_risk_level": delay_risk
+            "delay_risk_level": delay_risk,
+            "source": source,
         }
+
 
     def _calculate_base_prep_time(self, vendor_id: int) -> float:
         """Calculate base preparation time based on vendor history"""
@@ -141,5 +167,6 @@ class ETAEngine:
             "predicted_eta_minutes": 15,
             "pickup_window_start": now,
             "pickup_window_end": now + timedelta(minutes=15),
-            "delay_risk_level": "MEDIUM"
+            "delay_risk_level": "MEDIUM",
+            "source": "heuristic",
         }

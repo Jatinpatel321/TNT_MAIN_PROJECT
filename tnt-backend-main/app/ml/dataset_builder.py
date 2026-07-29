@@ -253,6 +253,7 @@ class DatasetBuilder:
 
             rows.append({
                 "order_id": o.order_id,
+                "created_at": o.created_at,          # kept for time-based train/test split
                 "vendor_id": o.vendor_id,
                 "slot_id": o.slot_id or 0,
                 "vendor_type": 0 if vendor_type == "food" else 1,  # encode
@@ -307,7 +308,14 @@ class DatasetBuilder:
 
         rows = []
         for h in hourly:
-            date_str = h.order_date.strftime("%m-%d") if h.order_date else ""
+            order_date = h.order_date
+            if isinstance(order_date, str):
+                try:
+                    order_date = datetime.strptime(order_date[:10], "%Y-%m-%d").date()
+                except Exception:
+                    order_date = None
+
+            date_str = order_date.strftime("%m-%d") if order_date else ""
             is_holiday = 1 if any(h_date == date_str for h_date, _ in PUBLIC_HOLIDAYS) else 0
 
             # Vendor type
@@ -321,8 +329,8 @@ class DatasetBuilder:
             # Historical average for this vendor-hour-weekday
             hist_avg = self.db.query(func.avg(Order.id)).filter(
                 Order.vendor_id == h.vendor_id,
-                extract('hour', Order.created_at) == int(h.hour),
-                extract('dow', Order.created_at) == int(h.day_of_week),
+                extract('hour', Order.created_at) == int(h.hour or 0),
+                extract('dow', Order.created_at) == int(h.day_of_week or 0),
                 Order.created_at < h.order_date,
             ).scalar() or 0
 
@@ -334,6 +342,14 @@ class DatasetBuilder:
 
             rows.append({
                 "vendor_id": h.vendor_id,
+                # order_timestamp is the exact start of the hour bucket, used for
+                # time-based train/test splitting to prevent data leakage.
+                "order_timestamp": (
+                    datetime(
+                        order_date.year, order_date.month, order_date.day,
+                        int(h.hour or 0)
+                    ) if order_date else None
+                ),
                 "hour": int(h.hour or 0),
                 "day_of_week": int(h.day_of_week or 0),
                 "month": int(h.month or 1),

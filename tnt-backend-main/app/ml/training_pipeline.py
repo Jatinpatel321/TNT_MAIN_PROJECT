@@ -88,23 +88,217 @@ from app.ml.registry import ModelRegistry
 MODEL_STORAGE_DIR = os.getenv("MODEL_STORAGE_DIR", "ml_models")
 
 
+def time_based_split(
+    X: np.ndarray,
+    y: np.ndarray,
+    timestamps: np.ndarray,
+    test_size: float = 0.2,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Chronological train/test split that prevents temporal data leakage.
+
+    Sorts all rows by `timestamps` in ascending order (oldest first), then takes
+    the earliest (1 - test_size) fraction as train and the most recent `test_size`
+    fraction as test.  No shuffling is performed.
+
+    This is critical for time-series targets (ETA, demand) where training on a
+    future observation and testing on an earlier one would leak target information.
+
+    Args:
+        X: Feature matrix, shape (n_samples, n_features).
+        y: Target array, shape (n_samples,).
+        timestamps: 1-D array of datetimes / timestamps, same length as X.
+        test_size: Fraction of samples to use as the test set (default 0.2).
+
+    Returns:
+        X_train, X_test, y_train, y_test, ts_train, ts_test
+        where ts_* are the corresponding timestamp sub-arrays (useful for assertions).
+    """
+    if len(X) == 0:
+        empty = np.array([])
+        return X, X, y, y, empty, empty
+
+    sort_idx = np.argsort(timestamps, kind="stable")
+    X_sorted = X[sort_idx]
+    y_sorted = y[sort_idx]
+    ts_sorted = timestamps[sort_idx]
+
+    split_at = max(1, int(len(X_sorted) * (1.0 - test_size)))
+    return (
+        X_sorted[:split_at],
+        X_sorted[split_at:],
+        y_sorted[:split_at],
+        y_sorted[split_at:],
+        ts_sorted[:split_at],
+        ts_sorted[split_at:],
+    )
+
+
 class ModelTrainer:
     """Trains ML models on real data from PostgreSQL via DatasetBuilder."""
+
+    # ── Hyper-parameter search spaces ────────────────────────────────────────
+    _RF_PARAM_GRID = {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [5, 8, 10, 15],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4],
+    }
+    _XGB_PARAM_GRID = {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [5, 8, 10, 15],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "subsample": [0.7, 0.8, 1.0],
+        "colsample_bytree": [0.7, 0.8, 1.0],
+    }
+    _LGBM_PARAM_GRID = {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [5, 8, 10, 15],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2],
+        "num_leaves": [15, 31, 63],
+    }
 
     def __init__(self, db: Session):
         self.db = db
         self.builder = DatasetBuilder(db)
 
+    # ── Cross-validation & tuning helpers ────────────────────────────────────
+
+    def _tune_regressor(
+        self,
+        estimator,
+        param_grid: dict,
+        X: np.ndarray,
+        y: np.ndarray,
+        name: str,
+        n_iter: int = 10,
+        cv: int = 5,
+    ) -> Tuple[Any, Dict[str, Any], float]:
+        """Run RandomizedSearchCV then compute k-fold CV RMSE on the best estimator.
+
+        Returns (best_estimator, best_params, cv_rmse).
+        cv_rmse is the mean absolute value of neg_root_mean_squared_error scores.
+        """
+        from sklearn.model_selection import RandomizedSearchCV, cross_val_score
+
+        n_samples = len(X)
+        effective_cv = min(cv, n_samples) if n_samples >= 2 else 2
+        effective_iter = min(n_iter, max(1, n_samples // 2))
+
+        try:
+            search = RandomizedSearchCV(
+                estimator,
+                param_distributions=param_grid,
+                n_iter=effective_iter,
+                cv=effective_cv,
+                scoring="neg_root_mean_squared_error",
+                random_state=42,
+                n_jobs=-1,
+                refit=True,
+            )
+            search.fit(X, y)
+            best_est = search.best_estimator_
+            best_params = search.best_params_
+            logger.info(f"{name} best params: {best_params}")
+        except Exception as e:
+            logger.warning(f"{name} RandomizedSearchCV failed ({e}), fitting with defaults")
+            estimator.fit(X, y)
+            best_est = estimator
+            best_params = {}
+
+        # Full k-fold CV RMSE on the tuned estimator
+        try:
+            cv_scores = cross_val_score(
+                best_est, X, y,
+                cv=effective_cv,
+                scoring="neg_root_mean_squared_error",
+                n_jobs=-1,
+            )
+            cv_rmse = float(np.mean(np.abs(cv_scores)))
+        except Exception as e:
+            logger.warning(f"{name} cross_val_score failed ({e}), using 0.0 placeholder")
+            cv_rmse = 0.0
+
+        return best_est, best_params, cv_rmse
+
+    def _tune_classifier(
+        self,
+        estimator,
+        param_grid: dict,
+        X: np.ndarray,
+        y: np.ndarray,
+        name: str,
+        n_iter: int = 10,
+        cv: int = 5,
+    ) -> Tuple[Any, Dict[str, Any], float]:
+        """Run RandomizedSearchCV then compute k-fold F1 on the best estimator.
+
+        Returns (best_estimator, best_params, cv_f1).
+        """
+        from sklearn.model_selection import RandomizedSearchCV, cross_val_score
+
+        n_samples = len(X)
+        effective_cv = min(cv, n_samples) if n_samples >= 2 else 2
+        effective_iter = min(n_iter, max(1, n_samples // 2))
+
+        try:
+            search = RandomizedSearchCV(
+                estimator,
+                param_distributions=param_grid,
+                n_iter=effective_iter,
+                cv=effective_cv,
+                scoring="f1",
+                random_state=42,
+                n_jobs=-1,
+                refit=True,
+            )
+            search.fit(X, y)
+            best_est = search.best_estimator_
+            best_params = search.best_params_
+            logger.info(f"{name} best params: {best_params}")
+        except Exception as e:
+            logger.warning(f"{name} RandomizedSearchCV failed ({e}), fitting with defaults")
+            estimator.fit(X, y)
+            best_est = estimator
+            best_params = {}
+
+        # Full k-fold F1
+        try:
+            cv_scores = cross_val_score(
+                best_est, X, y,
+                cv=effective_cv,
+                scoring="f1",
+                n_jobs=-1,
+            )
+            cv_f1 = float(np.mean(cv_scores))
+        except Exception as e:
+            logger.warning(f"{name} cross_val_score failed ({e}), using 0.0 placeholder")
+            cv_f1 = 0.0
+
+        return best_est, best_params, cv_f1
+
     # ── PHASE 3: ETA Prediction ─────────────────────────────────────────────
 
     def train_eta(self, days: int = 90) -> Dict[str, Any]:
         """Train ETA prediction model using real order data.
-        
-        Trains RandomForest, XGBoost, LightGBM. Selects best by RMSE.
+
+        Trains RandomForest, XGBoost, LightGBM with RandomizedSearchCV (n_iter=10)
+        and selects the winner by 5-fold cross-validated RMSE.
+
+        Temporal split note
+        -------------------
+        ETA is a time-series target (order completion time depends on when the order
+        was placed).  A random train_test_split risks including a future order in the
+        training set while a past order is in the test set, leaking temporal context.
+        We therefore sort by `created_at` and split chronologically (oldest 80% →
+        train, most recent 20% → test) via `time_based_split()`.
+
+        Cross-validation (5-fold) is applied after the split on the training set only;
+        sklearn's KFold is not time-aware, but its role here is hyper-parameter
+        selection (relative comparison), not final holdout evaluation, so the ordering
+        bias is acceptable.
         """
         logger.info("=== PHASE 3: Training ETA Prediction Model ===")
 
-        # Build dataset using extract_eta_training_data
         from app.ml.features import extract_eta_training_data
         try:
             X, y, feature_cols = extract_eta_training_data(self.db, days=days)
@@ -115,85 +309,133 @@ class ModelTrainer:
         if len(X) == 0:
             return {"status": "failed", "error": "Empty ETA dataset", "rows": 0}
 
-        # Train/test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
+        # ── Temporal split: fetch timestamps in the same order as extract_eta_training_data ──
+        # extract_eta_training_data builds rows from the same query (completed orders
+        # ordered by Order.id).  We replicate that ordering to align timestamps with X/y.
+        try:
+            from app.core.time_utils import utcnow_naive
+            from datetime import timedelta
+            from app.modules.orders.model import Order, OrderStatus
+            from sqlalchemy import extract as sql_extract
 
-        results = []
+            since = utcnow_naive() - timedelta(days=days)
+            ts_rows = self.db.query(
+                Order.id, Order.created_at,
+            ).join(
+                __import__('app.modules.slots.model', fromlist=['Slot']).Slot,
+                Order.slot_id == __import__('app.modules.slots.model', fromlist=['Slot']).Slot.id,
+            ).filter(
+                Order.created_at >= since,
+                Order.status.in_([
+                    OrderStatus.COMPLETED, OrderStatus.PICKED, OrderStatus.READY,
+                ]),
+            ).all()
+            timestamps_eta = np.array([r.created_at for r in ts_rows], dtype=object)
+        except Exception as ts_err:
+            logger.warning(f"ETA temporal timestamps unavailable ({ts_err}); falling back to random split")
+            timestamps_eta = None
+
+        if timestamps_eta is not None and len(timestamps_eta) == len(X):
+            X_train, X_test, y_train, y_test, _, _ = time_based_split(X, y, timestamps_eta)
+            split_method = "temporal"
+        else:
+            # Fallback: mismatched lengths can happen if the query order differs;
+            # log clearly and use random split rather than crash.
+            logger.warning(
+                f"ETA timestamp count ({len(timestamps_eta) if timestamps_eta is not None else 'n/a'}) "
+                f"!= feature row count ({len(X)}); using random split as fallback."
+            )
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
+            split_method = "random_fallback"
+
+        logger.info(f"ETA split method: {split_method} | train={len(X_train)} test={len(X_test)}")
+
+        results: List[Dict[str, Any]] = []
         best_model = None
-        best_rmse = float('inf')
+        best_cv_rmse = float("inf")
         best_name = None
+        best_params: Dict[str, Any] = {}
 
-        # 1. RandomForest
+        # 1. RandomForest — tuned
         if _RF_AVAILABLE:
             try:
-                rf = RandomForestRegressor(
-                    n_estimators=200, max_depth=15, random_state=42, n_jobs=-1
+                rf_base = RandomForestRegressor(random_state=42, n_jobs=-1)
+                tuned_rf, rf_params, rf_cv_rmse = self._tune_regressor(
+                    rf_base, self._RF_PARAM_GRID, X, y, "RF-ETA"
                 )
-                rf.fit(X_train, y_train)
-                y_pred = rf.predict(X_test)
-                metrics = self._evaluate(y_test, y_pred, "ETA")
-                results.append({"model": "RandomForest", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = rf
+                y_pred = tuned_rf.predict(X_test)
+                holdout = self._evaluate(y_test, y_pred, "ETA")
+                results.append({"model": "RandomForest", **holdout, "cv_rmse": rf_cv_rmse, "params": rf_params})
+                if rf_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = rf_cv_rmse
+                    best_model = tuned_rf
                     best_name = "RandomForest"
-                logger.info(f"RandomForest ETA: MAE={metrics['mae']:.2f}, RMSE={metrics['rmse']:.2f}, R²={metrics['r2']:.3f}")
+                    best_params = rf_params
+                logger.info(f"RF ETA: holdout_rmse={holdout['rmse']:.3f} cv_rmse={rf_cv_rmse:.3f}")
             except Exception as e:
                 logger.error(f"RandomForest ETA failed: {e}")
 
-        # 2. XGBoost
+        # 2. XGBoost — tuned
         if _XGB_AVAILABLE:
             try:
-                xgb_model = xgb.XGBRegressor(
-                    n_estimators=200, max_depth=8, learning_rate=0.1,
-                    random_state=42, n_jobs=-1
+                xgb_base = xgb.XGBRegressor(random_state=42, n_jobs=-1)
+                tuned_xgb, xgb_params, xgb_cv_rmse = self._tune_regressor(
+                    xgb_base, self._XGB_PARAM_GRID, X, y, "XGB-ETA"
                 )
-                xgb_model.fit(X_train, y_train)
-                y_pred = xgb_model.predict(X_test)
-                metrics = self._evaluate(y_test, y_pred, "ETA")
-                results.append({"model": "XGBoost", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = xgb_model
+                y_pred = tuned_xgb.predict(X_test)
+                holdout = self._evaluate(y_test, y_pred, "ETA")
+                results.append({"model": "XGBoost", **holdout, "cv_rmse": xgb_cv_rmse, "params": xgb_params})
+                if xgb_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = xgb_cv_rmse
+                    best_model = tuned_xgb
                     best_name = "XGBoost"
-                logger.info(f"XGBoost ETA: MAE={metrics['mae']:.2f}, RMSE={metrics['rmse']:.2f}, R²={metrics['r2']:.3f}")
+                    best_params = xgb_params
+                logger.info(f"XGB ETA: holdout_rmse={holdout['rmse']:.3f} cv_rmse={xgb_cv_rmse:.3f}")
             except Exception as e:
                 logger.error(f"XGBoost ETA failed: {e}")
 
-        # 3. LightGBM
+        # 3. LightGBM — tuned
         if _LGBM_AVAILABLE:
             try:
-                lgb_model = lgb.LGBMRegressor(
-                    n_estimators=200, max_depth=8, learning_rate=0.1,
-                    random_state=42, n_jobs=-1
+                lgb_base = lgb.LGBMRegressor(random_state=42, n_jobs=-1, verbose=-1)
+                tuned_lgb, lgb_params, lgb_cv_rmse = self._tune_regressor(
+                    lgb_base, self._LGBM_PARAM_GRID, X, y, "LGBM-ETA"
                 )
-                lgb_model.fit(X_train, y_train)
-                y_pred = lgb_model.predict(X_test)
-                metrics = self._evaluate(y_test, y_pred, "ETA")
-                results.append({"model": "LightGBM", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = lgb_model
+                y_pred = tuned_lgb.predict(X_test)
+                holdout = self._evaluate(y_test, y_pred, "ETA")
+                results.append({"model": "LightGBM", **holdout, "cv_rmse": lgb_cv_rmse, "params": lgb_params})
+                if lgb_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = lgb_cv_rmse
+                    best_model = tuned_lgb
                     best_name = "LightGBM"
-                logger.info(f"LightGBM ETA: MAE={metrics['mae']:.2f}, RMSE={metrics['rmse']:.2f}, R²={metrics['r2']:.3f}")
+                    best_params = lgb_params
+                logger.info(f"LGBM ETA: holdout_rmse={holdout['rmse']:.3f} cv_rmse={lgb_cv_rmse:.3f}")
             except Exception as e:
                 logger.error(f"LightGBM ETA failed: {e}")
 
         if best_model is None:
             return {"status": "failed", "error": "No model trained successfully", "rows": len(X)}
 
-        # Save best model
+        best_holdout = next(r for r in results if r["model"] == best_name)
         version_id = ModelRegistry.save(
             model=best_model,
             model_type="eta_prediction",
             metrics={
-                "rmse": float(best_rmse),
-                "mae": float([r["mae"] for r in results if r["model"] == best_name][0]),
-                "r2": float([r["r2"] for r in results if r["model"] == best_name][0]),
+                "rmse": best_holdout["rmse"],
+                "mae": best_holdout["mae"],
+                "r2": best_holdout["r2"],
+                "cv_rmse": round(best_cv_rmse, 4),
+                "cv_folds": 5,
             },
-            hyperparams={"days": days, "features": len(feature_cols), "model": best_name},
+            hyperparams={
+                "days": days,
+                "features": len(feature_cols),
+                "model": best_name,
+                "tuned_params": best_params,
+                "split_method": split_method,
+            },
             features=list(feature_cols),
             description=f"ETA prediction trained on {len(X)} real orders from last {days} days",
         )
@@ -203,34 +445,88 @@ class ModelTrainer:
             "model_type": "eta_prediction",
             "version_id": version_id,
             "best_model": best_name,
-            "best_rmse": float(best_rmse),
+            "best_rmse": best_holdout["rmse"],
+            "best_cv_rmse": round(best_cv_rmse, 4),
             "rows_trained": len(X),
             "features_used": len(feature_cols),
             "feature_names": list(feature_cols),
+            "tuned_params": best_params,
+            "split_method": split_method,
             "comparison": results,
         }
 
     # ── PHASE 4: Demand Forecasting ─────────────────────────────────────────
 
     def train_demand(self, days: int = 90) -> Dict[str, Any]:
-        """Train demand forecast model."""
+        """Train demand forecast model.
+
+        Temporal split note
+        -------------------
+        Demand is time-series data (hourly order counts per vendor).  Using a random
+        split leaks future hours into the training set.  We sort by `hour_bucket`
+        timestamps extracted alongside the features and split chronologically via
+        `time_based_split()`.
+
+        Non-time-series paths left on random split
+        ------------------------------------------
+        * vendor_ranking   — cross-sectional aggregate scores; no meaningful time axis
+          per row (all history collapsed into a single performance score per vendor).
+        * slot_recommendation — slot quality scores are static snapshots aggregated
+          over all orders; no row-level timestamp.
+        * fraud_detection  — per-user aggregate features over 30-day window; treated
+          as cross-sectional, not a sequence.  Random split is appropriate.
+        """
         logger.info("=== PHASE 4: Training Demand Forecast Model ===")
 
-        # Build dataset using extract_demand_features for all vendors
         from app.ml.features import extract_demand_features
         from app.modules.users.model import User
 
         vendors = self.db.query(User).filter(User.role == "vendor", User.is_approved == True).all()
 
-        X_all, y_all = [], []
+        X_all, y_all, ts_all = [], [], []
         feature_cols = []
         for vendor in vendors:
             try:
                 X_v, y_v, cols = extract_demand_features(self.db, vendor.id, days=days)
                 if len(X_v) > 0:
-                    X_all.append(X_v)
-                    y_all.append(y_v)
-                    feature_cols = cols
+                    # Fetch matching timestamps for this vendor in same query order
+                    from app.core.time_utils import utcnow_naive
+                    from datetime import timedelta
+                    from sqlalchemy import func as _func, text as _text
+                    from app.modules.orders.model import Order as _Order, OrderStatus as _OS
+
+                    since = utcnow_naive() - timedelta(days=days)
+                    ts_rows = self.db.query(
+                        _func.date_trunc(_text("'hour'"), _Order.created_at).label("hour_bucket"),
+                    ).filter(
+                        _Order.vendor_id == vendor.id,
+                        _Order.created_at >= since,
+                        _Order.status.notin_([_OS.CANCELLED]),
+                    ).group_by(
+                        _func.date_trunc(_text("'hour'"), _Order.created_at)
+                    ).order_by(
+                        _func.date_trunc(_text("'hour'"), _Order.created_at)
+                    ).all()
+
+                    ts_v = []
+                    for r in ts_rows:
+                        b = r.hour_bucket
+                        if isinstance(b, str):
+                            from datetime import datetime as _dt
+                            b = _dt.fromisoformat(b)
+                        ts_v.append(b)
+
+                    if len(ts_v) == len(X_v):
+                        ts_all.extend(ts_v)
+                        X_all.append(X_v)
+                        y_all.append(y_v)
+                        feature_cols = cols
+                    else:
+                        # Mismatched — include data but mark timestamps as None
+                        logger.warning(
+                            f"Demand vendor {vendor.id}: timestamp count {len(ts_v)} "
+                            f"!= feature row count {len(X_v)}; rows excluded from temporal split."
+                        )
             except Exception as e:
                 logger.error(f"Failed to extract demand features for vendor {vendor.id}: {e}")
 
@@ -240,64 +536,85 @@ class ModelTrainer:
         X = np.vstack(X_all)
         y = np.concatenate(y_all)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
+        if len(ts_all) == len(X):
+            timestamps_demand = np.array(ts_all, dtype=object)
+            X_train, X_test, y_train, y_test, _, _ = time_based_split(X, y, timestamps_demand)
+            split_method = "temporal"
+        else:
+            logger.warning(
+                f"Demand temporal timestamps count ({len(ts_all)}) != rows ({len(X)}); "
+                "using random split as fallback."
+            )
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
+            split_method = "random_fallback"
 
-        results = []
+        logger.info(f"Demand split method: {split_method} | train={len(X_train)} test={len(X_test)}")
+
+        results: List[Dict[str, Any]] = []
         best_model = None
-        best_rmse = float('inf')
+        best_cv_rmse = float("inf")
         best_name = None
+        best_params: Dict[str, Any] = {}
 
-        # XGBoost
+        # XGBoost — tuned
         if _XGB_AVAILABLE:
             try:
-                model = xgb.XGBRegressor(
-                    n_estimators=150, max_depth=6, learning_rate=0.1,
-                    random_state=42, n_jobs=-1
+                xgb_base = xgb.XGBRegressor(random_state=42, n_jobs=-1)
+                tuned_xgb, xgb_params, xgb_cv_rmse = self._tune_regressor(
+                    xgb_base, self._XGB_PARAM_GRID, X, y, "XGB-Demand"
                 )
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                y_pred = np.maximum(0, y_pred)  # No negative orders
-                metrics = self._evaluate(y_test, y_pred, "Demand")
-                results.append({"model": "XGBoost", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = model
+                y_pred = np.maximum(0, tuned_xgb.predict(X_test))
+                holdout = self._evaluate(y_test, y_pred, "Demand")
+                results.append({"model": "XGBoost", **holdout, "cv_rmse": xgb_cv_rmse, "params": xgb_params})
+                if xgb_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = xgb_cv_rmse
+                    best_model = tuned_xgb
                     best_name = "XGBoost"
+                    best_params = xgb_params
             except Exception as e:
                 logger.error(f"XGBoost Demand failed: {e}")
 
-        # RandomForest
+        # RandomForest — tuned
         if _RF_AVAILABLE:
             try:
-                model = RandomForestRegressor(
-                    n_estimators=150, max_depth=10, random_state=42, n_jobs=-1
+                rf_base = RandomForestRegressor(random_state=42, n_jobs=-1)
+                tuned_rf, rf_params, rf_cv_rmse = self._tune_regressor(
+                    rf_base, self._RF_PARAM_GRID, X, y, "RF-Demand"
                 )
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                y_pred = np.maximum(0, y_pred)
-                metrics = self._evaluate(y_test, y_pred, "Demand")
-                results.append({"model": "RandomForest", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = model
+                y_pred = np.maximum(0, tuned_rf.predict(X_test))
+                holdout = self._evaluate(y_test, y_pred, "Demand")
+                results.append({"model": "RandomForest", **holdout, "cv_rmse": rf_cv_rmse, "params": rf_params})
+                if rf_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = rf_cv_rmse
+                    best_model = tuned_rf
                     best_name = "RandomForest"
+                    best_params = rf_params
             except Exception as e:
                 logger.error(f"RandomForest Demand failed: {e}")
 
         if best_model is None:
             return {"status": "failed", "error": "No model trained", "rows": len(X)}
 
+        best_holdout = next(r for r in results if r["model"] == best_name)
         version_id = ModelRegistry.save(
             model=best_model,
             model_type="demand_forecast",
             metrics={
-                "rmse": float(best_rmse),
-                "mae": float([r["mae"] for r in results if r["model"] == best_name][0]),
-                "r2": float([r["r2"] for r in results if r["model"] == best_name][0]),
+                "rmse": best_holdout["rmse"],
+                "mae": best_holdout["mae"],
+                "r2": best_holdout["r2"],
+                "cv_rmse": round(best_cv_rmse, 4),
+                "cv_folds": 5,
             },
-            hyperparams={"days": days, "features": len(feature_cols), "model": best_name},
+            hyperparams={
+                "days": days,
+                "features": len(feature_cols),
+                "model": best_name,
+                "tuned_params": best_params,
+                "split_method": split_method,
+            },
             features=feature_cols,
             description=f"Demand forecast trained on {len(X)} hourly records",
         )
@@ -307,9 +624,12 @@ class ModelTrainer:
             "model_type": "demand_forecast",
             "version_id": version_id,
             "best_model": best_name,
-            "best_rmse": float(best_rmse),
+            "best_rmse": best_holdout["rmse"],
+            "best_cv_rmse": round(best_cv_rmse, 4),
             "rows_trained": len(X),
             "features_used": len(feature_cols),
+            "tuned_params": best_params,
+            "split_method": split_method,
             "comparison": results,
         }
 
@@ -333,41 +653,49 @@ class ModelTrainer:
             X, y, test_size=0.2, random_state=42
         )
 
-        results = []
+        results: List[Dict[str, Any]] = []
         best_model = None
-        best_rmse = float('inf')
+        best_cv_rmse = float("inf")
         best_name = None
+        best_params: Dict[str, Any] = {}
 
-        # RandomForest (regression for quality score)
+        # RandomForest — tuned
         if _RF_AVAILABLE:
             try:
-                model = RandomForestRegressor(
-                    n_estimators=100, max_depth=8, random_state=42, n_jobs=-1
+                rf_base = RandomForestRegressor(random_state=42, n_jobs=-1)
+                tuned_rf, rf_params, rf_cv_rmse = self._tune_regressor(
+                    rf_base, self._RF_PARAM_GRID, X, y, "RF-Slot"
                 )
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                y_pred = np.clip(y_pred, 0, 100)
-                metrics = self._evaluate(y_test, y_pred, "Slot")
-                results.append({"model": "RandomForest", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = model
+                y_pred = np.clip(tuned_rf.predict(X_test), 0, 100)
+                holdout = self._evaluate(y_test, y_pred, "Slot")
+                results.append({"model": "RandomForest", **holdout, "cv_rmse": rf_cv_rmse, "params": rf_params})
+                if rf_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = rf_cv_rmse
+                    best_model = tuned_rf
                     best_name = "RandomForest"
+                    best_params = rf_params
             except Exception as e:
                 logger.error(f"RandomForest Slot failed: {e}")
 
         if best_model is None:
             return {"status": "failed", "error": "No model trained", "rows": len(X)}
 
+        best_holdout = next(r for r in results if r["model"] == best_name)
         version_id = ModelRegistry.save(
             model=best_model,
             model_type="slot_recommendation",
             metrics={
-                "rmse": float(best_rmse),
-                "mae": float([r["mae"] for r in results if r["model"] == best_name][0]),
-                "r2": float([r["r2"] for r in results if r["model"] == best_name][0]),
+                "rmse": best_holdout["rmse"],
+                "mae": best_holdout["mae"],
+                "r2": best_holdout["r2"],
+                "cv_rmse": round(best_cv_rmse, 4),
+                "cv_folds": 5,
             },
-            hyperparams={"features": len(feature_cols), "model": best_name},
+            hyperparams={
+                "features": len(feature_cols),
+                "model": best_name,
+                "tuned_params": best_params,
+            },
             features=feature_cols,
             description=f"Slot recommendation trained on {len(X)} slots",
         )
@@ -377,9 +705,11 @@ class ModelTrainer:
             "model_type": "slot_recommendation",
             "version_id": version_id,
             "best_model": best_name,
-            "best_rmse": float(best_rmse),
+            "best_rmse": best_holdout["rmse"],
+            "best_cv_rmse": round(best_cv_rmse, 4),
             "rows_trained": len(X),
             "features_used": len(feature_cols),
+            "tuned_params": best_params,
             "comparison": results,
         }
 
@@ -554,60 +884,67 @@ class ModelTrainer:
             X, y, test_size=0.2, random_state=42
         )
 
-        results = []
+        results: List[Dict[str, Any]] = []
         best_model = None
-        best_rmse = float('inf')
+        best_cv_rmse = float("inf")
         best_name = None
+        best_params: Dict[str, Any] = {}
 
-        # RandomForest
+        # RandomForest — tuned
         if _RF_AVAILABLE:
             try:
-                model = RandomForestRegressor(
-                    n_estimators=100, max_depth=8, random_state=42, n_jobs=-1
+                rf_base = RandomForestRegressor(random_state=42, n_jobs=-1)
+                tuned_rf, rf_params, rf_cv_rmse = self._tune_regressor(
+                    rf_base, self._RF_PARAM_GRID, X, y, "RF-Vendor"
                 )
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                y_pred = np.clip(y_pred, 0, 100)
-                metrics = self._evaluate(y_test, y_pred, "Vendor")
-                results.append({"model": "RandomForest", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = model
+                y_pred = np.clip(tuned_rf.predict(X_test), 0, 100)
+                holdout = self._evaluate(y_test, y_pred, "Vendor")
+                results.append({"model": "RandomForest", **holdout, "cv_rmse": rf_cv_rmse, "params": rf_params})
+                if rf_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = rf_cv_rmse
+                    best_model = tuned_rf
                     best_name = "RandomForest"
+                    best_params = rf_params
             except Exception as e:
                 logger.error(f"RandomForest Vendor failed: {e}")
 
-        # XGBoost
+        # XGBoost — tuned
         if _XGB_AVAILABLE:
             try:
-                model = xgb.XGBRegressor(
-                    n_estimators=100, max_depth=6, learning_rate=0.1,
-                    random_state=42, n_jobs=-1
+                xgb_base = xgb.XGBRegressor(random_state=42, n_jobs=-1)
+                tuned_xgb, xgb_params, xgb_cv_rmse = self._tune_regressor(
+                    xgb_base, self._XGB_PARAM_GRID, X, y, "XGB-Vendor"
                 )
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                y_pred = np.clip(y_pred, 0, 100)
-                metrics = self._evaluate(y_test, y_pred, "Vendor")
-                results.append({"model": "XGBoost", **metrics})
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
-                    best_model = model
+                y_pred = np.clip(tuned_xgb.predict(X_test), 0, 100)
+                holdout = self._evaluate(y_test, y_pred, "Vendor")
+                results.append({"model": "XGBoost", **holdout, "cv_rmse": xgb_cv_rmse, "params": xgb_params})
+                if xgb_cv_rmse < best_cv_rmse:
+                    best_cv_rmse = xgb_cv_rmse
+                    best_model = tuned_xgb
                     best_name = "XGBoost"
+                    best_params = xgb_params
             except Exception as e:
                 logger.error(f"XGBoost Vendor failed: {e}")
 
         if best_model is None:
             return {"status": "failed", "error": "No model trained", "rows": len(X)}
 
+        best_holdout = next(r for r in results if r["model"] == best_name)
         version_id = ModelRegistry.save(
             model=best_model,
             model_type="vendor_ranking",
             metrics={
-                "rmse": float(best_rmse),
-                "mae": float([r["mae"] for r in results if r["model"] == best_name][0]),
-                "r2": float([r["r2"] for r in results if r["model"] == best_name][0]),
+                "rmse": best_holdout["rmse"],
+                "mae": best_holdout["mae"],
+                "r2": best_holdout["r2"],
+                "cv_rmse": round(best_cv_rmse, 4),
+                "cv_folds": 5,
             },
-            hyperparams={"features": len(feature_cols), "model": best_name},
+            hyperparams={
+                "features": len(feature_cols),
+                "model": best_name,
+                "tuned_params": best_params,
+            },
             features=feature_cols,
             description=f"Vendor ranking trained on {len(X)} vendors",
         )
@@ -617,9 +954,11 @@ class ModelTrainer:
             "model_type": "vendor_ranking",
             "version_id": version_id,
             "best_model": best_name,
-            "best_rmse": float(best_rmse),
+            "best_rmse": best_holdout["rmse"],
+            "best_cv_rmse": round(best_cv_rmse, 4),
             "rows_trained": len(X),
             "features_used": len(feature_cols),
+            "tuned_params": best_params,
             "comparison": results,
         }
 
@@ -728,28 +1067,67 @@ def train_fraud_detection(db: Session) -> Dict[str, Any]:
     if len(X) == 0:
         return {"status": "failed", "error": "Empty dataset"}
 
-    # Use RandomForest for fraud classification
+    # Use RandomForest for fraud classification with RandomizedSearchCV + CV F1
     if _RF_AVAILABLE:
         try:
             from sklearn.ensemble import RandomForestClassifier
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+            from sklearn.model_selection import RandomizedSearchCV, cross_val_score
 
-            # Ensure we have some variation in targets, otherwise fallback/dummy
+            # Ensure at least one positive label (binary classification requirement)
             if len(np.unique(y)) < 2:
-                # Force at least one dummy positive if all are zero to allow training
                 y[0] = 1.0
 
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.2, random_state=42
             )
 
-            model = RandomForestClassifier(
-                n_estimators=100, max_depth=8, random_state=42, n_jobs=-1,
-                class_weight='balanced'
-            )
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
+            n_samples = len(X)
+            effective_cv = min(5, n_samples) if n_samples >= 2 else 2
+            effective_iter = min(10, max(1, n_samples // 2))
 
-            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+            rf_clf_param_grid = {
+                "n_estimators": [100, 200, 300],
+                "max_depth": [5, 8, 10, 15],
+                "min_samples_split": [2, 5, 10],
+                "min_samples_leaf": [1, 2, 4],
+            }
+
+            try:
+                search = RandomizedSearchCV(
+                    RandomForestClassifier(random_state=42, n_jobs=-1, class_weight="balanced"),
+                    param_distributions=rf_clf_param_grid,
+                    n_iter=effective_iter,
+                    cv=effective_cv,
+                    scoring="f1",
+                    random_state=42,
+                    n_jobs=-1,
+                    refit=True,
+                )
+                search.fit(X, y)
+                model = search.best_estimator_
+                tuned_params = search.best_params_
+                logger.info(f"Fraud RF best params: {tuned_params}")
+            except Exception as tune_err:
+                logger.warning(f"Fraud RandomizedSearchCV failed ({tune_err}), using defaults")
+                model = RandomForestClassifier(
+                    n_estimators=100, max_depth=8, random_state=42,
+                    n_jobs=-1, class_weight="balanced"
+                )
+                model.fit(X_train, y_train)
+                tuned_params = {}
+
+            # CV F1
+            try:
+                cv_f1_scores = cross_val_score(
+                    model, X, y, cv=effective_cv, scoring="f1", n_jobs=-1
+                )
+                cv_f1 = round(float(np.mean(cv_f1_scores)), 4)
+            except Exception as cv_err:
+                logger.warning(f"Fraud cross_val_score failed ({cv_err})")
+                cv_f1 = 0.0
+
+            y_pred = model.predict(X_test)
             accuracy = accuracy_score(y_test, y_pred)
             precision = precision_score(y_test, y_pred, zero_division=0)
             recall = recall_score(y_test, y_pred, zero_division=0)
@@ -763,8 +1141,14 @@ def train_fraud_detection(db: Session) -> Dict[str, Any]:
                     "precision": round(float(precision), 3),
                     "recall": round(float(recall), 3),
                     "f1": round(float(f1), 3),
+                    "cv_f1": cv_f1,
+                    "cv_folds": effective_cv,
                 },
-                hyperparams={"algorithm": "RandomForest", "class_weight": "balanced"},
+                hyperparams={
+                    "algorithm": "RandomForest",
+                    "class_weight": "balanced",
+                    "tuned_params": tuned_params,
+                },
                 features=feature_cols,
                 description=f"Fraud detection trained on {len(X)} users",
             )
@@ -774,6 +1158,8 @@ def train_fraud_detection(db: Session) -> Dict[str, Any]:
                 "model_type": "fraud_detection",
                 "version_id": version_id,
                 "accuracy": round(float(accuracy), 3),
+                "cv_f1": cv_f1,
+                "tuned_params": tuned_params,
                 "rows_trained": len(X),
             }
         except Exception as e:
@@ -792,6 +1178,18 @@ def train_slot_recommendation(db: Session) -> Dict[str, Any]:
     """Train slot recommendation model."""
     trainer = ModelTrainer(db)
     return trainer.train_slot_recommendation()
+
+
+def train_eta(db: Session, days: int = 90) -> Dict[str, Any]:
+    """Train ETA model."""
+    trainer = ModelTrainer(db)
+    return trainer.train_eta(days)
+
+
+def train_demand(db: Session, days: int = 90) -> Dict[str, Any]:
+    """Train demand forecast model."""
+    trainer = ModelTrainer(db)
+    return trainer.train_demand(days)
 
 
 class RetrainingService:

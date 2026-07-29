@@ -1,0 +1,73 @@
+{
+  "model_type": "eta_prediction",
+  "feature_names": ["vendor_id", "queue_length", "slot_occupancy", "item_count", "time_of_day", "weekday", "rush_hour"],
+  "target_description": "predicted ETA in minutes (actual pickup time from order placement)",
+  "reasoning_notes": [
+    "Ranges derived from domain reasoning: Parul University canteen context.",
+    "Baseline single-item order off-peak = ~8-18 min (kitchen + queue).",
+    "Rush hour (12-14, 18-20) adds ~3-8 min from concurrency pressure.",
+    "Heavy queue (queue_length>=10) adds ~5-12 min further.",
+    "slot_occupancy of 0.9+ (near-full slot) adds ~3-7 min.",
+    "Multiple items (item_count>=3) add ~2-5 min prep time.",
+    "Upper bound deliberately loose (+40%) to absorb model variance.",
+    "Lower bound conservative (minimum physically possible ~6 min)."
+  ],
+  "cases": [
+    {
+      "id": "eta_001",
+      "description": "Single item, off-peak morning, empty queue — fastest possible scenario",
+      "features": {"vendor_id": 1, "queue_length": 0, "slot_occupancy": 0.1, "item_count": 1, "time_of_day": 9, "weekday": 1, "rush_hour": 1},
+      "expected_min": 6.0,
+      "expected_max": 18.0
+    },
+    {
+      "id": "eta_002",
+      "description": "Single item, off-peak mid-morning, low queue",
+      "features": {"vendor_id": 1, "queue_length": 2, "slot_occupancy": 0.2, "item_count": 1, "time_of_day": 10, "weekday": 2, "rush_hour": 0},
+      "expected_min": 6.0,
+      "expected_max": 20.0
+    },
+    {
+      "id": "eta_003",
+      "description": "Lunch rush, moderate queue, 2 items — typical busy weekday scenario",
+      "features": {"vendor_id": 2, "queue_length": 7, "slot_occupancy": 0.65, "item_count": 2, "time_of_day": 13, "weekday": 2, "rush_hour": 1},
+      "expected_min": 12.0,
+      "expected_max": 30.0
+    },
+    {
+      "id": "eta_004",
+      "description": "Peak lunch rush, heavy queue, 3 items — worst-case busy scenario",
+      "features": {"vendor_id": 2, "queue_length": 12, "slot_occupancy": 0.95, "item_count": 3, "time_of_day": 13, "weekday": 3, "rush_hour": 1},
+      "expected_min": 18.0,
+      "expected_max": 45.0
+    },
+    {
+      "id": "eta_005",
+      "description": "Evening dinner rush, moderate queue, 2 items",
+      "features": {"vendor_id": 3, "queue_length": 6, "slot_occupancy": 0.6, "item_count": 2, "time_of_day": 19, "weekday": 4, "rush_hour": 1},
+      "expected_min": 10.0,
+      "expected_max": 28.0
+    },
+    {
+      "id": "eta_006",
+      "description": "Weekend quiet afternoon, single item, near-empty slot",
+      "features": {"vendor_id": 1, "queue_length": 1, "slot_occupancy": 0.15, "item_count": 1, "time_of_day": 15, "weekday": 6, "rush_hour": 0},
+      "expected_min": 6.0,
+      "expected_max": 18.0
+    },
+    {
+      "id": "eta_007",
+      "description": "Monday morning, 4-item order, light queue — complex prep time",
+      "features": {"vendor_id": 2, "queue_length": 3, "slot_occupancy": 0.3, "item_count": 4, "time_of_day": 9, "weekday": 0, "rush_hour": 1},
+      "expected_min": 10.0,
+      "expected_max": 28.0
+    },
+    {
+      "id": "eta_008",
+      "description": "Full slot (occupancy 1.0), heavy queue — extreme congestion",
+      "features": {"vendor_id": 3, "queue_length": 15, "slot_occupancy": 1.0, "item_count": 2, "time_of_day": 13, "weekday": 1, "rush_hour": 1},
+      "expected_min": 20.0,
+      "expected_max": 55.0
+    }
+  ]
+}
