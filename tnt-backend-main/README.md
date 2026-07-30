@@ -144,3 +144,43 @@ Fraud Detection           | 6        | Accuracy: 0.9650          | ml_models/fra
 
 Trained model artifacts (.pkl files) are stored on disk under the directory specified by the `MODEL_STORAGE_DIR` environment variable (defaults to `ml_models/` at the project root).
 
+## AI/ML Testing & Safety Validation
+
+The AI/ML subsystem (`app.ml` and `app.modules.ai_intelligence`) is governed by strict unit testing, safety regression rules, and a **95% code coverage gate**.
+
+### AI/ML Coverage Gate Command (95% Minimum)
+
+```bash
+python -m pytest \
+  tests/test_ml_engine.py tests/test_ml_bridge.py tests/test_ml_predictions.py \
+  tests/test_ml_registry.py tests/test_ml_router.py tests/test_ml_promotion_retraining.py \
+  tests/test_training_pipeline_coverage.py tests/test_ml_safety_regression.py \
+  tests/test_model_performance_validation.py tests/test_targeted_aiml_coverage.py \
+  tests/test_ai_service.py tests/test_analytics_service.py tests/test_enhanced_eta_engine.py \
+  tests/test_redis_ai_cache.py tests/test_vendor_speed_service.py \
+  tests/test_production_upgrades.py tests/test_preference_engine.py \
+  tests/test_ai_routers.py tests/test_ai.py tests/test_analytics.py \
+  --cov=app.ml --cov=app.modules.ai_intelligence \
+  --cov-report=term-missing --cov-fail-under=95 -q
+```
+
+### Safety Regression Gates
+
+The following safety controls fall back to calibrated heuristics when data volume or confidence thresholds are not met:
+
+1. **ETA Model Gate:** Vendors with `< 30` completed orders use calibrated baseline heuristics.
+2. **Demand Model Gate:** Vendors with `< 90` days of order history use time-bucket heuristics.
+3. **Slot Safety Hard Limit:** Slots at `>= 90%` capacity are strictly excluded regardless of ML recommendations.
+4. **Vendor Ranking Express Pickup:** Express pickup eligibility is enforced as a hard filter independent of model ranking scores.
+5. **Deterministic Fraud Rules:** Hard risk rules trigger regardless of ML confidence or availability.
+6. **Payload Source Transparency:** AI response payloads expose a `source` field (`heuristic` or `model`) for auditability.
+
+### Model Performance Metrics & Backtesting
+
+- **Fraud Model Metrics:** Exposes `accuracy`, `precision`, `recall`, `f1`, and `cv_f1` in training outputs and model registry metadata.
+- **ETA Backtest Engine (`backtest_eta`):** Validates `within_3_min_pct`, `within_5_min_pct`, and `mae_minutes`.
+- **Vendor Ranking Backtest Engine (`backtest_vendor_ranking`):** Evaluates `top_1_hit_rate` and `top_3_hit_rate`.
+
+For complete details, see the latest formal report: [docs/AI_ML_Testing_Validation_Report_2026-07-30.md](docs/AI_ML_Testing_Validation_Report_2026-07-30.md).
+
+
