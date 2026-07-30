@@ -13,6 +13,7 @@ Implements production-grade features:
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -131,7 +132,7 @@ class MetricsCollector:
         if metric_name in self.metrics:
             # For histogram, store as average for simplicity
             current = self.metrics[metric_name].value
-            count = self.metrics[metric_name].labels.get("_count", 0)
+            count = int(self.metrics[metric_name].labels.get("_count", 0))
             new_count = count + 1
             new_avg = ((current * count) + value) / new_count
             self.metrics[metric_name].value = new_avg

@@ -447,7 +447,7 @@ export default function Login() {
   };
 
   // Motion Variants
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -458,7 +458,7 @@ export default function Login() {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 15 },
     visible: {
       opacity: 1,
@@ -471,7 +471,7 @@ export default function Login() {
     },
   };
 
-  const cardVariants = {
+  const cardVariants: any = {
     hidden: { opacity: 0, y: 25, scale: 0.97 },
     visible: {
       opacity: 1,
@@ -604,7 +604,7 @@ export default function Login() {
               left: item.left,
               top: item.top,
               right: item.right,
-              bottom: item.bottom,
+              bottom: (item as any).bottom,
               width: item.scale,
               height: item.scale,
               x: parallaxX,

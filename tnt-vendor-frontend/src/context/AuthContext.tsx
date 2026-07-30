@@ -4,8 +4,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
-import { API_BASE_URL, STORAGE_KEYS } from '../config/api';
+import { STORAGE_KEYS } from '../config/api';
 import apiClient from '../services/apiClient';
 import { onAuthEvent, AUTH_EVENTS } from '../services/apiClient';
 import { registerFCMToken } from '../services/pushRegistrationService';
@@ -164,7 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let response;
     try {
-      response = await axios.post(`${API_BASE_URL}/v1/vendors/auth/login`, loginPayload);
+      response = await apiClient.post('/v1/vendors/auth/login', loginPayload);
     } catch (error: any) {
       const backendMessage = error?.response?.data?.detail;
       throw new Error(backendMessage || error?.message || 'Login failed');

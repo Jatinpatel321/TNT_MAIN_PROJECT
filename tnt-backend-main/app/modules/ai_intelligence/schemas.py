@@ -5,11 +5,18 @@ from pydantic import BaseModel
 
 
 class DemandPlanningResponse(BaseModel):
-    expected_daily_orders: int
-    slot_wise_demand_graph: Dict[str, int]
-    popular_items: List[Dict[str, Any]]
-    stationery_workload_score: float
-    food_waste_risk_score: float
+    vendor_id: Optional[int] = None
+    demand_patterns: Optional[Dict[str, Any]] = None
+    forecast: Optional[Dict[str, Any]] = None
+    optimal_capacity: Optional[Dict[str, Any]] = None
+    recommendations: Optional[List[Any]] = None
+    expected_daily_orders: int = 0
+    slot_wise_demand_graph: Dict[str, int] = {}
+    popular_items: List[Dict[str, Any]] = []
+    stationery_workload_score: float = 0.0
+    food_waste_risk_score: float = 0.0
+    method: Optional[str] = None
+    disclaimer: Optional[str] = None
 
 
 class CapacityRecommendationResponse(BaseModel):
@@ -147,8 +154,8 @@ class SmartReorderItem(BaseModel):
 
 
 class SmartReorderResponse(BaseModel):
-    items: List[SmartReorderItem]
-    best_reorder_time: str
+    items: List[SmartReorderItem] = []
+    best_reorder_time: Optional[str] = None
     best_reorder_slot_id: Optional[int] = None
 
 
