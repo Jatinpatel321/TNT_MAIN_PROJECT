@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
 from app.core.security import get_current_user, require_role
+from app.modules.slots.model import Slot
 from app.modules.users.model import User
 
 from .schemas import *

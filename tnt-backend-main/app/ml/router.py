@@ -6,7 +6,7 @@ with model storage, retraining, accuracy tracking, versioning, and explainabilit
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session

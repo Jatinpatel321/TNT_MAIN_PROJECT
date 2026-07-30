@@ -25,6 +25,25 @@ from app.modules.ai_intelligence.vendor_speed_service import VendorSpeedService
 router = APIRouter(prefix="/ai", tags=["Vendor Speed"])
 
 
+@router.get("/vendor-speed/batch")
+async def get_batch_vendor_speeds(
+    vendor_ids: str = Query(..., description="Comma-separated vendor IDs"),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """Get speed metrics for multiple vendors.
+
+    Args:
+        vendor_ids: Comma-separated list of vendor IDs
+
+    Returns:
+        List of vendor speed metrics
+    """
+    ids = [int(vid.strip()) for vid in vendor_ids.split(",") if vid.strip()]
+    service = VendorSpeedService(db)
+    return service.get_batch_vendor_speeds(ids)
+
+
 @router.get("/vendor-speed/{vendor_id}")
 async def get_vendor_speed(
     vendor_id: int,
@@ -45,25 +64,6 @@ async def get_vendor_speed(
     """
     service = VendorSpeedService(db)
     return service.get_vendor_speed_metrics(vendor_id)
-
-
-@router.get("/vendor-speed/batch")
-async def get_batch_vendor_speeds(
-    vendor_ids: str = Query(..., description="Comma-separated vendor IDs"),
-    db: Session = Depends(get_db),
-    user=Depends(get_current_user),
-) -> list[dict[str, Any]]:
-    """Get speed metrics for multiple vendors.
-
-    Args:
-        vendor_ids: Comma-separated list of vendor IDs
-
-    Returns:
-        List of vendor speed metrics
-    """
-    ids = [int(vid.strip()) for vid in vendor_ids.split(",") if vid.strip()]
-    service = VendorSpeedService(db)
-    return service.get_batch_vendor_speeds(ids)
 
 
 @router.get("/vendor-speed/waiting-time/{vendor_id}")

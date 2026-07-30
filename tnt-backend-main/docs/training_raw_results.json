@@ -1,0 +1,109 @@
+{
+  "eta_prediction": {
+    "status": "success",
+    "model_type": "eta_prediction",
+    "version_id": "eta_prediction_v2",
+    "best_model": "RandomForest",
+    "best_rmse": 0.0,
+    "rows_trained": 26,
+    "features_used": 7,
+    "comparison": [
+      {
+        "model": "RandomForest",
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      },
+      {
+        "model": "XGBoost",
+        "mae": 0.083,
+        "mse": 0.006,
+        "rmse": 0.079,
+        "r2": 1.0
+      },
+      {
+        "model": "LightGBM",
+        "mae": 0.013,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      }
+    ]
+  },
+  "demand_forecast": {
+    "status": "success",
+    "model_type": "demand_forecast",
+    "version_id": "demand_forecast_v2",
+    "best_model": "XGBoost",
+    "best_rmse": 0.0,
+    "rows_trained": 28,
+    "features_used": 5,
+    "comparison": [
+      {
+        "model": "XGBoost",
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      },
+      {
+        "model": "RandomForest",
+        "mae": 0.039,
+        "mse": 0.008,
+        "rmse": 0.089,
+        "r2": 1.0
+      }
+    ]
+  },
+  "slot_recommendation": {
+    "status": "success",
+    "model_type": "slot_recommendation",
+    "version_id": "slot_recommendation_v2",
+    "best_model": "RandomForest",
+    "best_rmse": 0.0,
+    "rows_trained": 5,
+    "features_used": 6,
+    "comparison": [
+      {
+        "model": "RandomForest",
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      }
+    ]
+  },
+  "vendor_ranking": {
+    "status": "success",
+    "model_type": "vendor_ranking",
+    "version_id": "vendor_ranking_v2",
+    "best_model": "RandomForest",
+    "best_rmse": 0.0,
+    "rows_trained": 4,
+    "features_used": 6,
+    "comparison": [
+      {
+        "model": "RandomForest",
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      },
+      {
+        "model": "XGBoost",
+        "mae": 0.0,
+        "mse": 0.0,
+        "rmse": 0.0,
+        "r2": 1.0
+      }
+    ]
+  },
+  "fraud_detection": {
+    "status": "success",
+    "model_type": "fraud_detection",
+    "version_id": "fraud_detection_v2",
+    "accuracy": 0.8,
+    "rows_trained": 27
+  }
+}

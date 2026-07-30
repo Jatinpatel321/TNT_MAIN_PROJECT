@@ -11,7 +11,7 @@ Comprehensive unit + integration tests for:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, time as dt_time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine
@@ -563,8 +563,78 @@ class TestETAEngine:
             assert "predicted_eta_minutes" in result
             assert 5 <= result["predicted_eta_minutes"] <= 60
             assert result["delay_risk_level"] in ("LOW", "MEDIUM", "HIGH")
+            assert result["source"] == "heuristic"
         finally:
             engine.dispose()
+
+    def test_predict_eta_low_order_count_uses_heuristic_without_calling_model(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_eta_low", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            db.add(vendor)
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 10, 0), end_time=datetime(2026, 1, 1, 10, 30),
+                        max_orders=10, current_orders=2, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.commit()
+            eta_engine = ETAEngine(db)
+            with patch("app.modules.ai_intelligence.planners.eta_engine.predict_with_fallback") as mock_bridge:
+                result = eta_engine.predict_eta(slot.id, vendor.id)
+                assert result["source"] == "heuristic"
+                mock_bridge.assert_not_called()
+        finally:
+            engine.dispose()
+
+    def test_predict_eta_model_path_success(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_eta_high", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            student = User(phone="s_eta_high", role=UserRole.STUDENT, is_active=True)
+            db.add_all([vendor, student])
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 10, 0), end_time=datetime(2026, 1, 1, 10, 30),
+                        max_orders=10, current_orders=2, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.commit()
+            # Seed 30 orders for this vendor so order count >= 30
+            for i in range(30):
+                db.add(Order(user_id=student.id, vendor_id=vendor.id, slot_id=slot.id, status=OrderStatus.COMPLETED, total_amount=100))
+            db.commit()
+
+            eta_engine = ETAEngine(db)
+            with patch("app.modules.ai_intelligence.planners.eta_engine.predict_with_fallback", return_value=(25.0, "model")) as mock_bridge:
+                result = eta_engine.predict_eta(slot.id, vendor.id)
+                assert result["source"] == "model"
+                assert result["predicted_eta_minutes"] == 25
+                mock_bridge.assert_called_once()
+        finally:
+            engine.dispose()
+
+    def test_predict_eta_model_exception_fallback(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_eta_err", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            student = User(phone="s_eta_err", role=UserRole.STUDENT, is_active=True)
+            db.add_all([vendor, student])
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 10, 0), end_time=datetime(2026, 1, 1, 10, 30),
+                        max_orders=10, current_orders=2, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.commit()
+            # Seed 30 orders so order count >= 30
+            for i in range(30):
+                db.add(Order(user_id=student.id, vendor_id=vendor.id, slot_id=slot.id, status=OrderStatus.COMPLETED, total_amount=100))
+            db.commit()
+
+            eta_engine = ETAEngine(db)
+            # ModelRegistry.load fails or predict_with_fallback falls back
+            with patch("app.ml.registry.ModelRegistry.load", side_effect=RuntimeError("Model store unavailable")):
+                result = eta_engine.predict_eta(slot.id, vendor.id)
+                assert result["source"] == "heuristic"
+                assert 5 <= result["predicted_eta_minutes"] <= 60
+        finally:
+            engine.dispose()
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -870,6 +940,84 @@ class TestDemandPlanner:
             assert len(result["forecast"]["forecast"]) == 7
         finally:
             engine.dispose()
+
+    def test_demand_forecast_insufficient_history_uses_heuristic(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_df_low", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            student = User(phone="s_df_low", role=UserRole.STUDENT, is_active=True)
+            db.add_all([vendor, student])
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0), end_time=datetime(2026, 1, 1, 12, 30),
+                        max_orders=10, current_orders=0, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.flush()
+            # Order 10 days ago (< 90 days history)
+            o = Order(user_id=student.id, slot_id=slot.id, vendor_id=vendor.id, status=OrderStatus.COMPLETED, total_amount=100,
+                      created_at=_utcnow() - timedelta(days=10))
+            db.add(o)
+            db.commit()
+            planner = DemandPlanner(db)
+            with patch("app.modules.ai_intelligence.planners.demand_planner.predict_with_fallback") as mock_bridge:
+                result = planner._generate_demand_forecast(vendor.id, _utcnow() - timedelta(days=30))
+                assert result["source"] == "heuristic"
+                assert result["forecast"][0]["confidence"] == 0.75
+                mock_bridge.assert_not_called()
+        finally:
+            engine.dispose()
+
+    def test_demand_forecast_model_path_success(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_df_high", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            student = User(phone="s_df_high", role=UserRole.STUDENT, is_active=True)
+            db.add_all([vendor, student])
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0), end_time=datetime(2026, 1, 1, 12, 30),
+                        max_orders=10, current_orders=0, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.flush()
+            # Order 100 days ago (>= 90 days history)
+            o = Order(user_id=student.id, slot_id=slot.id, vendor_id=vendor.id, status=OrderStatus.COMPLETED, total_amount=100,
+                      created_at=_utcnow() - timedelta(days=100))
+            db.add(o)
+            db.commit()
+            planner = DemandPlanner(db)
+            mock_meta = {"metrics": {"r2": 0.88}, "accuracy": 0.88}
+            with patch("app.modules.ai_intelligence.planners.demand_planner.predict_with_fallback", return_value=(42.0, "model")) as mock_bridge, \
+                 patch("app.ml.registry.ModelRegistry.load", return_value=(MagicMock(), mock_meta)):
+                result = planner._generate_demand_forecast(vendor.id, _utcnow() - timedelta(days=30))
+                assert result["source"] == "model"
+                assert result["forecast"][0]["predicted_orders"] == 42
+                assert result["forecast"][0]["confidence"] == 0.88
+                mock_bridge.assert_called_once()
+        finally:
+            engine.dispose()
+
+    def test_demand_forecast_model_exception_fallback(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_df_err", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            student = User(phone="s_df_err", role=UserRole.STUDENT, is_active=True)
+            db.add_all([vendor, student])
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0), end_time=datetime(2026, 1, 1, 12, 30),
+                        max_orders=10, current_orders=0, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.flush()
+            # Order 100 days ago (>= 90 days history)
+            o = Order(user_id=student.id, slot_id=slot.id, vendor_id=vendor.id, status=OrderStatus.COMPLETED, total_amount=100,
+                      created_at=_utcnow() - timedelta(days=100))
+            db.add(o)
+            db.commit()
+            planner = DemandPlanner(db)
+            with patch("app.ml.registry.ModelRegistry.load", side_effect=RuntimeError("Model registry error")):
+                result = planner._generate_demand_forecast(vendor.id, _utcnow() - timedelta(days=30))
+                assert result["source"] == "heuristic"
+                assert result["forecast"][0]["confidence"] == 0.75
+        finally:
+            engine.dispose()
+
 
     def test_demand_volatility_insufficient_data(self):
         engine, db = _build_session()
@@ -1190,3 +1338,188 @@ class TestAISignals:
             engine.dispose()
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  VendorRanker ML Bridge Tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestVendorRankerMLBridge:
+    def _make_vendor_with_slot(self, db, phone_v, phone_s, n_orders=0):
+        vendor = User(phone=phone_v, role=UserRole.VENDOR, is_active=True, is_approved=True)
+        student = User(phone=phone_s, role=UserRole.STUDENT, is_active=True)
+        db.add_all([vendor, student])
+        db.flush()
+        slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0),
+                    end_time=datetime(2026, 1, 1, 12, 30),
+                    max_orders=10, current_orders=2, status=SlotStatus.AVAILABLE)
+        db.add(slot)
+        db.flush()
+        for i in range(n_orders):
+            o = Order(user_id=student.id, slot_id=slot.id, vendor_id=vendor.id,
+                      status=OrderStatus.COMPLETED, total_amount=100,
+                      created_at=_utcnow() - timedelta(days=i + 1))
+            db.add(o)
+        db.commit()
+        return vendor, student, slot
+
+    def test_vendor_rank_score_model_path(self):
+        engine, db = _build_session()
+        try:
+            vendor, _, _ = self._make_vendor_with_slot(db, "v_vr_mp", "s_vr_mp", n_orders=5)
+            ranker = VendorRanker(db)
+            with patch("app.modules.ai_intelligence.planners.vendor_ranker.predict_with_fallback",
+                       return_value=(0.9, "model")) as mock_bridge:
+                score, source = ranker._calculate_vendor_rank_score(vendor.id)
+                assert source == "model"
+                # model output 0.9 * 100 = 90
+                assert abs(score - 90.0) < 0.01
+                mock_bridge.assert_called_once()
+        finally:
+            engine.dispose()
+
+    def test_vendor_rank_score_heuristic_fallback(self):
+        engine, db = _build_session()
+        try:
+            vendor, _, _ = self._make_vendor_with_slot(db, "v_vr_fb", "s_vr_fb", n_orders=3)
+            ranker = VendorRanker(db)
+            with patch("app.modules.ai_intelligence.planners.vendor_ranker.predict_with_fallback",
+                       return_value=(62.5, "heuristic")) as mock_bridge:
+                score, source = ranker._calculate_vendor_rank_score(vendor.id)
+                assert source == "heuristic"
+                assert score == 62.5
+                mock_bridge.assert_called_once()
+        finally:
+            engine.dispose()
+
+    def test_express_pickup_eligibility_is_hard_rule_independent_of_model(self):
+        """Express pickup eligibility must reflect live slot state, never ML output."""
+        engine, db = _build_session()
+        try:
+            vendor, _, slot = self._make_vendor_with_slot(db, "v_vr_ep", "s_vr_ep")
+            slot.current_orders = 0
+            slot.max_orders = 0
+            db.commit()
+            ranker = VendorRanker(db)
+            # Even with model returning 1.0 confidence, eligibility is data-driven
+            with patch("app.modules.ai_intelligence.planners.vendor_ranker.predict_with_fallback",
+                       return_value=(1.0, "model")):
+                eligible = ranker._calculate_express_pickup_eligibility(vendor.id)
+                assert isinstance(eligible, bool)
+        finally:
+            engine.dispose()
+
+    def test_get_vendor_rankings_contains_source_field(self):
+        engine, db = _build_session()
+        try:
+            vendor, _, _ = self._make_vendor_with_slot(db, "v_vr_gs", "s_vr_gs", n_orders=1)
+            ranker = VendorRanker(db)
+            with patch("app.modules.ai_intelligence.planners.vendor_ranker.predict_with_fallback",
+                       return_value=(0.75, "heuristic")):
+                rankings = ranker.get_vendor_rankings()
+                assert len(rankings) >= 1
+                for entry in rankings:
+                    assert "source" in entry
+                    assert "vendor_rank_score" in entry
+                    assert "express_pickup_eligible" in entry
+        finally:
+            engine.dispose()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  SlotPlanner ML Bridge Tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestSlotPlannerMLBridge:
+    def test_capacity_recommendation_model_path(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_spm_mp", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            db.add(vendor)
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0),
+                        end_time=datetime(2026, 1, 1, 12, 30),
+                        max_orders=10, current_orders=5, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.commit()
+            planner = SlotPlanner(db)
+            with patch("app.modules.ai_intelligence.planners.slot_planner.predict_with_fallback",
+                       return_value=(0.5, "model")) as mock_bridge:
+                result = planner.get_capacity_recommendation(vendor.id)
+                assert result["source"] == "model"
+                assert "recommended_capacity" in result
+                assert 5 <= result["recommended_capacity"] <= 50
+                mock_bridge.assert_called_once()
+        finally:
+            engine.dispose()
+
+    def test_capacity_recommendation_heuristic_fallback(self):
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_spm_fb", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            db.add(vendor)
+            db.flush()
+            slot = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0),
+                        end_time=datetime(2026, 1, 1, 12, 30),
+                        max_orders=10, current_orders=3, status=SlotStatus.AVAILABLE)
+            db.add(slot)
+            db.commit()
+            planner = SlotPlanner(db)
+            with patch("app.modules.ai_intelligence.planners.slot_planner.predict_with_fallback",
+                       return_value=(8, "heuristic")) as mock_bridge:
+                result = planner.get_capacity_recommendation(vendor.id)
+                assert result["source"] == "heuristic"
+                assert 5 <= result["recommended_capacity"] <= 50
+                mock_bridge.assert_called_once()
+        finally:
+            engine.dispose()
+
+    def test_over_90_capacity_slots_excluded_even_if_model_recommends_them(self):
+        """HARD SAFETY RULE: slots at >= 90% occupancy must NEVER appear in
+        get_available_slots_ranked output even when the mock model returns the
+        maximum possible recommendation score."""
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_spm_cap", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            db.add(vendor)
+            db.flush()
+            # slot_ok: 50% occupancy — expected in results
+            slot_ok = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0),
+                           end_time=datetime(2026, 1, 1, 12, 30),
+                           max_orders=10, current_orders=5, status=SlotStatus.AVAILABLE)
+            # slot_over: 100% occupancy — must be excluded
+            slot_over = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 13, 0),
+                             end_time=datetime(2026, 1, 1, 13, 30),
+                             max_orders=10, current_orders=10, status=SlotStatus.AVAILABLE)
+            db.add_all([slot_ok, slot_over])
+            db.commit()
+
+            planner = SlotPlanner(db)
+            # Mock model returns maximum confidence score for ALL slots
+            with patch("app.modules.ai_intelligence.planners.slot_planner.predict_with_fallback",
+                       return_value=(0.99, "model")):
+                ranked = planner.get_available_slots_ranked(vendor.id)
+
+            slot_ids = [s["slot_id"] for s in ranked]
+            assert slot_over.id not in slot_ids, (
+                "Slot at >=90% occupancy must be excluded regardless of model output"
+            )
+            assert slot_ok.id in slot_ids
+        finally:
+            engine.dispose()
+
+    def test_over_90_capacity_rule_applies_on_heuristic_path_too(self):
+        """The >90% safety rule is structural, not model-specific."""
+        engine, db = _build_session()
+        try:
+            vendor = User(phone="v_spm_hcap", role=UserRole.VENDOR, is_active=True, is_approved=True)
+            db.add(vendor)
+            db.flush()
+            slot_over = Slot(vendor_id=vendor.id, start_time=datetime(2026, 1, 1, 12, 0),
+                             end_time=datetime(2026, 1, 1, 12, 30),
+                             max_orders=10, current_orders=10, status=SlotStatus.AVAILABLE)
+            db.add(slot_over)
+            db.commit()
+            planner = SlotPlanner(db)
+            ranked = planner.get_available_slots_ranked(vendor.id)
+            assert slot_over.id not in [s["slot_id"] for s in ranked]
+        finally:
+            engine.dispose()

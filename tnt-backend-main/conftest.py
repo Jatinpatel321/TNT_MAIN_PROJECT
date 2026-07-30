@@ -17,6 +17,9 @@ workspace.  This means:
 
 from __future__ import annotations
 
+# Register ML test environment stabilization plugin globally
+pytest_plugins = ["tests.conftest_ml"]
+
 import fakeredis
 import pytest
 
