@@ -10,65 +10,61 @@ University campuses are complex ecosystems with a high demand for shared resourc
 
 ## Features
 
--   **User Authentication:** Secure login and registration for students, faculty, and administrators.
--   **Smart Scheduling:** AI-powered scheduling for appointments, consultations, and study sessions.
+-   **User Authentication:** Secure login and registration for students, faculty, and administrators with JWT tokens and Redis token revocation.
+-   **Smart Scheduling & Slot Optimization:** AI-powered slot planner with strict 90% capacity safety limits and heuristic fallbacks.
 -   **Resource Booking:** Real-time booking of campus facilities such as study rooms, labs, and sports courts.
--   **Order Management:** A complete system for placing and tracking orders for various campus services (e.g., stationery, food).
--   **Payment Integration:** Seamless and secure payment processing for all transactions.
--   **Real-time Notifications:** Instant alerts for appointment reminders, booking confirmations, and order status updates.
--   **Admin Dashboard:** A comprehensive dashboard for administrators to manage users, resources, and services.
+-   **Order Management & Express Pickup:** Complete system for ordering stationery, food, and campus services with express pickup eligibility enforcement.
+-   **AI/ML Intelligence Subsystem:**
+    -   **Dynamic ETA Engine:** Real-time completion time estimation with historical fallback gates.
+    -   **Demand Forecasting:** Predictive order volume modeling across campus vendors.
+    -   **Vendor Speed & Ranking:** Multi-factor scoring with live load indicators and transparent source attribution.
+    -   **Fraud Detection Pipeline:** ML risk scoring backed by deterministic safety rules and complete classification metrics (Precision, Recall, F1).
+-   **Payment Integration:** Seamless Razorpay payment reconciliation with Redis distributed locks.
+-   **Real-time Notifications:** Multi-channel alerts (FCM push, SMS fallback, WebSockets) with 30s heartbeat.
+-   **Admin Dashboard & Vendor Apps:** Comprehensive admin dashboard (`tnt-admin`), vendor portal (`tnt-vendor-frontend`), and student application (`tnt-user-frontend`).
 
 ## Technology Stack
 
 ### Backend
 
--   **Framework:** FastAPI
--   **Database:** PostgreSQL
--   **ORM:** SQLAlchemy with Alembic for migrations
--   **Authentication:** JWT (JSON Web Tokens)
--   **Testing:** Pytest
--   **Asynchronous Tasks:** (Not specified, e.g., Celery)
+-   **Framework:** FastAPI (Python 3.11+)
+-   **Database:** PostgreSQL with SQLAlchemy ORM & Alembic migrations
+-   **Caching & Locking:** Redis (AI signal caching & distributed locking)
+-   **Machine Learning:** Scikit-Learn, Joblib, Scipy, NumPy
+-   **Testing & Coverage:** Pytest, pytest-cov (Enforced **95% coverage gate** on AI/ML modules)
 
 ### Frontend
 
--   **Framework:** React Native
--   **Language:** TypeScript
--   **State Management:** (Not specified, e.g., Redux Toolkit)
--   **Navigation:** React Navigation
--   **UI Components:** (Not specified, e.g., React Native Paper)
+-   **Student & Vendor Mobile Apps:** React Native (TypeScript), React Navigation, React Native Paper
+-   **Admin Web Dashboard:** React, Vite, Tailwind CSS, Lucide Icons
 
-## System Architecture
-
-*A high-level diagram of the system architecture will be added here.*
-
-## Installation Steps
+## Installation & Setup
 
 ### Prerequisites
 
--   Node.js and npm/yarn
--   Python 3.8+ and pip
--   PostgreSQL
+-   Node.js (v18+) and npm/yarn
+-   Python 3.11+ and pip
+-   PostgreSQL & Redis
 -   Git
 
 ### Backend
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/Jemin29/finalyear.git
-    cd finalyear/tnt-backend-main
+    git clone https://github.com/Jatinpatel321/TNT_MAIN_PROJECT.git
+    cd TNT_MAIN_PROJECT/tnt-backend-main
     ```
 2.  **Create and activate a virtual environment:**
     ```bash
     python -m venv .venv
-    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    .\.venv\Scripts\activate  # On Linux/macOS: source .venv/bin/activate
     ```
 3.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
-4.  **Set up the database:**
-    -   Create a PostgreSQL database.
-    -   Configure the database connection in a `.env` file (based on `.env.example`).
+4.  **Configure environment:**
+    -   Copy `.env.example` to `.env` and set PostgreSQL and Redis credentials.
 5.  **Run database migrations:**
     ```bash
     alembic upgrade head
@@ -78,39 +74,65 @@ University campuses are complex ecosystems with a high demand for shared resourc
     uvicorn app.main:app --reload
     ```
 
-### Frontend
+### AI/ML Testing & 95% Coverage Gate Verification
 
-1.  **Navigate to the frontend directory:**
+To verify that the AI/ML subsystem meets the **95% code coverage gate** and passes all unit and safety regression tests:
+
+```bash
+python -m pytest \
+  tests/test_ml_engine.py tests/test_ml_bridge.py tests/test_ml_predictions.py \
+  tests/test_ml_registry.py tests/test_ml_router.py tests/test_ml_promotion_retraining.py \
+  tests/test_training_pipeline_coverage.py tests/test_ml_safety_regression.py \
+  tests/test_model_performance_validation.py tests/test_targeted_aiml_coverage.py \
+  tests/test_ai_service.py tests/test_analytics_service.py tests/test_enhanced_eta_engine.py \
+  tests/test_redis_ai_cache.py tests/test_vendor_speed_service.py \
+  tests/test_production_upgrades.py tests/test_preference_engine.py \
+  tests/test_ai_routers.py tests/test_ai.py tests/test_analytics.py \
+  --cov=app.ml --cov=app.modules.ai_intelligence \
+  --cov-report=term-missing --cov-fail-under=95 -q
+```
+
+Detailed testing results and metrics: [docs/AI_ML_Testing_Validation_Report_2026-07-30.md](docs/AI_ML_Testing_Validation_Report_2026-07-30.md).
+
+### Frontends
+
+1.  **Student App (`tnt-user-frontend`):**
     ```bash
-    cd ../tnt-frontend
-    ```
-2.  **Install dependencies:**
-    ```bash
+    cd ../tnt-user-frontend
     npm install
+    npx react-native run-android
     ```
-3.  **Run the application:**
-    -   **For Android:** `npx react-native run-android`
-    -   **For iOS:** `npx react-native run-ios`
+2.  **Vendor App (`tnt-vendor-frontend`):**
+    ```bash
+    cd ../tnt-vendor-frontend
+    npm install
+    npx react-native run-android
+    ```
+3.  **Admin Portal (`tnt-admin`):**
+    ```bash
+    cd ../tnt-admin
+    npm install
+    npm run dev
+    ```
 
-## Folder Structure
+## Project Structure
 
 ```
-finalyear/
-├── tnt-backend-main/
-│   ├── alembic/          # Database migrations
-│   ├── app/              # Main application source code
-│   ├── tests/            # Pytest test suite
-│   ├── .venv/            # Python virtual environment
-│   └── requirements.txt  # Python dependencies
-└── tnt-frontend/
-    ├── android/          # Android project
-    ├── ios/              # iOS project
-    ├── src/              # React Native source code
-    ├── node_modules/     # Node.js dependencies
-    └── package.json      # Project configuration
+TNT_MAIN_PROJECT/
+├── tnt-backend-main/           # FastAPI Backend Service
+│   ├── app/
+│   │   ├── ml/                 # ML Models, Predictions, Backtest & Registry
+│   │   └── modules/            # Domain Modules (ai_intelligence, slots, orders, etc.)
+│   ├── docs/                   # AI/ML Validation Reports & Specifications
+│   ├── ml_models/              # Serialized ML Model Artifacts (.pkl)
+│   ├── tests/                  # Pytest Unit & Regression Suite
+│   └── alembic/                # Database Schema Migrations
+├── tnt-user-frontend/          # React Native Mobile App for Students
+├── tnt-vendor-frontend/        # React Native Mobile App for Campus Vendors
+└── tnt-admin/                  # React/Vite Admin Dashboard
 ```
 
 ## Contributors
 
--   Jemin29
 -   Jatinpatel321
+-   Jemin29
