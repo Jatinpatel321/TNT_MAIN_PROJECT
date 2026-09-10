@@ -3,12 +3,10 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, validator
 
 
 class AdminUserSummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     name: Optional[str] = None
     full_name: Optional[str] = None
@@ -17,11 +15,25 @@ class AdminUserSummary(BaseModel):
     is_active: bool = True
     created_at: Optional[datetime] = None
 
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
+    @validator("role", pre=True)
+    def parse_role(cls, v):
+        if hasattr(v, "value"):
+            return str(v.value)
+        return str(v) if v is not None else ""
+
 
 class AdminUserDetailResponse(AdminUserSummary):
     preferences: Optional[Dict[str, Any]] = None
     order_count: Optional[int] = None
     last_active_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class AdminUserListResponse(BaseModel):
@@ -31,6 +43,10 @@ class AdminUserListResponse(BaseModel):
     page_size: int = 20
     total_pages: int = 1
     role_summary: Dict[str, int] = {}
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class AdminUserStatusUpdate(BaseModel):

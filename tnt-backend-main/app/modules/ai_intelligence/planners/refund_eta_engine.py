@@ -115,9 +115,8 @@ class RefundETAEngine:
         """Compute live refund progress for the status endpoint.
 
         Derives a 0-100 progress percentage from elapsed time between
-        ``refunded_at`` and ``estimated_refund_at``, and auto-advances the
-        stored ``refund_status`` to COMPLETED once the ETA has elapsed. The
-        caller owns the commit.
+        ``refunded_at`` and ``estimated_refund_at``. Purely analytical;
+        does NOT mutate payment database state.
         """
         now = utcnow_naive()
         status = payment.refund_status or RefundStatus.PENDING.value
@@ -134,16 +133,9 @@ class RefundETAEngine:
             total = (eta - started).total_seconds()
             percent = int(max(0.0, min(1.0, elapsed / total)) * 100)
             if now >= eta:
-                # ETA elapsed → settle it.
-                payment.refund_status = RefundStatus.COMPLETED.value
-                status = RefundStatus.COMPLETED.value
                 percent = 100
             else:
-                # Keep a visible floor so a just-initiated refund doesn't read 0%.
                 percent = max(percent, 10)
-                if status == RefundStatus.PENDING.value:
-                    status = RefundStatus.PROCESSING.value
-                    payment.refund_status = status
 
         messages = {
             RefundStatus.PENDING.value: "Your refund has been requested.",

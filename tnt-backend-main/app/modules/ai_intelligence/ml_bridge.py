@@ -17,7 +17,7 @@ import math
 from collections import defaultdict
 from typing import Any, Callable, Dict, Optional, Tuple
 
-import numpy as np
+from sqlalchemy.orm import Session
 
 from app.ml.registry import ModelRegistry
 
@@ -31,7 +31,7 @@ def _is_invalid_feature_value(val: Any) -> bool:
     """Check if a feature value is None, NaN, or Infinite."""
     if val is None:
         return True
-    if isinstance(val, (float, int, np.number)):
+    if isinstance(val, (float, int)):
         try:
             f_val = float(val)
             if math.isnan(f_val) or math.isinf(f_val):
@@ -119,6 +119,7 @@ def predict_with_fallback(
                             feature_vector = [features[name] for name in feature_names]
                         else:
                             feature_vector = list(features.values())
+                        import numpy as np
                         input_data = np.array([feature_vector])
                         if callable(model) and not hasattr(model, "predict"):
                             raw_pred = model(input_data)
@@ -181,6 +182,7 @@ def predict_with_fallback(
         else:
             feature_vector = list(features.values())
 
+        import numpy as np
         input_data = np.array([feature_vector])
 
         if callable(model) and not hasattr(model, "predict"):
@@ -208,7 +210,7 @@ def predict_with_fallback(
             try:
                 probs = model.predict_proba(input_data)
                 if hasattr(probs, "__getitem__") and len(probs) > 0:
-                    confidence = float(np.max(probs[0]))
+                    confidence = float(max(probs[0]))
             except Exception:
                 pass
         elif hasattr(model, "predict_confidence"):

@@ -12,11 +12,8 @@ import type {
 } from '../types';
 
 export const aiApi = {
-  // Backend requires query param: vendor_id
-  // See: app/modules/ai_intelligence/router.py -> /ai/demand-planning?vendor_id=...
-  getDemandPlanning: (vendorId: number) =>
-    api.get<DemandPlan[]>('/v1/ai/demand-planning', { params: { vendor_id: vendorId } }),
-
+  getDemandPlanning: (vendorId?: number) =>
+    api.get<DemandPlan[]>('/v1/ai/demand-planning', { params: vendorId ? { vendor_id: vendorId } : {} }),
 
   getCapacityRecommendation: () =>
     api.get('/v1/ai/capacity-recommendation'),
@@ -24,9 +21,8 @@ export const aiApi = {
   getSlotRecommendations: () =>
     api.get<SlotSuggestion[]>('/v1/ai/slot-recommendations'),
 
-  getPredictiveETA: (slotId: number, vendorId: number) =>
-    api.get<ETAMetrics[]>('/v1/ai/predictive-eta', { params: { slot_id: slotId, vendor_id: vendorId } }),
-
+  getPredictiveETA: (slotId?: number, vendorId?: number) =>
+    api.get<ETAMetrics[]>('/v1/ai/predictive-eta', { params: slotId && vendorId ? { slot_id: slotId, vendor_id: vendorId } : {} }),
 
   getVendorRanking: () =>
     api.get<VendorRanking[]>('/v1/ai/vendor-ranking'),
@@ -44,9 +40,10 @@ export const aiApi = {
     api.get<ReorderPrompt[]>('/v1/ai/signals/reorder-prompts'),
 
   getAccuracySummary: () =>
-    api.get<ModelAccuracySummary>('/ml/accuracy/summary'),
+    api.get<ModelAccuracySummary>('/v1/ml/accuracy/summary'),
 
   getModelAccuracy: (modelType: string) =>
-    api.get<ModelAccuracyDetail>(`/ml/accuracy/${modelType}`),
+    api.get<ModelAccuracyDetail>(`/v1/ml/accuracy/${modelType}`),
 };
+
 

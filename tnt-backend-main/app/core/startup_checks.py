@@ -14,6 +14,22 @@ def validate_production_settings(app_env: str, cors_origins: list[str]) -> None:
     if otp_hmac_key == "dev_otp_key_change_in_production":
         raise RuntimeError("OTP_HMAC_KEY cannot use default development value in production environment")
 
+    secret_key = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET")
+    insecure_secret_keys = {
+        "tnt-dev-secret-key-change-in-production",
+        "dev_only_insecure_secret_do_not_use_in_production",
+    }
+    if not secret_key or secret_key in insecure_secret_keys:
+        raise RuntimeError("SECRET_KEY must be set to a secure, non-default value in production")
+
+    vendor_secret = os.getenv("VENDOR_JWT_SECRET")
+    insecure_vendor_secrets = {
+        "tnt_vendor_secret_key_change_in_prod",
+        "tnt-dev-vendor-secret-key-change-in-production",
+    }
+    if not vendor_secret or vendor_secret in insecure_vendor_secrets:
+        raise RuntimeError("VENDOR_JWT_SECRET must be set to an independent secure secret in production")
+
     if not cors_origins:
         raise RuntimeError("CORS_ORIGINS cannot be empty in production")
 

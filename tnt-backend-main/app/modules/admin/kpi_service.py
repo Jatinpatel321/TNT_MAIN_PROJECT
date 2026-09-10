@@ -751,7 +751,8 @@ class KPIService:
 
         # 3. Wastage breakdown by vendor
         vendor_waste_query = self.db.query(
-            User.username.label("vendor_name"),
+            User.id.label("vendor_id"),
+            User.name.label("vendor_name"),
             func.count(Order.id).label("cancelled_count"),
             func.sum(Order.total_amount).label("wasted_revenue")
         ).join(
@@ -759,12 +760,13 @@ class KPIService:
         ).filter(
             Order.status == OrderStatus.CANCELLED,
             Order.created_at >= start_date,
-        ).group_by(User.username).order_by(
+        ).group_by(User.id, User.name).order_by(
             func.sum(Order.total_amount).desc()
         ).all()
 
         vendor_waste = [
             {
+                "vendor_id": v.vendor_id,
                 "vendor_name": v.vendor_name,
                 "cancelled_count": v.cancelled_count,
                 "wasted_revenue": float(v.wasted_revenue or 0)

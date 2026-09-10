@@ -139,18 +139,19 @@ class RecommendationRankingService:
             .scalar() or 0
         )
 
-        # Average rating
-        from app.modules.feedback.model import MenuItemReview
-        avg_rating = (
-            self.db.query(func.avg(MenuItemReview.rating))
-            .filter(MenuItemReview.menu_item_id == menu_item_id)
-            .scalar() or 0
+        # Average rating from feedback on orders containing this item
+        from app.modules.feedback.model import Feedback
+        feedback_stats = (
+            self.db.query(
+                func.avg(func.coalesce(Feedback.overall_rating, Feedback.quality_rating)).label("avg_rating"),
+                func.count(Feedback.id).label("rating_count"),
+            )
+            .join(OrderItem, OrderItem.order_id == Feedback.order_id)
+            .filter(OrderItem.menu_item_id == menu_item_id)
+            .first()
         )
-        rating_count = (
-            self.db.query(func.count(MenuItemReview.id))
-            .filter(MenuItemReview.menu_item_id == menu_item_id)
-            .scalar() or 0
-        )
+        avg_rating = float(feedback_stats.avg_rating) if feedback_stats and feedback_stats.avg_rating else 0.0
+        rating_count = int(feedback_stats.rating_count) if feedback_stats and feedback_stats.rating_count else 0
 
         # Order score (max 100 orders = 1.0)
         order_score = min(1.0, total_orders / 100.0)

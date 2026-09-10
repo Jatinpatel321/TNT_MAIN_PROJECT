@@ -277,7 +277,7 @@ def orders_by_user_id(
     if not db_caller:
         raise HTTPException(status_code=404, detail="Authenticated user not found")
 
-    allowed_roles = {"vendor", "admin", "superadmin"}
+    allowed_roles = {"vendor", "admin", "super_admin"}
     caller_role = db_caller.role.value if hasattr(db_caller.role, "value") else str(db_caller.role)
     if db_caller.id != user_id and caller_role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Cannot view another user's orders")
@@ -397,14 +397,14 @@ def request_refund(
         .order_by(Payment.id.desc())
         .first()
     )
-    amount = (payload or {}).get("amount") or int(order.total_amount or 0)
+    amount = (payload or {}).get("amount") or float(order.total_amount or 0)
     reason = ((payload or {}).get("reason") or "").strip() or None
 
     req = RefundRequest(
         order_id=order_id,
         payment_id=payment.id if payment else None,
         user_id=user.get("id"),
-        amount=int(amount),
+        amount=float(amount),
         reason=reason,
         status=RefundRequestStatus.PENDING,
     )

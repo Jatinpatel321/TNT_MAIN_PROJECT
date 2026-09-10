@@ -12,6 +12,7 @@
       "backgroundColor": "#10B981"
     },
     "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-font"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tnt.vendor"

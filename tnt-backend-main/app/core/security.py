@@ -132,6 +132,15 @@ def get_current_user(
     if is_token_revoked(token, payload):
         raise HTTPException(status_code=401, detail="Token has been revoked")
 
+    # Reject unverified 2FA challenge tokens on all routes except the 2FA verification endpoint
+    if payload.get("is_2fa_pending") or payload.get("type") == "admin_2fa_challenge":
+        path = request.url.path
+        if not (path.endswith("/auth/admin/2fa/verify") or path.endswith("/admin/2fa/verify")):
+            raise HTTPException(
+                status_code=401,
+                detail="Two-factor authentication required. Please complete 2FA verification.",
+            )
+
     if is_vendor_token:
         vendor_id_str = payload.get("sub")
         role = payload.get("role")  # "vendor_owner" or "vendor_staff"
@@ -139,12 +148,16 @@ def get_current_user(
         if token_type != "vendor_access" or not vendor_id_str:
             raise HTTPException(status_code=401, detail="Invalid vendor token payload")
         
-        from app.modules.vendors.model import Vendor
+        from app.modules.vendors.model import Vendor, VendorStaff, VendorStatus
         from app.modules.users.model import User
         
         vendor = db.query(Vendor).filter(Vendor.vendor_id == int(vendor_id_str)).first()
         if not vendor:
             raise HTTPException(status_code=401, detail="Vendor not found")
+        
+        if vendor.status != VendorStatus.ACTIVE:
+            status_val = vendor.status.value if hasattr(vendor.status, "value") else str(vendor.status)
+            raise HTTPException(status_code=403, detail=f"Vendor account is not active (status: {status_val})")
             
         user = db.query(User).filter(User.id == vendor.owner_id).first()
         if not user:
@@ -152,6 +165,29 @@ def get_current_user(
             
         if not user.is_active:
             raise HTTPException(status_code=403, detail="Vendor owner user account is inactive")
+        
+        staff_permissions = {}
+        staff_id = payload.get("staff_id")
+        is_owner = (role == "vendor_owner")
+
+        if role == "vendor_staff":
+            if not staff_id:
+                raise HTTPException(status_code=401, detail="Invalid staff token: missing staff_id")
+            staff = db.query(VendorStaff).filter(
+                VendorStaff.id == int(staff_id),
+                VendorStaff.vendor_id == vendor.vendor_id,
+            ).first()
+            if not staff or not staff.is_active:
+                raise HTTPException(status_code=403, detail="Staff account is inactive or revoked")
+            staff_permissions = staff.permissions or {}
+        else:
+            staff_permissions = {
+                k: True for k in [
+                    "orders", "menu", "inventory", "analytics", "slots",
+                    "staff", "settlements", "promotions", "ai", "profile",
+                    "business_hours", "media"
+                ]
+            }
             
         return {
             "id": user.id,
@@ -160,7 +196,9 @@ def get_current_user(
             "is_active": user.is_active,
             "vendor_id": vendor.vendor_id,
             "vendor_role": role,
-            "staff_id": payload.get("staff_id"),
+            "staff_id": staff_id,
+            "staff_permissions": staff_permissions,
+            "is_owner": is_owner,
         }
 
     user_id = payload.get("sub")
@@ -218,10 +256,13 @@ def get_current_user(
             pass
         raise HTTPException(status_code=403, detail=_BLOCKED_USER_DETAIL)
 
+    # Resolve live database role so demotions and role changes apply immediately
+    current_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+
     return {
         "id": user_id,
-        "phone": phone,
-        "role": role,
+        "phone": user.phone,
+        "role": current_role,
         "is_active": user.is_active,
     }
 
@@ -251,9 +292,26 @@ def require_role(required_role: str):
                 )
             except Exception:
                 pass
-            raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail=f"Access denied: requires {required_role} role")
         return user
     return role_checker
+
+
+def require_vendor_permission(permission: str):
+    """
+    Dependency factory that gates a route to vendor owners or staff with specific permission.
+    """
+    def permission_checker(request: Request, user=Depends(require_role("vendor"))):
+        if user.get("is_owner", False) or user.get("vendor_role") == "vendor_owner":
+            return user
+        perms = user.get("staff_permissions", {})
+        if not perms.get(permission, False):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied: staff lacks required permission '{permission}'",
+            )
+        return user
+    return permission_checker
 
 
 def get_current_user_id(

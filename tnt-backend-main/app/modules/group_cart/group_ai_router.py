@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_db
 from app.core.security import get_current_user
 from app.modules.group_cart.group_ai_service import GroupAIService
+from app.modules.group_cart.group_service import require_group_member
 
 router = APIRouter(prefix="/groups", tags=["Group AI"])
 
@@ -44,6 +45,7 @@ async def get_group_ai_suggestions(
         - pickup_synchronization: Pickup timing analysis
         - overall_recommendations: Summary recommendations
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.get_group_ai_suggestions(group_id)
 
@@ -62,6 +64,7 @@ async def get_member_availability(
         - availability_score: Overall score
         - conflicts: Scheduling conflicts
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.analyze_member_availability(group_id)
 
@@ -85,6 +88,7 @@ async def get_pickup_slot_suggestion(
         - reasoning
         - confidence
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.suggest_best_pickup_slot(group_id, vendor_id)
 
@@ -108,6 +112,7 @@ async def get_common_menu_items(
         - member_preferences: Breakdown by member
         - conflicts: Preference conflicts
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.suggest_common_menu_items(group_id, vendor_id, limit)
 
@@ -125,6 +130,7 @@ async def get_ordering_conflicts(
         - severity: LOW, MEDIUM, HIGH
         - suggestions: Resolution suggestions
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.detect_ordering_conflicts(group_id)
 
@@ -143,6 +149,7 @@ async def get_pickup_synchronization(
         - pickup_windows: Per-item windows
         - synchronization_plan: Strategy recommendation
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.calculate_pickup_synchronization(group_id)
 
@@ -163,5 +170,6 @@ async def save_ai_suggestions(
         - saved: Success status
         - group_id
     """
+    require_group_member(group_id, user, db)
     service = GroupAIService(db)
     return service.save_ai_suggestions(group_id, suggestions)

@@ -21,6 +21,7 @@ Refresh token (7 day expiry, single-use):
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import timedelta
 from typing import Any, Optional
@@ -44,7 +45,24 @@ logger = logging.getLogger("tnt.vendor.auth")
 # ── Constants ────────────────────────────────────────────────────────────────
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 REFRESH_TOKEN_EXPIRE_DAYS = 7
-VENDOR_JWT_SECRET_KEY = "tnt_vendor_secret_key_change_in_prod"  # TODO: move to env
+INSECURE_LEGACY_VENDOR_SECRET = "tnt_vendor_secret_key_change_in_prod"
+
+
+def _get_vendor_jwt_secret() -> str:
+    secret = os.getenv("VENDOR_JWT_SECRET")
+    if not secret:
+        if os.getenv("APP_ENV", "development") == "production":
+            raise RuntimeError(
+                "VENDOR_JWT_SECRET environment variable must be set in production. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return "tnt-dev-vendor-secret-key-change-in-production"
+    if os.getenv("APP_ENV", "development") == "production" and secret == INSECURE_LEGACY_VENDOR_SECRET:
+        raise RuntimeError("VENDOR_JWT_SECRET cannot use insecure legacy literal in production")
+    return secret
+
+
+VENDOR_JWT_SECRET_KEY = _get_vendor_jwt_secret()
 VENDOR_JWT_ALGORITHM = "HS256"
 
 vendor_security = HTTPBearer(auto_error=False)
@@ -199,18 +217,41 @@ def register_vendor(
     owner_phone: str,
     password: str,
     db: Session,
+    authenticated_user: dict | None = None,
 ) -> dict:
     """Register a new vendor. Creates the Vendor record and links to a User.
 
     The User must already exist (phone registered). If not, this raises 400.
-    The User's role is upgraded to VENDOR if it isn't already.
+    Admin accounts cannot be converted to vendors.
     """
+    if authenticated_user:
+        auth_phone = authenticated_user.get("phone")
+        if auth_phone and auth_phone != owner_phone:
+            raise HTTPException(
+                status_code=403,
+                detail="Cannot register a vendor for a phone number other than your authenticated account",
+            )
+        auth_role = (authenticated_user.get("role") or "").lower()
+        if auth_role in {"admin", "super_admin"}:
+            raise HTTPException(
+                status_code=400,
+                detail="Admin accounts cannot register as vendors. Please use a separate account.",
+            )
+
     # Find the owner User
     user = db.query(User).filter(User.phone == owner_phone).first()
     if not user:
         raise HTTPException(
             status_code=400,
             detail="User not found. Register first via OTP login.",
+        )
+
+    # Double-check database role to prevent privilege tampering
+    db_role_str = (user.role.value if hasattr(user.role, "value") else str(user.role)).lower()
+    if db_role_str in {"admin", "super_admin"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin accounts cannot register as vendors.",
         )
 
     # Check if user already owns a vendor
@@ -221,8 +262,8 @@ def register_vendor(
             detail=f"User already owns vendor #{existing.vendor_id} ({existing.vendor_name})",
         )
 
-    # Upgrade user role to VENDOR
-    if user.role and user.role.name != "VENDOR":
+    # Upgrade eligible user role to VENDOR
+    if db_role_str != "vendor":
         from app.modules.users.model import UserRole
         user.role = UserRole.VENDOR
 

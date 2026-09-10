@@ -762,55 +762,85 @@ class EnhancedForecastingService:
 
     def forecast_by_vendor_type(self, vendor_id: int) -> Dict[str, Any]:
         """Forecast based on vendor type (food vs stationery)."""
-        vendor = self.db.query(VendorProfile).filter(
-            VendorProfile.user_id == vendor_id
-        ).first()
-        
-        if not vendor:
-            return self.get_comprehensive_forecast(vendor_id)
-        
-        # Check vendor type
-        is_stationery = vendor.vendor_type == "stationery"
-        
-        if is_stationery:
-            return self._forecast_stationery(vendor_id)
+        from app.modules.vendors.model import Vendor
+        from app.modules.vendors.profile_models import VendorProfile
+
+        # Resolve business vendor entity (by vendor_id or owner_id)
+        vendor = (
+            self.db.query(Vendor)
+            .filter((Vendor.vendor_id == vendor_id) | (Vendor.owner_id == vendor_id))
+            .first()
+        )
+
+        category = None
+        user_vendor_id = vendor_id
+
+        if vendor:
+            user_vendor_id = vendor.owner_id
+            category = vendor.category
+
+            profile = (
+                self.db.query(VendorProfile)
+                .filter(VendorProfile.vendor_id == vendor.vendor_id)
+                .first()
+            )
+            if profile and profile.category:
+                category = profile.category
         else:
-            return self._forecast_food(vendor_id)
+            profile = (
+                self.db.query(VendorProfile)
+                .filter(VendorProfile.vendor_id == vendor_id)
+                .first()
+            )
+            if profile and profile.category:
+                category = profile.category
+
+        # Check vendor type / category
+        is_stationery = str(category).lower() == "stationery"
+
+        if is_stationery:
+            return self._forecast_stationery(user_vendor_id)
+        else:
+            return self._forecast_food(user_vendor_id)
 
     def _forecast_stationery(self, vendor_id: int) -> Dict[str, Any]:
         """Forecast specifically for stationery vendors."""
         # Get base forecast
         base_forecast = self.get_comprehensive_forecast(vendor_id)
-        
+
         # Enhance with stationery-specific metrics
         thirty_days_ago = utcnow_naive() - timedelta(days=30)
-        
-        # Stationery job types
-        job_types = self.db.query(
-            OrderItem.menu_item_id,
-            func.count(OrderItem.id).label("job_count"),
-        ).join(
-            Order, Order.id == OrderItem.order_id
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= thirty_days_ago,
-            Order.status != OrderStatus.CANCELLED,
-        ).group_by(
-            OrderItem.menu_item_id
-        ).all()
-        
-        # Categorize jobs
-        print_jobs = sum(1 for j in job_types if "print" in str(j.menu_item_id).lower())
-        xerox_jobs = sum(1 for j in job_types if "xerox" in str(j.menu_item_id).lower())
-        binding_jobs = sum(1 for j in job_types if "binding" in str(j.menu_item_id).lower())
-        
+
+        # Stationery job types joining MenuItem to get names
+        job_types = (
+            self.db.query(
+                MenuItem.name.label("item_name"),
+                func.count(OrderItem.id).label("job_count"),
+            )
+            .join(MenuItem, MenuItem.id == OrderItem.menu_item_id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= thirty_days_ago,
+                Order.status != OrderStatus.CANCELLED,
+            )
+            .group_by(MenuItem.name)
+            .all()
+        )
+
+        # Categorize jobs by item name
+        print_jobs = sum(int(j.job_count) for j in job_types if "print" in str(j.item_name).lower())
+        xerox_jobs = sum(int(j.job_count) for j in job_types if "xerox" in str(j.item_name).lower() or "copy" in str(j.item_name).lower())
+        binding_jobs = sum(int(j.job_count) for j in job_types if "bind" in str(j.item_name).lower() or "spiral" in str(j.item_name).lower())
+        total_jobs = sum(int(j.job_count) for j in job_types)
+
         base_forecast["stationery_breakdown"] = {
             "print_jobs": print_jobs,
             "xerox_jobs": xerox_jobs,
             "binding_jobs": binding_jobs,
-            "total_jobs": len(job_types),
+            "total_jobs": total_jobs,
         }
-        
+
         return base_forecast
 
     def _forecast_food(self, vendor_id: int) -> Dict[str, Any]:

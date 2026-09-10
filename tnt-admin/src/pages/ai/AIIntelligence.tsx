@@ -343,22 +343,56 @@ export default function AIIntelligence() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [rushRes, rankRes, slotRes, reorderRes, accRes] = await Promise.allSettled([
+      const [rushRes, rankRes, slotRes, reorderRes, accRes, demandRes, etaRes] = await Promise.allSettled([
         aiApi.getRushHour(),
         aiApi.getVendorRanking(),
         aiApi.getSlotSuggestions(),
         aiApi.getReorderPrompts(),
         aiApi.getAccuracySummary(),
+        aiApi.getDemandPlanning(),
+        aiApi.getPredictiveETA(),
       ]);
-      if (rushRes.status === 'fulfilled') setRushHour(rushRes.value.data);
-      if (rankRes.status === 'fulfilled') setRankings(Array.isArray(rankRes.value.data) ? rankRes.value.data : []);
-      if (slotRes.status === 'fulfilled') setSlotSuggestions(Array.isArray(slotRes.value.data) ? slotRes.value.data : []);
-      if (accRes.status === 'fulfilled') setAccuracySummary(accRes.value.data);
+
+      if (rushRes.status === 'fulfilled' && rushRes.value?.data) {
+        setRushHour(rushRes.value.data);
+      }
+
+      if (rankRes.status === 'fulfilled') {
+        const d = rankRes.value?.data as any;
+        const list = Array.isArray(d) ? d : (d?.rankings || []);
+        setRankings(list);
+      }
+
+      if (slotRes.status === 'fulfilled') {
+        const d = slotRes.value?.data as any;
+        const list = Array.isArray(d) ? d : (d?.slots || d?.signals || []);
+        setSlotSuggestions(list);
+      }
+
+      if (accRes.status === 'fulfilled') {
+        setAccuracySummary(accRes.value?.data || null);
+      }
 
       if (reorderRes.status === 'fulfilled') {
-        const data = Array.isArray(reorderRes.value.data) ? reorderRes.value.data : [];
-        setReorderCount(data.length);
+        const d = reorderRes.value?.data as any;
+        const count = typeof d?.reorder_count === 'number'
+          ? d.reorder_count
+          : (Array.isArray(d) ? d.length : (d?.signals?.length || 0));
+        setReorderCount(count);
       }
+
+      if (demandRes.status === 'fulfilled') {
+        const d = demandRes.value?.data as any;
+        const list = Array.isArray(d) ? d : (d?.plans || d?.demand_plans || []);
+        setDemandPlans(list);
+      }
+
+      if (etaRes.status === 'fulfilled') {
+        const d = etaRes.value?.data as any;
+        const list = Array.isArray(d) ? d : [];
+        setETAMetrics(list);
+      }
+
       setLastRefresh(new Date());
     } catch { /* silent */ }
     finally { setLoading(false); }

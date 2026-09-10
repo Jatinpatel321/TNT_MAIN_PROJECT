@@ -103,7 +103,7 @@ def write(
         entity_id=str(entity_id) if entity_id is not None else None,
         before_state=_json_safe(before_state),
         after_state=_json_safe(after_state),
-        metadata=_json_safe(metadata),
+        meta=_json_safe(metadata),
         ip_address=ip,
         user_agent=ua,
     )
@@ -174,8 +174,22 @@ def list_audit_logs(
     
     logs = []
     for log, actor_name in results:
-        log_dict = {c.name: getattr(log, c.name) for c in log.__table__.columns}
-        log_dict["actor_name"] = actor_name
+        log_dict = {
+            "id": log.id,
+            "actor_id": log.actor_id,
+            "actor_role": log.actor_role,
+            "action": log.action,
+            "action_category": log.action_category,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "before_state": log.before_state,
+            "after_state": log.after_state,
+            "metadata": log.meta if isinstance(log.meta, dict) else (log.meta or {}),
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "created_at": log.created_at,
+            "actor_name": actor_name,
+        }
         logs.append(log_dict)
 
     return {
@@ -198,8 +212,22 @@ def get_timeline(db: Session, actor_id: int, page: int = 1, page_size: int = 50)
     
     logs = []
     for log, actor_name in results:
-        log_dict = {c.name: getattr(log, c.name) for c in log.__table__.columns}
-        log_dict["actor_name"] = actor_name
+        log_dict = {
+            "id": log.id,
+            "actor_id": log.actor_id,
+            "actor_role": log.actor_role,
+            "action": log.action,
+            "action_category": log.action_category,
+            "entity_type": log.entity_type,
+            "entity_id": log.entity_id,
+            "before_state": log.before_state,
+            "after_state": log.after_state,
+            "metadata": log.meta if isinstance(log.meta, dict) else (log.meta or {}),
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "created_at": log.created_at,
+            "actor_name": actor_name,
+        }
         logs.append(log_dict)
 
     return {
@@ -212,27 +240,55 @@ def get_timeline(db: Session, actor_id: int, page: int = 1, page_size: int = 50)
 
 
 def get_summary_stats(db: Session) -> Dict[str, Any]:
-    from sqlalchemy import func, case
+    from sqlalchemy import func, case, Date, cast
     from datetime import datetime, timedelta
     
     now = datetime.utcnow()
     yesterday = now - timedelta(days=1)
     last_week = now - timedelta(days=7)
+    last_30d = now - timedelta(days=30)
     
-    # 1. Single aggregate query for total, today, and weekly counts
+    # 1. Aggregate query for total, today, weekly, and 30-day counts
     stats = db.query(
         func.count(AuditLog.id).label("total"),
         func.sum(case((AuditLog.created_at >= yesterday, 1), else_=0)).label("today"),
-        func.sum(case((AuditLog.created_at >= last_week, 1), else_=0)).label("week")
+        func.sum(case((AuditLog.created_at >= last_week, 1), else_=0)).label("week"),
+        func.sum(case((AuditLog.created_at >= last_30d, 1), else_=0)).label("total_30d"),
+        func.count(func.distinct(case((AuditLog.created_at >= last_30d, AuditLog.actor_id), else_=None))).label("active_users_30d")
     ).first()
     
     total_events = int(stats.total or 0)
     today_events = int(stats.today or 0)
     week_events = int(stats.week or 0)
+    total_logs_30d = int(stats.total_30d or 0)
+    active_users_30d = int(stats.active_users_30d or 0)
     
-    # 2. Category counts in one query (helps avoid separate DB calls for AUTH/ORDER/POLICY/REFUND counts)
+    # 2. Critical actions in last 30 days
+    critical_action_names = [
+        AuditAction.LOGIN_FAILED,
+        AuditAction.USER_BLOCKED,
+        AuditAction.USER_ROLE_CHANGED,
+        AuditAction.VENDOR_SUSPENDED,
+        AuditAction.VENDOR_REJECTED,
+        AuditAction.ORDER_CANCELLED,
+        AuditAction.MAINTENANCE_MODE_CHANGED,
+        "security.target_blocked",
+        "emergency.shutdown_enabled",
+    ]
+    critical_actions_30d = db.query(func.count(AuditLog.id)).filter(
+        AuditLog.created_at >= last_30d,
+        AuditLog.action.in_(critical_action_names)
+    ).scalar() or 0
+    
+    # 3. Category counts
     category_counts_rows = db.query(AuditLog.action_category, func.count(AuditLog.id)).group_by(AuditLog.action_category).all()
-    category_counts = {c[0]: c[1] for c in category_counts_rows}
+    category_counts = {str(c[0]): int(c[1]) for c in category_counts_rows if c[0]}
+    
+    # Category counts for 30d (for actions_by_category)
+    cat_30d_rows = db.query(AuditLog.action_category, func.count(AuditLog.id)).filter(AuditLog.created_at >= last_30d).group_by(AuditLog.action_category).all()
+    actions_by_category = {str(c[0]): int(c[1]) for c in cat_30d_rows if c[0]}
+    if not actions_by_category and category_counts:
+        actions_by_category = dict(category_counts)
     
     auth_events = category_counts.get(AuditCategory.AUTH, 0)
     order_events = category_counts.get(AuditCategory.ORDER, 0)
@@ -244,9 +300,24 @@ def get_summary_stats(db: Session) -> Dict[str, Any]:
     ).outerjoin(User, AuditLog.actor_id == User.id).group_by(AuditLog.actor_id, User.full_name).order_by(desc("event_count")).limit(5).all()
     
     top_actors = [
-        {"actor_id": r[0], "actor_name": r[1] or "System", "event_count": r[2]}
+        {"actor_id": r[0], "actor_name": r[1] or "System", "event_count": int(r[2])}
         for r in top_actors_query
     ]
+    
+    # 4. Daily trend for last 30 days
+    day_counts_raw = db.query(
+        cast(AuditLog.created_at, Date).label("d"),
+        func.count(AuditLog.id).label("cnt")
+    ).filter(AuditLog.created_at >= last_30d).group_by(cast(AuditLog.created_at, Date)).all()
+    day_counts_map = {str(r[0]): int(r[1]) for r in day_counts_raw if r[0]}
+    
+    actions_by_day = []
+    for i in range(29, -1, -1):
+        day_date = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+        actions_by_day.append({
+            "date": day_date,
+            "count": day_counts_map.get(day_date, 0)
+        })
     
     return {
         "total_events": total_events,
@@ -257,4 +328,9 @@ def get_summary_stats(db: Session) -> Dict[str, Any]:
         "flagged_events": flagged_events,
         "category_counts": category_counts,
         "top_actors": top_actors,
+        "total_logs_30d": total_logs_30d,
+        "active_users_30d": active_users_30d,
+        "critical_actions_30d": int(critical_actions_30d),
+        "actions_by_category": actions_by_category,
+        "actions_by_day": actions_by_day,
     }

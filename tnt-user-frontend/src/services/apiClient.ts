@@ -43,6 +43,9 @@ export function resetUnauthorizedState(): void {
 }
 
 apiClient.interceptors.request.use(async (config) => {
+  if (config.url?.startsWith('/v1/')) {
+    config.url = config.url.substring(3);
+  }
   const token = await getItem(STORAGE_KEYS.accessToken);
   if (token) {
     config.headers = config.headers ?? {};

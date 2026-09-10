@@ -19,7 +19,7 @@ class MenuItem(Base):
     
     # Food-specific fields
     prep_time_minutes = Column(Integer, nullable=True)  # preparation time
-    available_quantity = Column(Integer, nullable=True, default=0)  # stock count
+    available_quantity = Column(Integer, nullable=True, default=None)  # stock count; None = unlimited
     is_veg = Column(Boolean, default=True, nullable=True)  # vegetarian flag
     
     # Category: "food" or "stationery"

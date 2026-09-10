@@ -390,7 +390,7 @@ def get_user_rewards(
     if not db_caller:
         raise HTTPException(status_code=404, detail="Authenticated user not found")
 
-    allowed_roles = {"vendor", "admin", "superadmin"}
+    allowed_roles = {"vendor", "admin", "super_admin"}
     caller_role = db_caller.role.value if hasattr(db_caller.role, "value") else str(db_caller.role)
     if db_caller.id != user_id and caller_role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Cannot view another user's rewards")

@@ -346,7 +346,6 @@ from app.modules.recommendations.prediction_router import router as prediction_r
 from app.modules.search.router import router as search_router
 from app.ml.router import router as ml_router
 
-app.include_router(api_v1_router)
 app.include_router(auth_router, deprecated=True)
 app.include_router(fraud_router, deprecated=True)
 app.include_router(backup_router, deprecated=True)

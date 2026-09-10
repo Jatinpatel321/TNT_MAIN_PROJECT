@@ -1,11 +1,11 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import type { AppTabsParamList } from '../types/navigation';
 
 import { HomeScreen } from '../screens/HomeScreen';
-import { OrdersScreen } from '../screens/OrdersScreen';
+import { OrdersScreen } from '../screens/orders/OrdersScreen';
 import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { getNotifications } from '../services/notificationService';

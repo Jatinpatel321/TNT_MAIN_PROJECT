@@ -207,7 +207,7 @@ def verify_payment(
         hashlib.sha256
     ).hexdigest()
 
-    if expected_signature != razorpay_signature:
+    if not hmac.compare_digest(expected_signature, razorpay_signature or ""):
         payment.status = PaymentStatus.FAILED
         observability.record_payment_failure()
         # Raise HTTPException — decorator commits the FAILED status before propagating.
@@ -235,26 +235,43 @@ def refund_payment(payment_id: int, user: dict, db):
 
     role = (user.get("role") or "").lower()
     is_admin = role in {"admin", "super_admin"}
-    if not is_admin and owner_user_id != user.get("id"):
-        raise HTTPException(status_code=403, detail="Not authorized to refund this payment")
+    if not is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Direct refund execution is restricted to administrators. Customers must submit a refund request.",
+        )
+
+    if payment.status == PaymentStatus.REFUNDED:
+        raise HTTPException(status_code=400, detail="Payment has already been refunded")
 
     if payment.status != PaymentStatus.SUCCESS:
         raise HTTPException(
             status_code=400,
-            detail="Only successful payments can be refunded"
+            detail="Only successful payments can be refunded",
         )
 
-    # 🔁 Razorpay refund
+    # ── Pre-check linked order state BEFORE initiating gateway transaction ──
+    order = None
+    if payment.order_id is not None:
+        order = db.query(Order).filter(Order.id == payment.order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail="Linked order not found")
+
+    # 🔁 Razorpay refund via gateway client
     from app.core.money import to_paise
-    refund = client.payment.refund(
-        payment.razorpay_payment_id,
-        {
-            "amount": to_paise(payment.amount)  # Razorpay refunds in paise
-        }
-    )
+    try:
+        refund = client.payment.refund(
+            payment.razorpay_payment_id,
+            {
+                "amount": to_paise(payment.amount)  # Razorpay refunds in paise
+            }
+        )
+    except Exception as e:
+        observability.record_exception(e)
+        raise HTTPException(status_code=502, detail=f"Payment gateway refund failed: {str(e)}")
 
     payment.status = PaymentStatus.REFUNDED
-    payment.razorpay_refund_id = refund["id"]
+    payment.razorpay_refund_id = refund.get("id") if isinstance(refund, dict) else str(refund)
     payment.refunded_at = utcnow_naive()
 
     # Auto refund ETA — estimate when the money actually reaches the customer.
@@ -264,15 +281,15 @@ def refund_payment(payment_id: int, user: dict, db):
     payment.refund_status = RefundStatus.PROCESSING.value
     payment.estimated_refund_at = _eta["estimated_completion_at"]
 
-    # Cancel the linked entity and notify owner
-    if payment.order_id is not None:
-        order = db.query(Order).filter(Order.id == payment.order_id).first()
-        if order:
-            from app.modules.orders.service import update_order_status
+    # Transition order state safely without corrupting terminal states
+    if payment.order_id is not None and order:
+        from app.modules.orders.service import update_order_status
+        # If order is not completed/cancelled, transition to CANCELLED cleanly
+        if order.status not in {OrderStatus.COMPLETED, OrderStatus.CANCELLED}:
             try:
-                update_order_status(order, OrderStatus.CANCELLED, "system", db, note="Refund issued")
-            except Exception:
-                order.status = OrderStatus.CANCELLED
+                update_order_status(order, OrderStatus.CANCELLED, "admin", db, note="Refund issued by admin")
+            except Exception as ex:
+                observability.record_exception(ex)
 
         add_ledger_entry(
             order_id=payment.order_id,
@@ -376,8 +393,7 @@ def get_refund_status(order_id: int, user: dict, db: Session) -> dict:
 
     from app.modules.ai_intelligence.planners.refund_eta_engine import RefundETAEngine
     engine = RefundETAEngine(db)
-    prog = engine.progress(payment)  # may mutate payment.refund_status
-    db.commit()
+    prog = engine.progress(payment)
 
     return {
         "order_id": order_id,

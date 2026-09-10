@@ -52,6 +52,7 @@ class AuditStatsResponse(BaseModel):
     active_users_30d: int = 0
     critical_actions_30d: int = 0
     actions_by_category: Dict[str, int] = {}
+    actions_by_day: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AuditTimelineResponse(BaseModel):

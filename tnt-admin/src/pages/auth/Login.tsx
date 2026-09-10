@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/authStore';
 import type { AdminUser } from '../../types';
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, type MotionValue } from 'framer-motion';
 
 // Outline SVG Illustration Components
 const BurgerIcon = () => (
@@ -195,6 +195,118 @@ interface VerifyOtpResponse {
   [key: string]: unknown;
 }
 
+/** Parallax illustration item — extracted so useTransform is at component top-level. */
+function ParallaxIllustration({ item, idx, mouseX, mouseY }: {
+  item: { icon: React.FC; colorClass: string; scale: number; rotation: number; left?: string; top?: string; right?: string; bottom?: string; responsiveClass: string };
+  idx: number;
+  mouseX: MotionValue<number>;
+  mouseY: MotionValue<number>;
+}) {
+  const weightX = ((idx % 3) - 1) * 8;
+  const weightY = (idx % 2 === 0 ? 1 : -1) * 6;
+  const weightRot = ((idx % 4) - 1.5) * 1.2;
+
+  const parallaxX = useTransform(mouseX, [-0.5, 0.5], [-weightX, weightX]);
+  const parallaxY = useTransform(mouseY, [-0.5, 0.5], [-weightY, weightY]);
+  const parallaxRot = useTransform(mouseX, [-0.5, 0.5], [-weightRot, weightRot]);
+
+  return (
+    <motion.div
+      className={`${item.responsiveClass} absolute pointer-events-none`}
+      style={{
+        left: item.left,
+        top: item.top,
+        right: item.right,
+        bottom: (item as any).bottom,
+        width: item.scale,
+        height: item.scale,
+        x: parallaxX,
+        y: parallaxY,
+        rotate: parallaxRot,
+      }}
+    >
+      <motion.div
+        className={item.colorClass}
+        style={{ width: '100%', height: '100%' }}
+        animate={{
+          y: [0, idx % 2 === 0 ? 5 : -5, 0],
+          rotate: [item.rotation, item.rotation + (idx % 3 === 0 ? 1.5 : -1.5), item.rotation],
+          opacity: [0.07, 0.11, 0.07],
+        }}
+        transition={{
+          duration: 11 + ((idx * 2) % 8),
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: (idx * 0.5) % 5,
+        }}
+      >
+        <item.icon />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** Parallax background detail — extracted so useTransform is at component top-level. */
+function ParallaxDetail({ item, idx, mouseX, mouseY }: {
+  item: { type: string; left?: string; top?: string; right?: string; bottom?: string; size: number };
+  idx: number;
+  mouseX: MotionValue<number>;
+  mouseY: MotionValue<number>;
+}) {
+  const weightX = (idx % 2 === 0 ? 4 : -4);
+  const weightY = (idx % 3 === 0 ? 3 : -3);
+
+  const parallaxX = useTransform(mouseX, [-0.5, 0.5], [-weightX, weightX]);
+  const parallaxY = useTransform(mouseY, [-0.5, 0.5], [-weightY, weightY]);
+
+  return (
+    <motion.div
+      className="absolute pointer-events-none"
+      style={{
+        left: item.left,
+        top: item.top,
+        right: item.right,
+        bottom: item.bottom,
+        width: item.size,
+        height: item.size,
+        x: parallaxX,
+        y: parallaxY,
+      }}
+    >
+      <motion.div
+        className={idx % 2 === 0 ? 'text-[#4F46E5]' : 'text-[#E85D24]'}
+        style={{ width: '100%', height: '100%' }}
+        animate={{
+          opacity: [0.04, 0.08, 0.04],
+          scale: [0.96, 1.04, 0.96],
+        }}
+        transition={{
+          duration: 9 + ((idx * 1.5) % 6),
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: (idx * 0.4) % 3,
+        }}
+      >
+        {item.type === 'plus' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+          </svg>
+        )}
+        {item.type === 'circle' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+        )}
+        {item.type === 'sparkle' && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M12 3c0 4.5 1.5 6 6 6-4.5 0-6 1.5-6 6 0-4.5-1.5-6-6-6 4.5 0 6-1.5 6-6z" strokeLinejoin="round" />
+          </svg>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const { setAuth, isAuthenticated, token, user } = useAuthStore();
@@ -222,6 +334,10 @@ export default function Login() {
 
   const bgX = useSpring(useTransform(mouseX, [-0.5, 0.5], [15, -15]), springConfig);
   const bgY = useSpring(useTransform(mouseY, [-0.5, 0.5], [15, -15]), springConfig);
+
+  // Hoisted from inline JSX to satisfy Rules of Hooks
+  const negBgX = useTransform(bgX, (v) => -v);
+  const negBgY = useTransform(bgY, (v) => -v);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -404,11 +520,12 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await authApi.verifyAdmin2fa(code, pendingAuth.token);
+      const res = await authApi.verifyAdmin2fa(code, pendingAuth.token);
 
-      // 2FA passed — complete authentication and route to dashboard
+      // 2FA passed — complete authentication with new privileged token and route to dashboard
+      const finalizedToken = res.data?.access_token || pendingAuth.token;
       setIsSuccess(true);
-      setAuth(pendingAuth.token, pendingAuth.user);
+      setAuth(finalizedToken, pendingAuth.user);
       setPendingAuth(null);
       toast.success(`Welcome back, ${pendingAuth.user.name}!`);
       setTimeout(() => {
@@ -548,7 +665,7 @@ export default function Login() {
 
         {/* Circle 2 - Orange */}
         <motion.div
-          style={{ x: useTransform(bgX, (v) => -v), y: useTransform(bgY, (v) => -v) }}
+          style={{ x: negBgX, y: negBgY }}
           className="absolute bottom-1/4 right-1/4 w-[32rem] h-[32rem] bg-orange-100 rounded-full blur-3xl opacity-45 animate-float-reverse"
         />
 
@@ -586,109 +703,14 @@ export default function Login() {
       <BottomWaves />
 
       {/* Scattered Outline Illustrations */}
-      {illustrations.map((item, idx) => {
-        // Individual parallax translation values based on index
-        const weightX = ((idx % 3) - 1) * 8; // -8px to 8px max offset
-        const weightY = (idx % 2 === 0 ? 1 : -1) * 6;
-        const weightRot = ((idx % 4) - 1.5) * 1.2; // -1.8deg to 1.8deg max rotation
-
-        const parallaxX = useTransform(mouseX, [-0.5, 0.5], [-weightX, weightX]);
-        const parallaxY = useTransform(mouseY, [-0.5, 0.5], [-weightY, weightY]);
-        const parallaxRot = useTransform(mouseX, [-0.5, 0.5], [-weightRot, weightRot]);
-
-        return (
-          <motion.div
-            key={`illus-${idx}`}
-            className={`${item.responsiveClass} absolute pointer-events-none`}
-            style={{
-              left: item.left,
-              top: item.top,
-              right: item.right,
-              bottom: (item as any).bottom,
-              width: item.scale,
-              height: item.scale,
-              x: parallaxX,
-              y: parallaxY,
-              rotate: parallaxRot,
-            }}
-          >
-            <motion.div
-              className={item.colorClass}
-              style={{ width: '100%', height: '100%' }}
-              animate={{
-                y: [0, idx % 2 === 0 ? 5 : -5, 0],
-                rotate: [item.rotation, item.rotation + (idx % 3 === 0 ? 1.5 : -1.5), item.rotation],
-                opacity: [0.07, 0.11, 0.07],
-              }}
-              transition={{
-                duration: 11 + ((idx * 2) % 8), // 11-19s
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: (idx * 0.5) % 5,
-              }}
-            >
-              <item.icon />
-            </motion.div>
-          </motion.div>
-        );
-      })}
+      {illustrations.map((item, idx) => (
+        <ParallaxIllustration key={`illus-${idx}`} item={item} idx={idx} mouseX={mouseX} mouseY={mouseY} />
+      ))}
 
       {/* Tiny geometric details (plus, circles, sparkles) scattered */}
-      {backgroundDetails.map((item, idx) => {
-        const weightX = (idx % 2 === 0 ? 4 : -4);
-        const weightY = (idx % 3 === 0 ? 3 : -3);
-
-        const parallaxX = useTransform(mouseX, [-0.5, 0.5], [-weightX, weightX]);
-        const parallaxY = useTransform(mouseY, [-0.5, 0.5], [-weightY, weightY]);
-
-        return (
-          <motion.div
-            key={`detail-${idx}`}
-            className="absolute pointer-events-none"
-            style={{
-              left: item.left,
-              top: item.top,
-              right: item.right,
-              bottom: item.bottom,
-              width: item.size,
-              height: item.size,
-              x: parallaxX,
-              y: parallaxY,
-            }}
-          >
-            <motion.div
-              className={idx % 2 === 0 ? 'text-[#4F46E5]' : 'text-[#E85D24]'}
-              style={{ width: '100%', height: '100%' }}
-              animate={{
-                opacity: [0.04, 0.08, 0.04],
-                scale: [0.96, 1.04, 0.96],
-              }}
-              transition={{
-                duration: 9 + ((idx * 1.5) % 6), // 9-15s
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: (idx * 0.4) % 3,
-              }}
-            >
-              {item.type === 'plus' && (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-                </svg>
-              )}
-              {item.type === 'circle' && (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <circle cx="12" cy="12" r="8" />
-                </svg>
-              )}
-              {item.type === 'sparkle' && (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M12 3c0 4.5 1.5 6 6 6-4.5 0-6 1.5-6 6 0-4.5-1.5-6-6-6 4.5 0 6-1.5 6-6z" strokeLinejoin="round" />
-                </svg>
-              )}
-            </motion.div>
-          </motion.div>
-        );
-      })}
+      {backgroundDetails.map((item, idx) => (
+        <ParallaxDetail key={`detail-${idx}`} item={item} idx={idx} mouseX={mouseX} mouseY={mouseY} />
+      ))}
 
       <motion.div
         initial="hidden"

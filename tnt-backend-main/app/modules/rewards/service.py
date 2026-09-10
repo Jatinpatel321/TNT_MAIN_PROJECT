@@ -37,78 +37,90 @@ def get_or_create_reward_points(user_id: int, db: Session) -> RewardPoints:
 
 def award_points(user_id: int, reward_type: RewardType, points: float, description: str, order_id: int = None, db: Session = None):
     """Award points to user"""
+    close_db = False
     if db is None:
-        from app.database.session import get_db
-        db = next(get_db())
+        from app.database.session import SessionLocal
+        db = SessionLocal()
+        close_db = True
 
-    # Create transaction record
-    transaction = RewardTransaction(
-        user_id=user_id,
-        reward_type=reward_type,
-        points=points,
-        description=description,
-        order_id=order_id
-    )
-    db.add(transaction)
+    try:
+        # Create transaction record
+        transaction = RewardTransaction(
+            user_id=user_id,
+            reward_type=reward_type,
+            points=points,
+            description=description,
+            order_id=order_id
+        )
+        db.add(transaction)
 
-    # Update points balance
-    reward_points = get_or_create_reward_points(user_id, db)
-    reward_points.points += points
-    reward_points.total_earned += points
+        # Update points balance
+        reward_points = get_or_create_reward_points(user_id, db)
+        reward_points.points += points
+        reward_points.total_earned += points
 
-    db.commit()
+        db.commit()
+    finally:
+        if close_db:
+            db.close()
 
 
 def redeem_points(user_id: int, redemption_type: RedemptionType, points_used: float, value: float, order_id: int = None, db: Session = None):
     """Redeem points for discount/benefit"""
+    close_db = False
     if db is None:
-        from app.database.session import get_db
-        db = next(get_db())
+        from app.database.session import SessionLocal
+        db = SessionLocal()
+        close_db = True
 
-    # Check if user has enough points
-    reward_points = get_or_create_reward_points(user_id, db)
-    if reward_points.points < points_used:
-        raise ValueError("Insufficient points")
+    try:
+        # Check if user has enough points
+        reward_points = get_or_create_reward_points(user_id, db)
+        if reward_points.points < points_used:
+            raise ValueError("Insufficient points")
 
-    # Validate redemption rules
-    rule = db.query(RedemptionRule).filter(
-        and_(RedemptionRule.redemption_type == redemption_type, RedemptionRule.is_active == 1)
-    ).first()
+        # Validate redemption rules
+        rule = db.query(RedemptionRule).filter(
+            and_(RedemptionRule.redemption_type == redemption_type, RedemptionRule.is_active == 1)
+        ).first()
 
-    if not rule:
-        raise ValueError("Redemption type not available")
+        if not rule:
+            raise ValueError("Redemption type not available")
 
-    if points_used < rule.min_points:
-        raise ValueError(f"Minimum {rule.min_points} points required")
+        if points_used < rule.min_points:
+            raise ValueError(f"Minimum {rule.min_points} points required")
 
-    # For percentage discounts, validate max percentage
-    if redemption_type == RedemptionType.DISCOUNT_PERCENTAGE and rule.max_discount_percentage:
-        if value > rule.max_discount_percentage:
-            raise ValueError(f"Maximum discount percentage is {rule.max_discount_percentage}%")
+        # For percentage discounts, validate max percentage
+        if redemption_type == RedemptionType.DISCOUNT_PERCENTAGE and rule.max_discount_percentage:
+            if value > rule.max_discount_percentage:
+                raise ValueError(f"Maximum discount percentage is {rule.max_discount_percentage}%")
 
-    # For fixed discounts, validate max amount
-    if redemption_type == RedemptionType.DISCOUNT_FIXED and rule.max_discount_amount:
-        if value > rule.max_discount_amount:
-            raise ValueError(f"Maximum discount amount is ₹{rule.max_discount_amount}")
+        # For fixed discounts, validate max amount
+        if redemption_type == RedemptionType.DISCOUNT_FIXED and rule.max_discount_amount:
+            if value > rule.max_discount_amount:
+                raise ValueError(f"Maximum discount amount is ₹{rule.max_discount_amount}")
 
-    # Create redemption record
-    redemption = RewardRedemption(
-        user_id=user_id,
-        redemption_type=redemption_type,
-        points_used=points_used,
-        value=value,
-        description=f"Redeemed {points_used} points for {redemption_type.value}",
-        order_id=order_id
-    )
-    db.add(redemption)
+        # Create redemption record
+        redemption = RewardRedemption(
+            user_id=user_id,
+            redemption_type=redemption_type,
+            points_used=points_used,
+            value=value,
+            description=f"Redeemed {points_used} points for {redemption_type.value}",
+            order_id=order_id
+        )
+        db.add(redemption)
 
-    # Update points balance
-    reward_points.points -= points_used
-    reward_points.total_redeemed += points_used
+        # Update points balance
+        reward_points.points -= points_used
+        reward_points.total_redeemed += points_used
 
-    db.commit()
-    db.refresh(redemption)
-    return redemption
+        db.commit()
+        db.refresh(redemption)
+        return redemption
+    finally:
+        if close_db:
+            db.close()
 
 
 def get_user_points(user_id: int, db: Session):

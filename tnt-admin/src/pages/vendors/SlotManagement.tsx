@@ -72,10 +72,6 @@ export default function SlotManagementPage() {
     peak_capacity: undefined as number | undefined,
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     try {
       const [slotsRes, analyticsRes, rulesRes, capacityRes] = await Promise.all([
@@ -94,6 +90,10 @@ export default function SlotManagementPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -255,7 +255,7 @@ def get_vendor_orders(
         raise HTTPException(status_code=404, detail="User not found")
 
     effective_vendor_id = db_user.id
-    if vendor_id is not None and db_user.role.value in ("admin", "superadmin"):
+    if vendor_id is not None and db_user.role.value in ("admin", "super_admin"):
         effective_vendor_id = vendor_id
 
     query = db.query(Order).filter(Order.vendor_id == effective_vendor_id).order_by(Order.created_at.desc())

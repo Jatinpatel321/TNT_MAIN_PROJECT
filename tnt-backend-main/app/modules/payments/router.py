@@ -31,10 +31,17 @@ def mock_payment(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Dev-only mock payment gateway.  Always succeeds.
+    """Dev/test mock payment gateway. Disabled in production.
     Accepts method = 'UPI' | 'CARD' | 'WALLET'.
-    Updates Payment → SUCCESS and Order → CONFIRMED, then emits a Notification.
+    Enforces valid order states and delegates to the unified payment finalizer.
     """
+    from app.core.config import settings
+    if settings.APP_ENV == "production":
+        raise HTTPException(
+            status_code=404,
+            detail="Mock payment endpoint is disabled in production environment.",
+        )
+
     # Per-user rate limit: 10 payment attempts per 5 minutes per user
     check_rate_limit(
         key=f"payment:user:{user['id']}",
@@ -52,6 +59,31 @@ def mock_payment(
     if order.user_id != user["id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
+    # Invariant: Order must be in PENDING state to receive payment
+    if order.status != OrderStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Order cannot be paid for in current status '{order.status.value}'",
+        )
+
+    from decimal import Decimal
+    expected_amount = Decimal(str(order.total_amount or 0))
+    if expected_amount <= 0:
+        raise HTTPException(status_code=400, detail="Order amount is invalid")
+
+    if payload.amount is not None:
+        supplied_amount = Decimal(str(payload.amount))
+        if supplied_amount <= 0:
+            raise HTTPException(status_code=400, detail="Payment amount must be positive")
+        if supplied_amount < expected_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Supplied amount ₹{supplied_amount:.2f} is less than required total ₹{expected_amount:.2f}",
+            )
+        amount = supplied_amount
+    else:
+        amount = expected_amount
+
     payment = (
         db.query(Payment)
         .filter(Payment.order_id == payload.order_id)
@@ -59,32 +91,25 @@ def mock_payment(
         .first()
     )
 
-    from decimal import Decimal
-    amount = Decimal(str(payload.amount)) if payload.amount else Decimal(str(order.total_amount or 0))
     mock_payment_id = f"mock_pay_{uuid.uuid4().hex[:16]}"
 
     if payment:
-        payment.status = PaymentStatus.SUCCESS
+        payment.amount = amount
         payment.razorpay_payment_id = mock_payment_id
     else:
         payment = Payment(
             order_id=payload.order_id,
             amount=amount,
-            status=PaymentStatus.SUCCESS,
+            status=PaymentStatus.INITIATED,
             razorpay_payment_id=mock_payment_id,
             idempotency_key=f"mock_{payload.order_id}_{uuid.uuid4().hex[:8]}",
         )
         db.add(payment)
+        db.flush()
 
-    order.status = OrderStatus.CONFIRMED
-
-    notification = Notification(
-        user_id=user["id"],
-        title="Payment Successful 🎉",
-        message=f"₹{amount:.2f} paid via {method}. Order #{payload.order_id} is confirmed!",
-        is_read=False,
-    )
-    db.add(notification)
+    # Unified payment pipeline: handles ledger credit, notifications, websockets, and status update
+    from app.modules.payments.service import finalize_payment
+    finalize_payment(payment, order, db)
     db.commit()
     db.refresh(payment)
 

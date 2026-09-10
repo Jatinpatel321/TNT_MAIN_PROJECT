@@ -23,6 +23,7 @@ class CampaignStatus(enum.Enum):
     PAUSED = "paused"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    INACTIVE = "paused"
 
 
 class DiscountCampaign(Base):

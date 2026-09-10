@@ -42,11 +42,15 @@ def list_users(
     # --- Role-based summary counts ---
     role_counts = (
         db.query(User.role, func.count(User.id))
-        .filter(*_build_filters(search, role, is_active))
+        .filter(*_build_filters(search, None, is_active))
         .group_by(User.role)
         .all()
     )
-    role_summary = {str(r): c for r, c in role_counts}
+    role_summary = {
+        (r.value if hasattr(r, "value") else str(r)): c
+        for r, c in role_counts
+        if r is not None
+    }
 
     # --- Pagination ---
     offset = (page - 1) * page_size
@@ -57,8 +61,21 @@ def list_users(
         .all()
     )
 
+    user_list = [
+        {
+            "id": u.id,
+            "name": u.name,
+            "full_name": u.full_name,
+            "phone": u.phone or "",
+            "role": u.role.value if hasattr(u.role, "value") else str(u.role or ""),
+            "is_active": bool(u.is_active),
+            "created_at": u.created_at,
+        }
+        for u in users
+    ]
+
     return {
-        "users": users,
+        "users": user_list,
         "total": total,
         "page": page,
         "page_size": page_size,

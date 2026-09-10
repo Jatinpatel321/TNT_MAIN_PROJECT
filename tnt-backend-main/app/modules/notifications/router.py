@@ -239,7 +239,7 @@ def get_notifications_by_user_id(
     user=Depends(get_current_user),
 ):
     db_caller = _resolve_db_user(user, db)
-    allowed_roles = {"vendor", "admin", "superadmin"}
+    allowed_roles = {"vendor", "admin", "super_admin"}
     caller_role = db_caller.role.value if hasattr(db_caller.role, "value") else str(db_caller.role)
     if db_caller.id != user_id and caller_role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Cannot view another user's notifications")

@@ -164,3 +164,16 @@ uploads/
 *.pem
 *.cert
 *.secret
+
+# Scratch and runtime cache
+RKStorage
+**/RKStorage
+*_report.txt
+**/*_report.txt
+routes_dump.json
+*.png.tmp
+device_screenshot.png
+test_screen.png
+user_app_preview.png
+vendor_clean_preview.png
+vendor_screen.png

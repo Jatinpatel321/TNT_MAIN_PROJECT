@@ -2,7 +2,11 @@ import axios from 'axios';
 import { AUTH_STORAGE_KEY, useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? `http://${window.location.hostname}:8000`
+    : 'http://localhost:8000');
 let redirectingToLogin = false;
 
 const api = axios.create({
@@ -18,6 +22,7 @@ api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().token;
     if (token) {
+      redirectingToLogin = false;
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -47,6 +52,9 @@ api.interceptors.response.use(
       if (window.location.pathname !== '/login' && !redirectingToLogin) {
         redirectingToLogin = true;
         window.location.replace('/login');
+        setTimeout(() => {
+          redirectingToLogin = false;
+        }, 2000);
       }
 
       return Promise.reject(error);
@@ -68,11 +76,26 @@ api.interceptors.response.use(
     }
 
     // Generic error with backend message
-    const message = error.response?.data?.detail || error.response?.data?.message || 'Something went wrong';
+    const rawDetail = error.response?.data?.detail;
+    let message = 'Something went wrong';
+    if (typeof rawDetail === 'string') {
+      message = rawDetail;
+    } else if (Array.isArray(rawDetail)) {
+      message = rawDetail.map((d: any) => (typeof d === 'string' ? d : d.msg || JSON.stringify(d))).join('; ');
+    } else if (typeof rawDetail === 'object' && rawDetail !== null) {
+      message = (rawDetail as any).msg || (rawDetail as any).message || JSON.stringify(rawDetail);
+    } else if (typeof error.response?.data?.message === 'string') {
+      message = error.response.data.message;
+    }
+
     toast.error(message, { id: `error-${status}` });
 
     return Promise.reject(error);
   }
 );
+
+export const resetLoginRedirect = () => {
+  redirectingToLogin = false;
+};
 
 export default api;

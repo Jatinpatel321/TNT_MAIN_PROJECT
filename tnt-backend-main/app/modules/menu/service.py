@@ -28,7 +28,7 @@ def create_menu_item(db: Session, vendor_id: int, data: MenuItemCreate) -> MenuI
         image_url=data.image_url,
         category=data.category,
         prep_time_minutes=data.prep_time_minutes,
-        available_quantity=data.available_quantity or 0,
+        available_quantity=data.available_quantity,  # None = unlimited stock
         is_available=True
     )
     db.add(item)

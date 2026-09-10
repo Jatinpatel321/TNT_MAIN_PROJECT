@@ -16,13 +16,19 @@ Integrates with existing Razorpay implementation.
 
 from __future__ import annotations
 
+from decimal import Decimal
+import hashlib
+import hmac
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
+from app.core.money import to_paise
+from app.core.razorpay_client import client
 from app.core.time_utils import utcnow_naive
 from app.modules.group_cart.model import (
     Group,
@@ -110,51 +116,68 @@ class GroupPaymentService:
                     "split_type": "CUSTOM",
                 })
 
-        elif split_type == PaymentSplitType.PERCENTAGE:
+        elif split_type == PaymentSplitType.PERCENTAGE or str(split_type).lower() in {"percentage", "paymentsplittype.percentage"}:
             # Percentage-based split
-            # Get existing percentage splits from database
-            existing_splits = (
-                self.db.query(GroupPaymentSplit)
-                .filter(GroupPaymentSplit.group_id == group_id)
-                .all()
-            )
-
-            if not existing_splits:
-                # Default to equal percentages
-                per_member_pct = 100.0 / member_count
-                for member in members:
-                    splits.append({
-                        "user_id": member.user_id,
-                        "user_name": member.user.name if member.user else "Unknown",
-                        "amount": round(total_amount * per_member_pct / 100, 2),
-                        "percentage": round(per_member_pct, 2),
-                        "split_type": "PERCENTAGE",
-                    })
-            else:
-                # Use stored percentages
-                total_pct = sum(s.percentage or 0 for s in existing_splits)
+            if custom_splits:
+                total_pct = sum(custom_splits.values())
                 if abs(total_pct - 100.0) > 0.01:
                     return {
                         "error": f"Percentage splits total ({total_pct}%) doesn't equal 100%"
                     }
+                for member in members:
+                    pct = float(custom_splits.get(member.user_id, 0.0))
+                    amount = round(total_amount * pct / 100.0, 2)
+                    splits.append({
+                        "user_id": member.user_id,
+                        "user_name": member.user.name if member.user else "Unknown",
+                        "amount": amount,
+                        "percentage": round(pct, 2),
+                        "split_type": "PERCENTAGE",
+                    })
+            else:
+                existing_splits = (
+                    self.db.query(GroupPaymentSplit)
+                    .filter(GroupPaymentSplit.group_id == group_id)
+                    .all()
+                )
 
-                for split in existing_splits:
-                    member = next((m for m in members if m.user_id == split.user_id), None)
-                    if member:
-                        amount = total_amount * (split.percentage or 0) / 100
+                if not existing_splits:
+                    # Default to equal percentages
+                    per_member_pct = 100.0 / member_count
+                    for member in members:
                         splits.append({
-                            "user_id": split.user_id,
+                            "user_id": member.user_id,
                             "user_name": member.user.name if member.user else "Unknown",
-                            "amount": round(amount, 2),
-                            "percentage": round(split.percentage or 0, 2),
+                            "amount": round(total_amount * per_member_pct / 100.0, 2),
+                            "percentage": round(per_member_pct, 2),
                             "split_type": "PERCENTAGE",
                         })
+                else:
+                    # Use stored percentages
+                    total_pct = sum(float(s.percentage or 0) for s in existing_splits)
+                    if abs(total_pct - 100.0) > 0.01:
+                        return {
+                            "error": f"Percentage splits total ({total_pct}%) doesn't equal 100%"
+                        }
 
+                    for split in existing_splits:
+                        member = next((m for m in members if m.user_id == split.user_id), None)
+                        if member:
+                            amount = total_amount * float(split.percentage or 0) / 100.0
+                            splits.append({
+                                "user_id": split.user_id,
+                                "user_name": member.user.name if member.user else "Unknown",
+                                "amount": round(amount, 2),
+                                "percentage": round(float(split.percentage or 0), 2),
+                                "split_type": "PERCENTAGE",
+                            })
+
+        split_type_str = split_type.value if hasattr(split_type, "value") else str(split_type)
         return {
             "group_id": group_id,
             "splits": splits,
             "total_amount": total_amount,
-            "split_type": split_type.value,
+            "split_type": split_type_str,
             "member_count": member_count,
         }
 
@@ -216,8 +239,13 @@ class GroupPaymentService:
             self.db.refresh(split)
 
         # Update split with payment info
-        split.amount_paid = (split.amount_paid or 0) + amount
-        split.payment_status = "PAID" if split.amount_paid >= (split.amount or 0) else "PARTIAL"
+        amount_dec = Decimal(str(round(amount, 2)))
+        curr_paid = Decimal(str(split.amount_paid or 0))
+        target_amount = Decimal(str(split.amount or 0))
+        new_paid = curr_paid + amount_dec
+
+        split.amount_paid = new_paid
+        split.payment_status = "PAID" if (new_paid >= target_amount and target_amount > 0) or (new_paid > 0 and target_amount == 0) else "PARTIAL"
         split.paid_at = utcnow_naive()
         split.payment_method = payment_method
         split.razorpay_payment_id = razorpay_payment_id
@@ -232,19 +260,22 @@ class GroupPaymentService:
             publish_group_event(group_id, "payment_recorded", {
                 "user_id": user_id,
                 "payment_status": split.payment_status,
-                "amount_paid": round(split.amount_paid, 2),
+                "amount_paid": round(float(split.amount_paid), 2),
             })
         except Exception:
             pass
 
+        paid_float = round(float(split.amount_paid), 2)
+        due_float = round(max(0.0, float(target_amount) - paid_float), 2)
+
         return {
             "group_id": group_id,
             "user_id": user_id,
-            "amount_paid": round(split.amount_paid, 2),
-            "amount_due": round((split.amount or 0) - split.amount_paid, 2),
+            "amount_paid": paid_float,
+            "amount_due": due_float,
             "payment_status": split.payment_status,
             "payment_method": payment_method,
-            "paid_at": split.paid_at.isoformat(),
+            "paid_at": split.paid_at.isoformat() if split.paid_at else None,
             "razorpay_payment_id": razorpay_payment_id,
         }
 
@@ -272,9 +303,9 @@ class GroupPaymentService:
             .all()
         )
 
-        total_amount = sum(s.amount or 0 for s in splits)
-        total_paid = sum(s.amount_paid or 0 for s in splits)
-        total_pending = total_amount - total_paid
+        total_amount = sum(float(s.amount or 0) for s in splits)
+        total_paid = sum(float(s.amount_paid or 0) for s in splits)
+        total_pending = max(0.0, total_amount - total_paid)
         payment_percentage = (total_paid / total_amount * 100) if total_amount > 0 else 0
 
         members_status = []
@@ -291,17 +322,18 @@ class GroupPaymentService:
             )
 
             user_name = member.user.name if member and member.user else "Unknown"
-            amount_due = (split.amount or 0) - (split.amount_paid or 0)
+            amount_due = max(0.0, float(split.amount or 0) - float(split.amount_paid or 0))
             status = split.payment_status or "PENDING"
+            member_role = member.role.value if (member and hasattr(member.role, "value")) else (str(member.role) if member else "MEMBER")
 
             members_status.append({
                 "user_id": split.user_id,
                 "user_name": user_name,
-                "role": member.role.value if member else "MEMBER",
-                "amount": round(split.amount or 0, 2),
-                "amount_paid": round(split.amount_paid or 0, 2),
+                "role": member_role,
+                "amount": round(float(split.amount or 0), 2),
+                "amount_paid": round(float(split.amount_paid or 0), 2),
                 "amount_due": round(amount_due, 2),
-                "percentage": round(split.percentage or 0, 2),
+                "percentage": round(float(split.percentage or 0), 2),
                 "payment_status": status,
                 "payment_method": split.payment_method,
                 "paid_at": split.paid_at.isoformat() if split.paid_at else None,
@@ -538,12 +570,13 @@ class GroupPaymentService:
         self.db.commit()
         self.db.refresh(split)
 
+        split_type_val = split.split_type.value if hasattr(split.split_type, "value") else str(split.split_type)
         return {
             "updated": True,
             "group_id": group_id,
             "user_id": user_id,
             "split": {
-                "split_type": split.split_type.value,
+                "split_type": split_type_val,
                 "amount": float(split.amount or 0),
                 "percentage": split.percentage,
             },
@@ -567,21 +600,69 @@ class GroupPaymentService:
             - currency: Currency code
             - receipt: Receipt ID
         """
-        # TODO: Integrate with existing Razorpay implementation
-        # This should use the existing Razorpay service
+        # Verify user is member
+        member = (
+            self.db.query(GroupMember)
+            .filter(
+                GroupMember.group_id == group_id,
+                GroupMember.user_id == user_id,
+            )
+            .first()
+        )
+        if not member:
+            return {"error": "User is not a member of this group"}
 
-        receipt = f"group_{group_id}_user_{user_id}_{int(datetime.now().timestamp())}"
+        if amount <= 0:
+            return {"error": "Amount must be greater than zero"}
 
-        # Placeholder - actual implementation would call Razorpay API
-        razorpay_order_id = f"order_{receipt}"
+        amount_dec = Decimal(str(round(amount, 2)))
+        paise = to_paise(amount_dec)
+        receipt = f"grp_{group_id}_u_{user_id}_{int(utcnow_naive().timestamp())}"
+
+        # Get or create split record
+        split = (
+            self.db.query(GroupPaymentSplit)
+            .filter(
+                GroupPaymentSplit.group_id == group_id,
+                GroupPaymentSplit.user_id == user_id,
+            )
+            .first()
+        )
+        if not split:
+            split = GroupPaymentSplit(
+                group_id=group_id,
+                user_id=user_id,
+                split_type=PaymentSplitType.EQUAL,
+                amount=amount_dec,
+            )
+            self.db.add(split)
+        elif not split.amount or split.amount == 0:
+            split.amount = amount_dec
+
+        try:
+            razorpay_order = client.order.create({
+                "amount": paise,
+                "currency": "INR",
+                "receipt": receipt,
+                "payment_capture": 1,
+            })
+            razorpay_order_id = razorpay_order["id"]
+        except Exception as e:
+            logger.error(f"Failed to create Razorpay order for group {group_id}, user {user_id}: {e}")
+            return {"error": f"Payment gateway error: {str(e)}"}
+
+        split.razorpay_order_id = razorpay_order_id
+        self.db.commit()
+        self.db.refresh(split)
 
         return {
             "group_id": group_id,
             "user_id": user_id,
             "razorpay_order_id": razorpay_order_id,
-            "amount": int(amount * 100),  # Convert to paise
+            "amount": paise,
             "currency": "INR",
             "receipt": receipt,
+            "key": os.getenv("RAZORPAY_KEY_ID"),
         }
 
     def verify_razorpay_payment(
@@ -590,6 +671,7 @@ class GroupPaymentService:
         user_id: int,
         razorpay_payment_id: str,
         razorpay_signature: str,
+        razorpay_order_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Verify Razorpay payment and update records.
 
@@ -598,45 +680,84 @@ class GroupPaymentService:
             user_id: User ID
             razorpay_payment_id: Razorpay payment ID
             razorpay_signature: Razorpay signature
+            razorpay_order_id: Optional Razorpay order ID (retrieved from split if not provided)
 
         Returns:
             - verified: Success status
-            - payment_status: Payment status
+            - payment: Payment details if verified
         """
-        # TODO: Integrate with existing Razorpay verification
-        # This should use the existing Razorpay service
-
-        # Placeholder verification
-        verified = True  # Actual implementation would verify signature
-
-        if verified:
-            # Record payment
-            # Get amount from split
-            split = (
-                self.db.query(GroupPaymentSplit)
-                .filter(
-                    GroupPaymentSplit.group_id == group_id,
-                    GroupPaymentSplit.user_id == user_id,
-                )
-                .first()
+        split = (
+            self.db.query(GroupPaymentSplit)
+            .filter(
+                GroupPaymentSplit.group_id == group_id,
+                GroupPaymentSplit.user_id == user_id,
             )
+            .first()
+        )
+        if not split:
+            return {
+                "verified": False,
+                "group_id": group_id,
+                "user_id": user_id,
+                "error": "No split record found for this member",
+            }
 
-            amount = (split.amount or 0) - (split.amount_paid or 0) if split else 0
+        order_id = razorpay_order_id or split.razorpay_order_id
+        if not order_id:
+            return {
+                "verified": False,
+                "group_id": group_id,
+                "user_id": user_id,
+                "error": "Missing razorpay_order_id",
+            }
 
-            if amount > 0:
-                return self.record_payment(
-                    group_id=group_id,
-                    user_id=user_id,
-                    amount=amount,
-                    payment_method="RAZORPAY",
-                    razorpay_payment_id=razorpay_payment_id,
-                )
+        secret = os.getenv("RAZORPAY_KEY_SECRET")
+        if not secret:
+            logger.error("RAZORPAY_KEY_SECRET is not configured on server")
+            return {
+                "verified": False,
+                "group_id": group_id,
+                "user_id": user_id,
+                "error": "Payment verification unavailable: gateway secret not configured",
+            }
+
+        body = f"{order_id}|{razorpay_payment_id}"
+        expected_signature = hmac.new(
+            bytes(secret, "utf-8"),
+            bytes(body, "utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected_signature, razorpay_signature or ""):
+            logger.warning(f"Invalid payment signature for group {group_id}, user {user_id}")
+            return {
+                "verified": False,
+                "group_id": group_id,
+                "user_id": user_id,
+                "error": "Invalid payment signature",
+            }
+
+        split.razorpay_order_id = order_id
+        split.razorpay_payment_id = razorpay_payment_id
+        self.db.commit()
+
+        amount_to_pay = float((split.amount or 0) - (split.amount_paid or 0))
+        if amount_to_pay <= 0:
+            amount_to_pay = float(split.amount or 0)
+
+        record_res = self.record_payment(
+            group_id=group_id,
+            user_id=user_id,
+            amount=amount_to_pay,
+            payment_method="RAZORPAY",
+            razorpay_payment_id=razorpay_payment_id,
+        )
 
         return {
-            "verified": False,
+            "verified": True,
             "group_id": group_id,
             "user_id": user_id,
-            "error": "Payment verification failed",
+            "payment": record_res,
         }
 
     # ── Public API ────────────────────────────────────────────────────────

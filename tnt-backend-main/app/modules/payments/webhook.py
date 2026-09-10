@@ -49,17 +49,21 @@ async def razorpay_webhook(
     # ✅ PAYMENT SUCCESS — delegate to the shared finalizer so ledger,
     # order status, and notification are identical to the manual verify path.
     if event == "payment.captured":
+        if not order:
+            return {"status": "order_not_found"}
         finalize_payment(payment, order, db)
 
     # ❌ PAYMENT FAILED
     elif event == "payment.failed":
         payment.status = PaymentStatus.FAILED
-        order.status = OrderStatus.CANCELLED
+        if order:
+            order.status = OrderStatus.CANCELLED
         observability.record_payment_failure()
 
     # 🔁 REFUND PROCESSED
     elif event == "refund.processed":
         payment.status = PaymentStatus.REFUNDED
-        order.status = OrderStatus.CANCELLED
+        if order:
+            order.status = OrderStatus.CANCELLED
 
     return {"status": "ok"}  # decorator commits

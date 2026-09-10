@@ -37,6 +37,7 @@ class GroupMemberRole(enum.Enum):
 class PaymentSplitType(enum.Enum):
     EQUAL = "equal"
     CUSTOM = "custom"
+    PERCENTAGE = "percentage"
     UNIFIED = "unified"
 
 
@@ -114,7 +115,13 @@ class GroupPaymentSplit(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     split_type = Column(Enum(PaymentSplitType, values_callable=lambda x: [e.value for e in x]), default=PaymentSplitType.EQUAL)
     amount = Column(Numeric(10, 2), nullable=True)  # rupees, for custom splits
+    amount_paid = Column(Numeric(10, 2), nullable=False, default=0.0)  # rupees paid so far
     percentage = Column(Float, nullable=True)  # For percentage-based splits
+    payment_status = Column(String(50), nullable=False, default="PENDING")  # PENDING, PARTIAL, PAID
+    payment_method = Column(String(50), nullable=True)  # UPI, CARD, WALLET, RAZORPAY
+    paid_at = Column(DateTime, nullable=True)
+    razorpay_order_id = Column(String(100), nullable=True)
+    razorpay_payment_id = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=utcnow_naive)
 
     # Relationships

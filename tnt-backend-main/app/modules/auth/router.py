@@ -158,6 +158,48 @@ def verify_otp_login(
     except Exception:
         pass
 
+    requires_2fa = (
+        user.role.value in {"admin", "super_admin"}
+        and getattr(user, "totp_enabled", False)
+    )
+
+    if requires_2fa:
+        challenge_token = create_access_token(
+            data={
+                "sub": str(user.id),
+                "phone": user.phone,
+                "role": user.role.value,
+                "type": "admin_2fa_challenge",
+                "is_2fa_pending": True,
+            },
+            expires_delta=5,
+        )
+        return {
+            "success": True,
+            "message": "Two-factor authentication required",
+            "data": {
+                "access_token": challenge_token,
+                "refresh_token": None,
+                "token_type": "bearer",
+                "requires_2fa": True,
+                "user": {
+                    "id": user.id,
+                    "phone": user.phone,
+                    "name": user.name,
+                    "full_name": user.full_name,
+                    "role": user.role.value,
+                    "vendor_type": user.vendor_type,
+                    "university_id": user.university_id,
+                    "department": user.department,
+                    "semester": user.semester,
+                    "profile_image": user.profile_image,
+                    "is_active": user.is_active,
+                    "is_approved": user.is_approved,
+                },
+                "is_new_user": user.name is None,
+            },
+        }
+
     expires_minutes = settings.JWT_EXPIRY_MINUTES if hasattr(settings, "JWT_EXPIRY_MINUTES") else 1440
     token = create_access_token(
         data={
@@ -171,11 +213,6 @@ def verify_otp_login(
     # Generate refresh token for session persistence
     refresh_token = create_refresh_token(user.id, user.role.value, user.phone)
 
-    requires_2fa = (
-        user.role.value in {"admin", "super_admin"}
-        and getattr(user, "totp_enabled", False)
-    )
-
     return {
         "success": True,
         "message": "Login successful",
@@ -183,7 +220,7 @@ def verify_otp_login(
             "access_token": token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
-            "requires_2fa": requires_2fa,
+            "requires_2fa": False,
             "user": {
                 "id": user.id,
                 "phone": user.phone,
@@ -269,4 +306,22 @@ def verify_admin_2fa(
         raise HTTPException(status_code=400, detail="2FA not enabled on this account")
     if not verify_totp(db_user.totp_secret, totp_code):
         raise HTTPException(status_code=401, detail="Invalid authenticator code")
-    return {"message": "2FA verified", "fully_authenticated": True}
+
+    expires_minutes = settings.JWT_EXPIRY_MINUTES if hasattr(settings, "JWT_EXPIRY_MINUTES") else 1440
+    access_token = create_access_token(
+        data={
+            "sub": str(db_user.id),
+            "phone": db_user.phone,
+            "role": db_user.role.value,
+            "is_2fa_verified": True,
+        },
+        expires_delta=expires_minutes,
+    )
+    refresh_token = create_refresh_token(db_user.id, db_user.role.value, db_user.phone)
+
+    return {
+        "message": "2FA verified",
+        "fully_authenticated": True,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }

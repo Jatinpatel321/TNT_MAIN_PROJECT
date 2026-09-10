@@ -40,3 +40,7 @@ class VendorReview(Base):
 
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+
+# Compatibility alias
+MenuItemReview = Feedback

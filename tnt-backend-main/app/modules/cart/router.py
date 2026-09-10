@@ -103,13 +103,23 @@ def _save_cart(user_id: int, cart: dict) -> None:
 
 
 def _cart_response(cart: dict) -> dict:
-    total_amount = sum(int(item["price"]) * int(item["quantity"]) for item in cart["items"])
-    total_items = sum(int(item["quantity"]) for item in cart["items"])
+    valid_items = []
+    total_amount = 0.0
+    total_items = 0
+    for item in cart.get("items", []):
+        try:
+            price = float(item["price"])
+            qty = int(item["quantity"])
+            total_amount += price * qty
+            total_items += qty
+            valid_items.append(item)
+        except (KeyError, TypeError, ValueError):
+            continue  # skip corrupted items
     return {
         "vendor_id": cart.get("vendor_id"),
-        "items": cart.get("items", []),
+        "items": valid_items,
         "total_items": total_items,
-        "total_amount": total_amount,
+        "total_amount": round(total_amount, 2),
     }
 
 
@@ -215,7 +225,7 @@ def get_cart_by_user_id(
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Authenticated user not found")
-    if db_user.id != user_id and db_user.role.value not in {"admin", "superadmin"}:
+    if db_user.id != user_id and db_user.role.value not in {"admin", "super_admin"}:
         raise HTTPException(status_code=403, detail="Cannot view another user's cart")
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -366,7 +376,7 @@ def add_cart_item(
             {
                 "menu_item_id": menu_item.id,
                 "name": menu_item.name,
-                "price": int(menu_item.price),
+                "price": float(menu_item.price),
                 "quantity": int(payload.quantity),
             }
         )

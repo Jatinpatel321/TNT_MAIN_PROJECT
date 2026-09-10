@@ -92,7 +92,7 @@ def toggle_campaign(
         raise HTTPException(status_code=404, detail="Campaign not found")
 
     campaign.is_active = not campaign.is_active
-    campaign.status = CampaignStatus.ACTIVE if campaign.is_active else CampaignStatus.INACTIVE
+    campaign.status = CampaignStatus.ACTIVE if campaign.is_active else CampaignStatus.PAUSED
     db.commit()
 
     return {

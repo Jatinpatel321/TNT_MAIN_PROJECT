@@ -104,14 +104,19 @@ def verify_job_payment(
 
     body = f"{razorpay_order_id}|{razorpay_payment_id}"
     secret = os.getenv("RAZORPAY_KEY_SECRET")
+    if not secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Payment verification unavailable: gateway secret not configured",
+        )
 
     expected_signature = hmac.new(
-        bytes(secret, "utf-8"),
-        bytes(body, "utf-8"),
+        secret.encode("utf-8"),
+        body.encode("utf-8"),
         hashlib.sha256
     ).hexdigest()
 
-    if expected_signature != razorpay_signature:
+    if not hmac.compare_digest(expected_signature, razorpay_signature or ""):
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
     job.is_paid = True

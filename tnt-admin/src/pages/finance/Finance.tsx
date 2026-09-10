@@ -85,8 +85,13 @@ export default function Finance() {
   };
 
   const rejectRefund = async (id: number) => {
-    const note = window.prompt('Reason for rejecting this refund?') || '';
-    if (note === null) return;
+    const rawNote = window.prompt('Reason for rejecting this refund?');
+    if (rawNote === null) return; // User clicked Cancel
+    const note = rawNote.trim();
+    if (!note) {
+      toast.error('Rejection reason is required');
+      return;
+    }
     setBusyId(id);
     try {
       await adminApi.rejectRefundRequest(id, note);

@@ -81,20 +81,20 @@ export default function WastageDashboard() {
   }));
 
   return (
-    <div className="space-y-6 text-[#F1F0FF]">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-[#F1F0FF] tracking-tight">Food Wastage Dashboard</h1>
-          <p className="text-sm text-[#9B9BC4]">Monitor and track university-wide food waste reduction metrics from cancelled orders.</p>
+          <h1 className="text-2xl font-bold text-[#111827] tracking-tight">Food Wastage Dashboard</h1>
+          <p className="text-sm text-[#6B7280] mt-1">Monitor and track university-wide food waste reduction metrics from cancelled orders.</p>
         </div>
         <button
           onClick={handleRefresh}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-[#F1F0FF] bg-[#1A1A2E] border border-[#2D2D44] rounded-lg hover:bg-[#252538] transition-colors shadow-sm"
+          className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-[#374151] bg-white border border-[#E5E7EB] rounded-lg hover:bg-[#F9FAFB] hover:text-[#111827] transition-all shadow-sm self-start sm:self-auto"
           disabled={refreshing}
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-[#E85D24]' : 'text-[#6B7280]'}`} />
+          <span>Refresh</span>
         </button>
       </div>
 
@@ -134,7 +134,7 @@ export default function WastageDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Trend Area Chart */}
         <div className="tnt-card">
-          <h3 className="text-base font-bold text-[#F1F0FF] mb-4 tracking-tight">Wasted Revenue Trend (Last 30 Days)</h3>
+          <h3 className="text-base font-semibold text-[#111827] mb-4">Wasted Revenue Trend (Last 30 Days)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -144,11 +144,11 @@ export default function WastageDashboard() {
                     <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2D2D44" />
-                <XAxis dataKey="label" tick={{ fill: '#9B9BC4', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#9B9BC4', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: '#1A1A2E', borderColor: '#2D2D44', color: '#F1F0FF' }} />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0F1F5" />
+                <XAxis dataKey="label" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={{ stroke: '#E5E7EB' }} tickLine={false} />
+                <YAxis tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#E5E7EB', color: '#111827', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+                <Legend wrapperStyle={{ color: '#4B5563', fontSize: 12, paddingTop: 8 }} />
                 <Area type="monotone" dataKey="revenue" name="Wasted Revenue (₹)" stroke="#EF4444" fillOpacity={1} fill="url(#colorWaste)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -157,15 +157,15 @@ export default function WastageDashboard() {
 
         {/* Vendor Waste Bar Chart */}
         <div className="tnt-card">
-          <h3 className="text-base font-bold text-[#F1F0FF] mb-4 tracking-tight">Wastage by Vendor</h3>
+          <h3 className="text-base font-semibold text-[#111827] mb-4">Wastage by Vendor</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={vendorData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2D2D44" />
-                <XAxis dataKey="name" tick={{ fill: '#9B9BC4', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#9B9BC4', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: '#1A1A2E', borderColor: '#2D2D44', color: '#F1F0FF' }} />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" stroke="#F0F1F5" />
+                <XAxis dataKey="name" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={{ stroke: '#E5E7EB' }} tickLine={false} />
+                <YAxis tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#E5E7EB', color: '#111827', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+                <Legend wrapperStyle={{ color: '#4B5563', fontSize: 12, paddingTop: 8 }} />
                 <Bar dataKey="revenue" name="Wasted Revenue (₹)" fill="#F59E0B" radius={[4, 4, 0, 0]} maxBarSize={40} />
               </BarChart>
             </ResponsiveContainer>
@@ -177,22 +177,22 @@ export default function WastageDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Wasted Items */}
         <div className="tnt-card">
-          <h3 className="text-base font-bold text-[#F1F0FF] mb-4 tracking-tight">Top 5 Wasted Menu Items</h3>
-          <div className="divide-y divide-[#2D2D44]">
+          <h3 className="text-base font-semibold text-[#111827] mb-4">Top 5 Wasted Menu Items</h3>
+          <div className="divide-y divide-[#F0F1F5]">
             {wasted_items.length === 0 ? (
-              <div className="py-8 text-center text-sm text-[#9B9BC4]">No items registered waste.</div>
+              <div className="py-8 text-center text-sm text-[#9CA3AF]">No items registered waste.</div>
             ) : (
               wasted_items.map((item: any, idx: number) => (
                 <div key={idx} className="py-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-red-950 text-red-400 text-xs font-bold flex items-center justify-center">
+                    <span className="w-6 h-6 rounded-full bg-red-50 text-red-600 border border-red-100 text-xs font-bold flex items-center justify-center">
                       {idx + 1}
                     </span>
-                    <span className="font-semibold text-[#F1F0FF] text-sm">{item.name}</span>
+                    <span className="font-medium text-[#111827] text-sm">{item.name}</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-[#F1F0FF]">{formatRupees(item.wasted_value)}</div>
-                    <div className="text-xs text-[#9B9BC4]">{item.cancelled_count} cancellations</div>
+                    <div className="text-sm font-semibold text-[#111827]">{formatRupees(item.wasted_value)}</div>
+                    <div className="text-xs text-[#6B7280]">{item.cancelled_count} cancellations</div>
                   </div>
                 </div>
               ))
@@ -202,17 +202,17 @@ export default function WastageDashboard() {
 
         {/* Detailed Vendor list */}
         <div className="tnt-card">
-          <h3 className="text-base font-bold text-[#F1F0FF] mb-4 tracking-tight">Vendor Waste Leaderboard</h3>
-          <div className="divide-y divide-[#2D2D44]">
+          <h3 className="text-base font-semibold text-[#111827] mb-4">Vendor Waste Leaderboard</h3>
+          <div className="divide-y divide-[#F0F1F5]">
             {vendor_waste.length === 0 ? (
-              <div className="py-8 text-center text-sm text-[#9B9BC4]">No vendors registered waste.</div>
+              <div className="py-8 text-center text-sm text-[#9CA3AF]">No vendors registered waste.</div>
             ) : (
               vendor_waste.map((v: any, idx: number) => (
                 <div key={idx} className="py-3 flex items-center justify-between">
-                  <span className="font-semibold text-[#F1F0FF] text-sm">{v.vendor_name}</span>
+                  <span className="font-medium text-[#111827] text-sm">{v.vendor_name}</span>
                   <div className="text-right">
-                    <div className="text-sm font-bold text-red-400">{formatRupees(v.wasted_revenue)}</div>
-                    <div className="text-xs text-[#9B9BC4]">{v.cancelled_count} orders cancelled</div>
+                    <div className="text-sm font-semibold text-red-600">{formatRupees(v.wasted_revenue)}</div>
+                    <div className="text-xs text-[#6B7280]">{v.cancelled_count} orders cancelled</div>
                   </div>
                 </div>
               ))
@@ -223,3 +223,4 @@ export default function WastageDashboard() {
     </div>
   );
 }
+

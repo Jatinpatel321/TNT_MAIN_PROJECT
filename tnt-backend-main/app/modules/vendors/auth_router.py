@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
 
+from app.core.security import get_current_user
 from app.modules.vendors.auth_schemas import (
     VendorLoginRequest,
     VendorLoginResponse,
@@ -60,19 +61,20 @@ router = APIRouter(prefix="", tags=["Vendor Auth"])
 def register(
     body: VendorRegisterRequest,
     db: Session = Depends(get_db),
+    user=Depends(get_current_user),
 ):
     """Register a new vendor business.
 
-    The owner_phone must belong to an existing User (created via OTP login).
-    The User's role is upgraded to VENDOR automatically.
-    Returns the new vendor profile with PENDING status.
+    Requires an authenticated user session. The newly created vendor
+    is attached to the authenticated user. Admin accounts cannot be converted.
     """
     result = register_vendor(
         vendor_name=body.vendor_name,
         category=body.category,
-        owner_phone=body.owner_phone,
+        owner_phone=user["phone"],
         password=body.password,
         db=db,
+        authenticated_user=user,
     )
     return result
 

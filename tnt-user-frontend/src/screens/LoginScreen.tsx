@@ -4,7 +4,7 @@ import { Text, TextInput } from 'react-native-paper';
 
 import { Screen } from '../components/Screen';
 import { GradientButton } from '../components/GradientButton';
-import { sendOtp, verifyOtp } from '../services/authService';
+import { sendOtp, login } from '../services/authService';
 import { toApiError } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
 
@@ -34,7 +34,7 @@ export function LoginScreen() {
   const onVerify = async () => {
     try {
       setLoading(true);
-      const res = await verifyOtp(phoneClean, otp.trim());
+      const res = await login(phoneClean, otp.trim());
       await setSession(res.data.access_token, res.data.user);
     } catch (e) {
       const err = toApiError(e);

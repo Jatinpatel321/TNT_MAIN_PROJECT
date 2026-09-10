@@ -41,6 +41,27 @@ def _svc(db: Session) -> GroupCartService:
     return GroupCartService(db)
 
 
+def require_group_member(group_id: int, user: dict, db: Session) -> Group:
+    """Verify group exists and user is an active member or admin. Raises 404/403."""
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    role = (user.get("role") or "").lower()
+    if role in {"admin", "super_admin"}:
+        return group
+
+    user_id = user.get("id")
+    is_member = (
+        db.query(GroupMember)
+        .filter(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
+        .first()
+    )
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Not authorized: You are not a member of this group")
+    return group
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────────────────────────────────────

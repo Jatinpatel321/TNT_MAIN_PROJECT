@@ -483,14 +483,17 @@ class MLPredictionService:
                 Order.created_at >= thirty_days_ago,
             ).count()
 
-            repeat = self.db.query(
-                Order.user_id, self.db.query(func.count(Order.id)).filter(
-                    Order.vendor_id == vendor.id
-                ).correlate(Order).as_scalar()
-            ).filter(
-                Order.vendor_id == vendor.id,
-                Order.created_at >= thirty_days_ago,
-            ).group_by(Order.user_id).having(func.count(Order.id) > 1).count()
+            repeat_subquery = (
+                self.db.query(Order.user_id)
+                .filter(
+                    Order.vendor_id == vendor.id,
+                    Order.created_at >= thirty_days_ago,
+                )
+                .group_by(Order.user_id)
+                .having(func.count(Order.id) > 1)
+                .subquery()
+            )
+            repeat = self.db.query(func.count()).select_from(repeat_subquery).scalar() or 0
 
             completion_rate = completed / max(total_orders, 1)
             ml_score = None

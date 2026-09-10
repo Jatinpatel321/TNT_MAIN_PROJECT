@@ -93,17 +93,18 @@ def refresh_access_token(body: RefreshRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Malformed refresh token payload")
 
     user_id = payload.get("user_id")
-    role = payload.get("role")
     phone = payload.get("phone")
 
-    # Re-check user is still active
+    # Re-check user is still active and fetch authoritative DB role
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         revoke_refresh_token(body.refresh_token)
         raise HTTPException(status_code=403, detail="Account is inactive")
 
+    current_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+
     access_token = create_access_token(
-        {"sub": str(user_id), "phone": phone, "role": role},
+        {"sub": str(user_id), "phone": user.phone or phone, "role": current_role},
         expires_delta=ACCESS_TTL_MINUTES,
     )
     return RefreshResponse(access_token=access_token)

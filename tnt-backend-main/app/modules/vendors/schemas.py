@@ -28,10 +28,14 @@ class VendorMenuItemResponse(BaseModel):
     id: int
     vendor_id: int
     name: str
-    description: str | None
-    price: int
+    description: str | None = None
+    price: float
     image_url: str
     is_available: bool
+    prep_time_minutes: int | None = None
+    available_quantity: int | None = None
+    category: str | None = None
+    is_veg: bool | None = True
 
 
 class VendorSlotResponse(BaseModel):

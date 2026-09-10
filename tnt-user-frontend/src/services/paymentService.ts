@@ -30,6 +30,54 @@ export async function mockPayment(
   return data;
 }
 
+export interface RazorpayInitiateResult {
+  payment_id: number;
+  razorpay_order_id: string;
+  amount: number;
+  key: string;
+  idempotent?: boolean;
+}
+
+/**
+ * Initiate real Razorpay gateway payment for an order.
+ */
+export async function initiateRazorpayPayment(
+  orderId: number,
+  idempotencyKey?: string,
+): Promise<RazorpayInitiateResult> {
+  const headers: Record<string, string> = {};
+  if (idempotencyKey) {
+    headers['X-Idempotency-Key'] = idempotencyKey;
+  }
+  const { data } = await apiClient.post<RazorpayInitiateResult>(
+    `/payments/razorpay/initiate/${orderId}`,
+    null,
+    { headers },
+  );
+  return data;
+}
+
+/**
+ * Verify Razorpay payment signature after gateway transaction.
+ */
+export async function verifyRazorpayPayment(
+  paymentId: number,
+  razorpayPaymentId: string,
+  razorpaySignature: string,
+): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(
+    `/payments/razorpay/verify/${paymentId}`,
+    null,
+    {
+      params: {
+        razorpay_payment_id: razorpayPaymentId,
+        razorpay_signature: razorpaySignature,
+      },
+    },
+  );
+  return data;
+}
+
 export type RefundStatus = 'pending' | 'processing' | 'completed';
 
 export interface RefundStatusResult {

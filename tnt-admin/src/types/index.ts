@@ -25,8 +25,27 @@ export interface AdminAnalytics {
   active_vendors?: number;
   food_vendors?: number;
   stationery_vendors?: number;
+  total_students?: number;
   completed_today?: number;
   pending_today?: number;
+  // Extended analytics data for charts
+  orders_by_day?: Array<{ date: string; orders: number }>;
+  revenue_by_day?: Array<{ date: string; revenue_paise: number }>;
+  signups_by_day?: Array<{ date: string; signups: number }>;
+  order_status?: Record<string, number>;
+  payment_status?: Record<string, number>;
+  top_vendors?: Array<{ vendor_id: number; order_count: number; total_revenue_paise: number }>;
+  peak_hours?: Record<string, number>;
+  week_comparison?: {
+    this_week: { orders: number; revenue_paise: number };
+    last_week: { orders: number; revenue_paise: number };
+    order_delta: number;
+    revenue_delta_paise: number;
+  };
+  fraud_stats?: {
+    total_flagged: number;
+    fraud_rate_pct: number;
+  };
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

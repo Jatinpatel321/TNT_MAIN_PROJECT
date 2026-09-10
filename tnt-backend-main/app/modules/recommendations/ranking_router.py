@@ -52,32 +52,33 @@ async def get_ranked_recommendations(
     """
     from app.modules.recommendations.smart_engine import SmartRecommendationEngine
 
+    user_id = user["id"] if isinstance(user, dict) else user.id
     engine = SmartRecommendationEngine(db)
     ranking_service = RecommendationRankingService(db)
 
     # Get base recommendations
-    base_recs = engine.get_recommendations(user.id)
+    base_recs = await engine.get_recommendations(user_id)
 
     # Rank each category
     ranked_recs = {
-        "user_id": user.id,
+        "user_id": user_id,
         "frequently_ordered": ranking_service.rank_recommendations(
-            user.id,
+            user_id,
             base_recs.get("frequently_ordered", []),
             "frequently_ordered"
         ),
         "recommended_for_you": ranking_service.rank_recommendations(
-            user.id,
+            user_id,
             base_recs.get("recommended_for_you", []),
             "recommended"
         ),
         "trending_near_you": ranking_service.rank_recommendations(
-            user.id,
+            user_id,
             base_recs.get("trending_near_you", []),
             "trending"
         ),
         "because_you_ordered": ranking_service.rank_recommendations(
-            user.id,
+            user_id,
             base_recs.get("because_you_ordered", []),
             "because_you_ordered"
         ),
@@ -101,8 +102,9 @@ async def get_recommendation_insights(
         - confidence: Overall confidence
         - insights: Additional insights
     """
+    user_id = user["id"] if isinstance(user, dict) else user.id
     ranking_service = RecommendationRankingService(db)
-    return ranking_service.get_recommendation_insights(user.id, item_id)
+    return ranking_service.get_recommendation_insights(user_id, item_id)
 
 
 @router.post("/rank")
@@ -120,9 +122,10 @@ async def rank_custom_items(
     Returns:
         Ranked and scored items with reasons
     """
+    user_id = user["id"] if isinstance(user, dict) else user.id
     ranking_service = RecommendationRankingService(db)
     return ranking_service.rank_recommendations(
-        user.id,
+        user_id,
         request.items,
         request.category
     )

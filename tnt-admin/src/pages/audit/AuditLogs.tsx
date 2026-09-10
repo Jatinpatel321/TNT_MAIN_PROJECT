@@ -217,15 +217,21 @@ export default function AuditLogs() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="tnt-card">
                   <p className="text-sm font-medium text-[#6B7280]">Events (30 Days)</p>
-                  <p className="text-3xl font-bold text-[#111827] mt-1">{stats.total_logs_30d.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-[#111827] mt-1">
+                    {(stats.total_logs_30d ?? stats.total_events ?? 0).toLocaleString()}
+                  </p>
                 </div>
                 <div className="tnt-card">
                   <p className="text-sm font-medium text-[#6B7280]">Active Actors (30 Days)</p>
-                  <p className="text-3xl font-bold text-[#111827] mt-1">{stats.active_users_30d.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-[#111827] mt-1">
+                    {(stats.active_users_30d ?? stats.top_actors?.length ?? 0).toLocaleString()}
+                  </p>
                 </div>
                 <div className="tnt-card">
                   <p className="text-sm font-medium text-[#6B7280]">Critical Actions</p>
-                  <p className="text-3xl font-bold text-[#EF4444] mt-1">{stats.critical_actions_30d.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-[#EF4444] mt-1">
+                    {(stats.critical_actions_30d ?? stats.flagged_events ?? 0).toLocaleString()}
+                  </p>
                 </div>
               </div>
 
@@ -234,8 +240,9 @@ export default function AuditLogs() {
                 <div className="tnt-card">
                   <h3 className="text-lg font-semibold text-[#111827] mb-4">Events by Category</h3>
                   <div className="space-y-4">
-                    {Object.entries(stats.actions_by_category).map(([cat, count]: [string, any]) => {
-                      const percentage = Math.round((count / stats.total_logs_30d) * 100);
+                    {Object.entries(stats.actions_by_category || stats.category_counts || {}).map(([cat, count]: [string, any]) => {
+                      const totalLogs = Number(stats.total_logs_30d || stats.total_events || 0);
+                      const percentage = totalLogs > 0 ? Math.min(100, Math.round((Number(count || 0) / totalLogs) * 100)) : 0;
                       return (
                         <div key={cat}>
                           <div className="flex justify-between text-sm mb-1">
@@ -248,31 +255,41 @@ export default function AuditLogs() {
                         </div>
                       );
                     })}
+                    {Object.keys(stats.actions_by_category || stats.category_counts || {}).length === 0 && (
+                      <p className="text-sm text-[#9CA3AF] py-6 text-center">No categorized events recorded yet.</p>
+                    )}
                   </div>
                 </div>
 
                 {/* Daily Trend */}
                 <div className="tnt-card">
                   <h3 className="text-lg font-semibold text-[#111827] mb-4">30-Day Activity Trend</h3>
-                  <div className="h-64 flex items-end justify-between gap-1 mt-6">
-                    {stats.actions_by_day.map((d: any) => {
-                      const max = Math.max(...stats.actions_by_day.map((x: any) => x.count), 1);
-                      const height = `${Math.max((d.count / max) * 100, 2)}%`;
-                      return (
-                        <div key={d.date} className="relative group w-full flex justify-center">
-                          <div 
-                            className="w-full bg-[#818CF8] hover:bg-[#4F46E5] rounded-t-sm transition-colors" 
-                            style={{ height }}
-                          ></div>
-                          <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                            <div className="bg-[#111827] text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                              {d.date}: {d.count} events
+                  {Array.isArray(stats.actions_by_day) && stats.actions_by_day.length > 0 ? (
+                    <div className="h-64 flex items-end justify-between gap-1 mt-6">
+                      {stats.actions_by_day.map((d: any) => {
+                        const counts = stats.actions_by_day.map((x: any) => Number(x.count) || 0);
+                        const max = Math.max(...counts, 1);
+                        const height = `${Math.max(((Number(d.count) || 0) / max) * 100, 2)}%`;
+                        return (
+                          <div key={d.date} className="relative group w-full h-full flex items-end justify-center">
+                            <div 
+                              className="w-full bg-[#818CF8] hover:bg-[#4F46E5] rounded-t-sm transition-colors" 
+                              style={{ height }}
+                            ></div>
+                            <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+                              <div className="bg-[#111827] text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                {d.date}: {d.count} events
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-sm text-[#9CA3AF]">
+                      No daily activity trend data available.
+                    </div>
+                  )}
                 </div>
               </div>
             </>
@@ -390,7 +407,7 @@ export default function AuditLogs() {
 
                       {isExpanded && (
                         <div className="px-12 pb-5 pt-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#F9FAFB] border-t border-[#E5E7EB]">
-                          {log.before_state && Object.keys(log.before_state).length > 0 && (
+                          {log.before_state && typeof log.before_state === 'object' && Object.keys(log.before_state).length > 0 && (
                             <div>
                               <p className="text-xs font-bold text-red-500 mb-2 uppercase tracking-wider flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
@@ -401,8 +418,8 @@ export default function AuditLogs() {
                               </pre>
                             </div>
                           )}
-                          {log.after_state && Object.keys(log.after_state).length > 0 && (
-                            <div className={!log.before_state || Object.keys(log.before_state).length === 0 ? "md:col-span-2" : ""}>
+                          {log.after_state && typeof log.after_state === 'object' && Object.keys(log.after_state).length > 0 && (
+                            <div className={!log.before_state || typeof log.before_state !== 'object' || Object.keys(log.before_state).length === 0 ? "md:col-span-2" : ""}>
                               <p className="text-xs font-bold text-green-500 mb-2 uppercase tracking-wider flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
                                 New State

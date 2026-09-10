@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import app.database.init_db  # Ensure all SQLAlchemy models are registered
-import numpy as np
 from sqlalchemy import func, extract, text
 from sqlalchemy.orm import Session
 

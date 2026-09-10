@@ -224,9 +224,10 @@ def _check_calendar_event_restrictions(slot: Slot, user_id: int, db: Session) ->
                 detail=f"Slot on {slot_date.isoformat()} is reserved for faculty/staff "
                        f"({event.label} — Exam Day). Student bookings are not allowed.",
             )
-        # Faculty can book — reduce max_orders by half to prioritise faculty
-        if hasattr(slot, 'max_orders'):
-            slot.max_orders = max(1, slot.max_orders // 2)
+        # NOTE: Do NOT mutate slot.max_orders here — that change persists to
+        # the DB and permanently halves capacity on every booking.  The
+        # effective capacity reduction for exam days is handled by
+        # _apply_capacity_rules() instead.
 
 
 def _apply_capacity_rules(slot: Slot, user_id: int, db: Session) -> int:

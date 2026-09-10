@@ -756,14 +756,52 @@ async def get_analytics(
         total_flagged = db.query(func.count(Order.id)).filter(Order.fraud_flag == True).scalar() or 0
         fraud_rate_pct = round(total_flagged / total_orders * 100, 2) if total_orders else 0.0
 
+        # ── Computed fields the frontend dashboard expects ──────────────
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        active_users = db.query(func.count(func.distinct(Order.user_id))).filter(
+            Order.created_at >= thirty_days_ago
+        ).scalar() or 0
+
+        pending_vendors = db.query(func.count(User.id)).filter(
+            User.role == UserRole.VENDOR,
+            User.is_approved == False,
+            User.is_active == True,
+        ).scalar() or 0
+
+        orders_today = db.query(func.count(Order.id)).filter(
+            Order.created_at >= today_start
+        ).scalar() or 0
+
+        revenue_today_paise = db.query(func.coalesce(func.sum(Payment.amount), 0)).filter(
+            Payment.status == PaymentStatus.SUCCESS,
+            Payment.created_at >= today_start,
+        ).scalar() or 0
+
+        completed_today = db.query(func.count(Order.id)).filter(
+            Order.created_at >= today_start,
+            Order.status.in_([OrderStatus.PICKED, OrderStatus.READY]),
+        ).scalar() or 0
+
+        pending_today = db.query(func.count(Order.id)).filter(
+            Order.created_at >= today_start,
+            Order.status.in_([OrderStatus.PLACED, OrderStatus.CONFIRMED, OrderStatus.PREPARING]),
+        ).scalar() or 0
+
         return {
-            "totals": {
-                "users": total_users,
-                "vendors": total_vendors,
-                "students": total_students,
-                "orders": total_orders,
-                "revenue_paise": int(total_revenue_paise),
-            },
+            # ── Flat fields matching AdminAnalytics frontend interface ──
+            "total_users": total_users,
+            "active_users": active_users,
+            "total_vendors": total_vendors,
+            "pending_vendors": pending_vendors,
+            "total_orders": total_orders,
+            "orders_today": orders_today,
+            "total_revenue_paise": int(total_revenue_paise),
+            "revenue_today_paise": int(revenue_today_paise),
+            "total_students": total_students,
+            "completed_today": completed_today,
+            "pending_today": pending_today,
+            # ── Extended data for charts & deeper analytics ──
             "orders_by_day": orders_by_day,
             "revenue_by_day": revenue_by_day,
             "signups_by_day": signups_by_day,
@@ -1325,6 +1363,13 @@ def update_user_role(
     db_user.role = mapped_role
     db.commit()
     db.refresh(db_user)
+
+    # Revoke existing refresh sessions so stale credentials cannot persist
+    try:
+        from app.modules.auth.refresh_router import revoke_all_user_tokens
+        revoke_all_user_tokens(db_user.id)
+    except Exception:
+        pass
 
     # Log to audit history
     try:

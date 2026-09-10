@@ -161,6 +161,7 @@ const router = createBrowserRouter([
       { path: 'finance', element: <Finance /> },
       { path: 'announcements', element: <Announcements /> },
       { path: 'audit-logs', element: <AuditLogs /> },
+      { path: 'audit', element: <Navigate to="/audit-logs" replace /> },
       { path: 'conflicts', element: <ConflictResolution /> },
       { path: 'backup', element: <BackupRecovery /> },
       {

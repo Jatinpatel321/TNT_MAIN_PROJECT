@@ -1,11 +1,13 @@
+import os
 import re
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db
-from app.core.file_upload_stationery import save_stationery_file
+from app.core.file_upload_stationery import SECURE_UPLOAD_DIR, save_stationery_file
 from app.core.security import get_current_user, require_role
 from app.modules.notifications.service import notify_user
 from app.modules.stationery.job_model import JobStatus, PaperSize, PrintType, StationeryJob
@@ -227,3 +229,92 @@ def update_job_status(
         )
 
     return {"message": "Job status updated"}
+
+
+@router.get("/jobs/{job_id}/document")
+def download_job_document(
+    job_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Secure, authorized document retrieval for stationery print jobs."""
+    job = db.query(StationeryJob).filter(StationeryJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    caller_id = user.get("id")
+    caller_role = (user.get("role") or "").lower()
+
+    # Authorization: job owner (student), assigned vendor, or platform admin
+    is_owner = (job.user_id == caller_id)
+    is_vendor = (job.vendor_id == caller_id)
+    is_admin = caller_role in {"admin", "super_admin"}
+
+    if not (is_owner or is_vendor or is_admin):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to access this document",
+        )
+
+    if not job.file_url:
+        raise HTTPException(status_code=404, detail="No document associated with this job")
+
+    filename = os.path.basename(job.file_url)
+    filepath = os.path.join(SECURE_UPLOAD_DIR, filename)
+
+    if not os.path.exists(filepath):
+        legacy_path = os.path.join(os.getcwd(), "uploads", "stationery", filename)
+        if os.path.exists(legacy_path):
+            filepath = legacy_path
+        else:
+            raise HTTPException(status_code=404, detail="Document file not found on server")
+
+    return FileResponse(
+        filepath,
+        media_type="application/pdf",
+        filename=filename,
+    )
+
+
+@router.get("/jobs/document/{filename}")
+def download_job_document_by_name(
+    filename: str,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Secure document retrieval by filename, verifying caller authorization against the job."""
+    safe_filename = os.path.basename(filename)
+    job = (
+        db.query(StationeryJob)
+        .filter(StationeryJob.file_url.endswith(safe_filename))
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Document or job not found")
+
+    caller_id = user.get("id")
+    caller_role = (user.get("role") or "").lower()
+
+    is_owner = (job.user_id == caller_id)
+    is_vendor = (job.vendor_id == caller_id)
+    is_admin = caller_role in {"admin", "super_admin"}
+
+    if not (is_owner or is_vendor or is_admin):
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to access this document",
+        )
+
+    filepath = os.path.join(SECURE_UPLOAD_DIR, safe_filename)
+    if not os.path.exists(filepath):
+        legacy_path = os.path.join(os.getcwd(), "uploads", "stationery", safe_filename)
+        if os.path.exists(legacy_path):
+            filepath = legacy_path
+        else:
+            raise HTTPException(status_code=404, detail="Document file not found on server")
+
+    return FileResponse(
+        filepath,
+        media_type="application/pdf",
+        filename=safe_filename,
+    )

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.core.deps import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, require_role, require_vendor_permission
 from app.modules.menu.model import MenuItem, Inventory
 from app.modules.stationery.service_model import StationeryService
 from app.modules.menu.schemas import (
@@ -41,7 +41,7 @@ def add_menu_item(
     available_quantity: int | None = Form(None),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Add a new menu item (food or stationery)."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -108,7 +108,7 @@ def edit_menu_item(
     available_quantity: int | None = Form(None),
     image: UploadFile = File(None),
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Edit a menu item."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -149,7 +149,7 @@ def edit_menu_item(
 def remove_menu_item(
     item_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Delete a menu item."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -166,7 +166,7 @@ def remove_menu_item(
 def toggle_item_availability(
     item_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Enable/disable a menu item."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -191,7 +191,7 @@ def create_inventory_record(
     low_stock_threshold: int = Form(10),
     auto_disable: bool = Form(True),
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("inventory"))
 ):
     """Create inventory record for a menu item."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -241,7 +241,7 @@ def update_inventory_record(
     low_stock_threshold: int | None = Form(None),
     auto_disable: bool | None = Form(None),
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("inventory"))
 ):
     """Update inventory."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -309,7 +309,7 @@ def add_stationery_service(
     max_capacity: int | None = Form(None),
     is_available: bool = Form(True),
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Add a new stationery service (xerox, color print, BW print)."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -364,7 +364,7 @@ def edit_stationery_service(
     current_load: int | None = Form(None),
     is_available: bool | None = Form(None),
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Edit a stationery service."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
@@ -390,7 +390,7 @@ def edit_stationery_service(
 def remove_stationery_service(
     service_id: int,
     db: Session = Depends(get_db),
-    user=Depends(require_role("vendor"))
+    user=Depends(require_vendor_permission("menu"))
 ):
     """Delete a stationery service."""
     db_user = db.query(User).filter(User.phone == user["phone"]).first()
