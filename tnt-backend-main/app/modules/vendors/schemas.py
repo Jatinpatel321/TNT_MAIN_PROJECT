@@ -61,3 +61,4 @@ class VendorSlotListResponse(BaseModel):
 
     estimated_ready_time: str | None = None
     slots: list[VendorSlotResponse]
+

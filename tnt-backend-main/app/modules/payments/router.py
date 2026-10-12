@@ -59,8 +59,8 @@ def mock_payment(
     if order.user_id != user["id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
-    # Invariant: Order must be in PENDING state to receive payment
-    if order.status != OrderStatus.PENDING:
+    # Invariant: Order must be in PENDING or PLACED state to receive payment
+    if order.status not in {OrderStatus.PENDING, OrderStatus.PLACED}:
         raise HTTPException(
             status_code=400,
             detail=f"Order cannot be paid for in current status '{order.status.value}'",

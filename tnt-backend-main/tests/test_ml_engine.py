@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 TEST_MODEL_DIR = Path(tempfile.mkdtemp())
 os.environ["MODEL_STORAGE_DIR"] = str(TEST_MODEL_DIR)
 
+# Register every SQLAlchemy model (including MlModel) on the shared Base
+import app.database.init_db  # noqa: E402,F401
 from app.ml.registry import ModelRegistry
 from app.ml.features import (
     is_rush_hour,
@@ -95,7 +97,7 @@ def clean_registry():
         if p.is_dir():
             import shutil
             shutil.rmtree(p)
-            
+
     # Clear DB registry metadata
     from app.database.session import SessionLocal
     from app.ml.ml_models_model import MlModel

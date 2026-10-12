@@ -38,6 +38,7 @@ class MenuItemResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
+        orm_mode = True
         from_attributes = True
 
 
@@ -66,6 +67,7 @@ class InventoryResponse(BaseModel):
     menu_item: Optional[MenuItemResponse] = None
 
     class Config:
+        orm_mode = True
         from_attributes = True
 
 
@@ -101,6 +103,7 @@ class StationeryServiceResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
+        orm_mode = True
         from_attributes = True
 
 
@@ -111,6 +114,10 @@ class PaginatedResponse(BaseModel):
     page_size: int
     total_pages: int
 
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
 
 class MenuItemPaginatedResponse(BaseModel):
     items: List[MenuItemResponse]
@@ -118,6 +125,10 @@ class MenuItemPaginatedResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+    class Config:
+        orm_mode = True
+        from_attributes = True
 
 
 class InventoryPaginatedResponse(BaseModel):
@@ -127,6 +138,10 @@ class InventoryPaginatedResponse(BaseModel):
     page_size: int
     total_pages: int
 
+    class Config:
+        orm_mode = True
+        from_attributes = True
+
 
 class StationeryServicePaginatedResponse(BaseModel):
     items: List[StationeryServiceResponse]
@@ -134,3 +149,7 @@ class StationeryServicePaginatedResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+    class Config:
+        orm_mode = True
+        from_attributes = True

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, text
 from sqlalchemy.orm import Session
 
 from app.core.time_utils import utcnow_naive
@@ -20,6 +20,9 @@ class VendorAIService:
 
     def __init__(self, db: Session):
         self.db = db
+
+    def _is_sqlite(self) -> bool:
+        return bool(getattr(getattr(self.db, "bind", None), "dialect", None) and self.db.bind.dialect.name == "sqlite")
 
     # ── Demand Prediction ──────────────────────────────────────────────────
 
@@ -93,13 +96,22 @@ class VendorAIService:
         
         # Historical weekly data from last 12 weeks
         twelve_weeks_ago = today - timedelta(weeks=12)
-        historical = self.db.query(
-            func.date_trunc("week", Order.created_at).label("week_start"),
-            func.count(Order.id).label("order_count"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= twelve_weeks_ago,
-        ).group_by(func.date_trunc("week", Order.created_at)).all()
+        if self._is_sqlite():
+            historical = self.db.query(
+                func.strftime("%Y-W%W", Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= twelve_weeks_ago,
+            ).group_by(func.strftime("%Y-W%W", Order.created_at)).all()
+        else:
+            historical = self.db.query(
+                func.date_trunc(text("'week'"), Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= twelve_weeks_ago,
+            ).group_by(func.date_trunc(text("'week'"), Order.created_at)).all()
         
         weekly_counts = [row.order_count for row in historical]
         avg_weekly = sum(weekly_counts) / len(weekly_counts) if weekly_counts else 0
@@ -133,13 +145,22 @@ class VendorAIService:
         today = date.today()
         
         six_months_ago = today - timedelta(days=180)
-        historical = self.db.query(
-            func.date_trunc("month", Order.created_at).label("month_start"),
-            func.count(Order.id).label("order_count"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= six_months_ago,
-        ).group_by(func.date_trunc("month", Order.created_at)).all()
+        if self._is_sqlite():
+            historical = self.db.query(
+                func.strftime("%Y-%m", Order.created_at).label("month_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= six_months_ago,
+            ).group_by(func.strftime("%Y-%m", Order.created_at)).all()
+        else:
+            historical = self.db.query(
+                func.date_trunc(text("'month'"), Order.created_at).label("month_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= six_months_ago,
+            ).group_by(func.date_trunc(text("'month'"), Order.created_at)).all()
         
         monthly_counts = [row.order_count for row in historical]
         avg_monthly = sum(monthly_counts) / len(monthly_counts) if monthly_counts else 0

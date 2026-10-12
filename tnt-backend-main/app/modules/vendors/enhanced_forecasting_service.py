@@ -24,7 +24,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
 
-from sqlalchemy import func, extract, and_, or_
+from sqlalchemy import func, extract, and_, or_, text
 from sqlalchemy.orm import Session
 
 from app.core.time_utils import utcnow_naive
@@ -90,6 +90,9 @@ class EnhancedForecastingService:
         self.db = db
         self._cache: Dict[str, Any] = {}
         self._cache_ttl = 1800  # 30 minutes
+
+    def _is_sqlite(self) -> bool:
+        return bool(getattr(getattr(self.db, "bind", None), "dialect", None) and self.db.bind.dialect.name == "sqlite")
 
     # ── Short-Term Forecasting (Next 24 Hours) ───────────────────────────
 
@@ -440,18 +443,32 @@ class EnhancedForecastingService:
         """
         # Get historical weekly data
         six_months_ago = utcnow_naive() - timedelta(days=180)
-        weekly_data = self.db.query(
-            func.date_trunc("week", Order.created_at).label("week_start"),
-            func.count(Order.id).label("order_count"),
-            func.sum(Order.total_amount).label("total_revenue"),
-            func.count(Order.user_id.distinct()).label("customer_count"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= six_months_ago,
-            Order.status != OrderStatus.CANCELLED,
-        ).group_by(
-            func.date_trunc("week", Order.created_at),
-        ).all()
+        if self._is_sqlite():
+            weekly_data = self.db.query(
+                func.strftime("%Y-W%W", Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.total_amount).label("total_revenue"),
+                func.count(Order.user_id.distinct()).label("customer_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= six_months_ago,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.strftime("%Y-W%W", Order.created_at),
+            ).all()
+        else:
+            weekly_data = self.db.query(
+                func.date_trunc(text("'week'"), Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+                func.sum(Order.total_amount).label("total_revenue"),
+                func.count(Order.user_id.distinct()).label("customer_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= six_months_ago,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.date_trunc(text("'week'"), Order.created_at),
+            ).all()
         
         # Build weekly series
         weekly_series = [row.order_count for row in weekly_data]
@@ -461,7 +478,7 @@ class EnhancedForecastingService:
         
         # Calculate average
         avg_weekly_orders = sum(weekly_series) / len(weekly_series) if weekly_series else 20
-        avg_weekly_revenue = sum(row.total_revenue or 0 for row in weekly_data) / len(weekly_data) if weekly_data else 2000
+        avg_weekly_revenue = float(sum(row.total_revenue or 0 for row in weekly_data) / len(weekly_data)) if weekly_data else 2000.0
         
         # Generate forecast
         weekly_forecast = []

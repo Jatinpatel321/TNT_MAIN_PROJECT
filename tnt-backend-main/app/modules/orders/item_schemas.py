@@ -20,3 +20,4 @@ class OrderItemDetailResponse(BaseModel):
     quantity: int
     price_at_time: int
     line_total: int
+

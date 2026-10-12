@@ -110,6 +110,9 @@ class HistoricalLearningService:
         self._cache_ttl = 3600  # 1 hour
         self._last_cache_update: Optional[datetime] = None
 
+    def _is_sqlite(self) -> bool:
+        return bool(getattr(getattr(self.db, "bind", None), "dialect", None) and self.db.bind.dialect.name == "sqlite")
+
     # ── Daily Order Analysis ──────────────────────────────────────────────
 
     def analyze_daily_patterns(self, vendor_id: int, days: int = 90) -> Dict[str, Any]:
@@ -222,16 +225,28 @@ class HistoricalLearningService:
         """Analyze weekly order patterns."""
         cutoff_date = utcnow_naive() - timedelta(weeks=weeks)
         
-        weekly_orders = self.db.query(
-            func.date_trunc("week", Order.created_at).label("week_start"),
-            func.count(Order.id).label("order_count"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= cutoff_date,
-            Order.status != OrderStatus.CANCELLED,
-        ).group_by(
-            func.date_trunc("week", Order.created_at),
-        ).all()
+        if self._is_sqlite():
+            weekly_orders = self.db.query(
+                func.strftime("%Y-W%W", Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= cutoff_date,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.strftime("%Y-W%W", Order.created_at),
+            ).all()
+        else:
+            weekly_orders = self.db.query(
+                func.date_trunc(text("'week'"), Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= cutoff_date,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.date_trunc(text("'week'"), Order.created_at),
+            ).all()
         
         order_counts = [row.order_count for row in weekly_orders]
         
@@ -301,21 +316,37 @@ class HistoricalLearningService:
 
     def _analyze_week_of_month(self, vendor_id: int, since: datetime) -> List[Dict[str, Any]]:
         """Analyze patterns by week of month."""
-        weekly_data = self.db.query(
-            func.date_trunc("week", Order.created_at).label("week_start"),
-            func.count(Order.id).label("order_count"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= since,
-            Order.status != OrderStatus.CANCELLED,
-        ).group_by(
-            func.date_trunc("week", Order.created_at),
-        ).all()
+        if self._is_sqlite():
+            weekly_data = self.db.query(
+                func.strftime("%Y-W%W", Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= since,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.strftime("%Y-W%W", Order.created_at),
+            ).all()
+        else:
+            weekly_data = self.db.query(
+                func.date_trunc(text("'week'"), Order.created_at).label("week_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= since,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.date_trunc(text("'week'"), Order.created_at),
+            ).all()
         
         # Group by week of month
         week_groups: Dict[int, List[int]] = defaultdict(list)
         for row in weekly_data:
-            week_num = row.week_start.isocalendar()[1] % 4 + 1  # 1-4
+            week_start_val = row.week_start
+            if hasattr(week_start_val, 'isocalendar'):
+                week_num = week_start_val.isocalendar()[1] % 4 + 1  # 1-4
+            else:
+                week_num = 1
             week_groups[week_num].append(row.order_count)
         
         patterns = []
@@ -337,16 +368,28 @@ class HistoricalLearningService:
         """Analyze monthly order patterns."""
         cutoff_date = utcnow_naive() - timedelta(days=months * 30)
         
-        monthly_orders = self.db.query(
-            func.date_trunc("month", Order.created_at).label("month_start"),
-            func.count(Order.id).label("order_count"),
-        ).filter(
-            Order.vendor_id == vendor_id,
-            Order.created_at >= cutoff_date,
-            Order.status != OrderStatus.CANCELLED,
-        ).group_by(
-            func.date_trunc("month", Order.created_at),
-        ).all()
+        if self._is_sqlite():
+            monthly_orders = self.db.query(
+                func.strftime("%Y-%m", Order.created_at).label("month_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= cutoff_date,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.strftime("%Y-%m", Order.created_at),
+            ).all()
+        else:
+            monthly_orders = self.db.query(
+                func.date_trunc(text("'month'"), Order.created_at).label("month_start"),
+                func.count(Order.id).label("order_count"),
+            ).filter(
+                Order.vendor_id == vendor_id,
+                Order.created_at >= cutoff_date,
+                Order.status != OrderStatus.CANCELLED,
+            ).group_by(
+                func.date_trunc(text("'month'"), Order.created_at),
+            ).all()
         
         order_counts = [row.order_count for row in monthly_orders]
         

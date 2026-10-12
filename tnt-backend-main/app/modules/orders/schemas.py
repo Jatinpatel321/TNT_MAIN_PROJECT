@@ -64,3 +64,4 @@ class OrderResponse(BaseModel):
     is_group: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
+

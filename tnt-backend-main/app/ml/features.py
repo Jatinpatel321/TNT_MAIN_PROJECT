@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Optional
-
+import numpy as np
 import app.database.init_db  # Ensure all SQLAlchemy models are registered
 from sqlalchemy import func, extract, text
 from sqlalchemy.orm import Session
